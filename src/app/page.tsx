@@ -1,17 +1,21 @@
+'use client';
+
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import BriefingCard from '@/components/BriefingCard';
 import ScheduleStrip from '@/components/ScheduleStrip';
+import AuthGate from '@/components/AuthGate';
 
 export default function Dashboard() {
   return (
-    <div className="flex flex-col h-screen">
-      <TopBar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
-          <BriefingCard />
-          <ScheduleStrip />
+    <AuthGate>
+      <div className="flex flex-col h-screen">
+        <TopBar />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto p-6 space-y-6">
+            <BriefingCard />
+            <ScheduleStrip />
 
           {/* Mobile mic placeholder - Sprint 2 */}
           <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2">
@@ -26,8 +30,9 @@ export default function Dashboard() {
               </svg>
             </div>
           </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthGate>
   );
 }

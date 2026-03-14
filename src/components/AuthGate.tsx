@@ -1,0 +1,62 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function AuthGate({ children }: { children: React.ReactNode }) {
+  const [token, setToken] = useState<string | null>(null);
+  const [input, setInput] = useState('');
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('jarvis_token');
+    if (stored) {
+      setToken(stored);
+    }
+    setChecking(false);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) {
+      localStorage.setItem('jarvis_token', input.trim());
+      setToken(input.trim());
+    }
+  };
+
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-6 h-6 border-2 border-jarvis-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-jarvis-accent mb-1">JARVIS</h1>
+            <p className="text-sm text-jarvis-text-muted">Enter your auth token to continue</p>
+          </div>
+          <input
+            type="password"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Auth token"
+            className="w-full px-4 py-3 rounded-lg bg-jarvis-bg border border-jarvis-border text-jarvis-text-primary placeholder-jarvis-text-dim focus:border-jarvis-accent focus:outline-none"
+            autoFocus
+          />
+          <button
+            type="submit"
+            className="w-full py-3 rounded-lg bg-jarvis-accent/10 border border-jarvis-accent/30 text-jarvis-accent hover:bg-jarvis-accent/20 transition-colors"
+          >
+            Enter
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
