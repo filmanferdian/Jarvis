@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Transform Outlook events for Supabase upsert\nconst events = $input.all();\nconst results = [];\n\nfor (const item of events) {\n  const event = item.json;\n  const isAllDay = event.isAllDay === true;\n  \n  results.push({\n    json: {\n      event_id: event.id,\n      title: event.subject || '(No title)',\n      start_time: isAllDay\n        ? event.start.dateTime.split('T')[0] + 'T00:00:00+07:00'\n        : event.start.dateTime + (event.start.timeZone === 'UTC' ? 'Z' : ''),\n      end_time: isAllDay\n        ? event.end.dateTime.split('T')[0] + 'T23:59:59+07:00'\n        : (event.end?.dateTime ? event.end.dateTime + (event.end.timeZone === 'UTC' ? 'Z' : '') : null),\n      is_all_day: isAllDay,\n      last_synced: new Date().toISOString()\n    }\n  });\n}\n\nreturn results.length > 0 ? results : [{ json: { _empty: true } }];"
+        "jsCode": "// Transform Outlook events for Supabase upsert\nconst events = $input.all();\nconst results = [];\n\nfor (const item of events) {\n  const event = item.json;\n  const isAllDay = event.isAllDay === true;\n  \n  results.push({\n    json: {\n      event_id: event.id,\n      title: event.subject || '(No title)',\n      start_time: isAllDay\n        ? event.start.dateTime.split('T')[0] + 'T00:00:00+07:00'\n        : event.start.dateTime + (event.start.timeZone === 'UTC' ? 'Z' : ''),\n      end_time: isAllDay\n        ? event.end.dateTime.split('T')[0] + 'T23:59:59+07:00'\n        : (event.end?.dateTime ? event.end.dateTime + (event.end.timeZone === 'UTC' ? 'Z' : '') : null),\n      is_all_day: isAllDay,\n      last_synced: new Date().toISOString(),\n      source: 'outlook'\n    }\n  });\n}\n\nreturn results.length > 0 ? results : [{ json: { _empty: true } }];"
       },
       "id": "transform-events",
       "name": "Transform Events",
@@ -82,7 +82,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "DELETE FROM calendar_events WHERE start_time::date = CURRENT_DATE;"
+        "query": "DELETE FROM calendar_events WHERE start_time::date = CURRENT_DATE AND source = 'outlook';"
       },
       "id": "clear-today",
       "name": "Clear Today Events",
@@ -106,7 +106,8 @@
             { "fieldName": "start_time", "fieldValue": "={{ $json.start_time }}" },
             { "fieldName": "end_time", "fieldValue": "={{ $json.end_time }}" },
             { "fieldName": "is_all_day", "fieldValue": "={{ $json.is_all_day }}" },
-            { "fieldName": "last_synced", "fieldValue": "={{ $json.last_synced }}" }
+            { "fieldName": "last_synced", "fieldValue": "={{ $json.last_synced }}" },
+            { "fieldName": "source", "fieldValue": "={{ $json.source }}" }
           ]
         }
       },

@@ -50,7 +50,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Transform Google Calendar events for Supabase upsert\nconst events = $input.all();\nconst results = [];\n\nfor (const item of events) {\n  const event = item.json;\n  const isAllDay = !!event.start?.date;\n  \n  results.push({\n    json: {\n      event_id: event.id,\n      title: event.summary || '(No title)',\n      start_time: isAllDay ? event.start.date + 'T00:00:00+07:00' : event.start.dateTime,\n      end_time: isAllDay ? event.end.date + 'T23:59:59+07:00' : (event.end?.dateTime || null),\n      is_all_day: isAllDay,\n      last_synced: new Date().toISOString()\n    }\n  });\n}\n\nreturn results.length > 0 ? results : [{ json: { _empty: true } }];"
+        "jsCode": "// Transform Google Calendar events for Supabase upsert\nconst events = $input.all();\nconst results = [];\n\nfor (const item of events) {\n  const event = item.json;\n  const isAllDay = !!event.start?.date;\n  \n  results.push({\n    json: {\n      event_id: event.id,\n      title: event.summary || '(No title)',\n      start_time: isAllDay ? event.start.date + 'T00:00:00+07:00' : event.start.dateTime,\n      end_time: isAllDay ? event.end.date + 'T23:59:59+07:00' : (event.end?.dateTime || null),\n      is_all_day: isAllDay,\n      last_synced: new Date().toISOString(),\n      source: 'google-1'\n    }\n  });\n}\n\nreturn results.length > 0 ? results : [{ json: { _empty: true } }];"
       },
       "id": "transform-events",
       "name": "Transform Events",
@@ -89,7 +89,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "DELETE FROM calendar_events WHERE start_time::date = CURRENT_DATE;"
+        "query": "DELETE FROM calendar_events WHERE start_time::date = CURRENT_DATE AND source = 'google-1';"
       },
       "id": "clear-today",
       "name": "Clear Today Events",
@@ -113,7 +113,8 @@
             { "fieldName": "start_time", "fieldValue": "={{ $json.start_time }}" },
             { "fieldName": "end_time", "fieldValue": "={{ $json.end_time }}" },
             { "fieldName": "is_all_day", "fieldValue": "={{ $json.is_all_day }}" },
-            { "fieldName": "last_synced", "fieldValue": "={{ $json.last_synced }}" }
+            { "fieldName": "last_synced", "fieldValue": "={{ $json.last_synced }}" },
+            { "fieldName": "source", "fieldValue": "={{ $json.source }}" }
           ]
         }
       },

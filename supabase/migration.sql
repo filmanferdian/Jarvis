@@ -72,6 +72,7 @@ CREATE TABLE calendar_events (
   start_time TIMESTAMPTZ NOT NULL,
   end_time TIMESTAMPTZ,
   is_all_day BOOLEAN DEFAULT false,
+  source TEXT NOT NULL DEFAULT 'unknown',
   last_synced TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
