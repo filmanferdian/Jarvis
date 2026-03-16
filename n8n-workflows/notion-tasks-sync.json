@@ -1,0 +1,133 @@
+{
+  "name": "Jarvis — Notion Tasks Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "014c674aecec833894f30134b85d8c94",
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status",
+              "type": "status",
+              "condition": "does_not_equal",
+              "statusValue": "Done"
+            },
+            {
+              "key": "Status",
+              "type": "status",
+              "condition": "does_not_equal",
+              "statusValue": "Archived"
+            }
+          ],
+          "combinator": "AND"
+        }
+      },
+      "id": "fetch-notion-tasks",
+      "name": "Fetch Notion Tasks",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [440, 300],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Notion Internal Integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Notion pages into Supabase-ready rows\nconst items = $input.all();\nconst tasks = items.map(item => {\n  const props = item.json.properties;\n  \n  // Extract title\n  const name = props['Task name']?.title?.[0]?.plain_text || 'Untitled';\n  \n  // Extract due date\n  const dueDate = props['Due']?.date?.start || null;\n  \n  // Extract priority\n  const priority = props['Priority']?.select?.name || null;\n  \n  // Extract status\n  const status = props['Status']?.status?.name || 'Not Started';\n  \n  // Extract project name from relation (resolved)\n  const projectName = props['Project']?.relation?.[0]?.id ? null : null;\n  // Note: project name resolution requires a separate Notion API call\n  // For now, we'll resolve it in the next node\n  const projectRelation = props['Project']?.relation || [];\n  \n  // Extract tags\n  const tags = (props['Tags']?.multi_select || []).map(t => t.name);\n  \n  return {\n    json: {\n      notion_page_id: item.json.id,\n      name,\n      due_date: dueDate,\n      priority,\n      status,\n      project_relation_id: projectRelation.length > 0 ? projectRelation[0].id : null,\n      tags,\n      last_synced: new Date().toISOString()\n    }\n  };\n});\n\nreturn tasks;"
+      },
+      "id": "transform-tasks",
+      "name": "Transform Tasks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DELETE FROM notion_tasks WHERE notion_page_id NOT IN ({{ $items.map(i => \"'\" + i.json.notion_page_id + \"'\").join(',') || \"'__none__'\" }});"
+      },
+      "id": "cleanup-removed",
+      "name": "Remove Stale Tasks",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [960, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO notion_tasks (notion_page_id, name, due_date, priority, status, project_name, tags, last_synced) VALUES {{ $items.map(i => {\n  const j = i.json;\n  const name = j.name.replace(/'/g, \"''\");\n  const projectName = j.project_name ? \"'\" + j.project_name.replace(/'/g, \"''\") + \"'\" : 'NULL';\n  const dueDate = j.due_date ? \"'\" + j.due_date + \"'\" : 'NULL';\n  const priority = j.priority ? \"'\" + j.priority + \"'\" : 'NULL';\n  const tags = j.tags && j.tags.length > 0 ? \"ARRAY[\" + j.tags.map(t => \"'\" + t.replace(/'/g, \"''\") + \"'\").join(',') + \"]\" : 'NULL';\n  return `('${j.notion_page_id}', '${name}', ${dueDate}, ${priority}, '${j.status}', ${projectName}, ${tags}, '${j.last_synced}')`;\n}).join(',\\n') }} ON CONFLICT (notion_page_id) DO UPDATE SET name = EXCLUDED.name, due_date = EXCLUDED.due_date, priority = EXCLUDED.priority, status = EXCLUDED.status, project_name = EXCLUDED.project_name, tags = EXCLUDED.tags, last_synced = EXCLUDED.last_synced;"
+      },
+      "id": "upsert-tasks",
+      "name": "Upsert to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [960, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Supabase"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [
+        [
+          { "node": "Fetch Notion Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Notion Tasks": {
+      "main": [
+        [
+          { "node": "Transform Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Transform Tasks": {
+      "main": [
+        [
+          { "node": "Remove Stale Tasks", "type": "main", "index": 0 },
+          { "node": "Upsert to Supabase", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "jarvis" }
+  ]
+}

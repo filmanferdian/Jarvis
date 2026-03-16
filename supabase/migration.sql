@@ -76,22 +76,23 @@ CREATE TABLE calendar_events (
   last_synced TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ClickUp tasks cache
-CREATE TABLE clickup_tasks (
+-- Notion tasks cache (synced from Notion "Projects & Tasks" workspace)
+CREATE TABLE notion_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id TEXT UNIQUE,
+  notion_page_id TEXT UNIQUE,
   name TEXT NOT NULL,
   due_date DATE,
-  priority INTEGER,
-  status TEXT,
-  list_name TEXT,
+  priority TEXT CHECK (priority IN ('Low', 'Medium', 'High')),
+  status TEXT CHECK (status IN ('Not Started', 'In Progress', 'Done', 'Archived')),
+  project_name TEXT,
+  tags TEXT[],
   last_synced TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Email synthesis cache (bridge from e-Assistant)
+-- Email synthesis cache
 CREATE TABLE email_synthesis (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  date DATE NOT NULL,
+  date DATE NOT NULL UNIQUE,
   synthesis_text TEXT NOT NULL,
   important_count INTEGER DEFAULT 0,
   deadline_count INTEGER DEFAULT 0,
@@ -113,7 +114,7 @@ ALTER TABLE top_kpis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE briefing_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE voice_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clickup_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notion_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_synthesis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE api_usage ENABLE ROW LEVEL SECURITY;
 
@@ -124,6 +125,6 @@ CREATE POLICY "Allow all for authenticated" ON top_kpis FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated" ON briefing_cache FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated" ON voice_log FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated" ON calendar_events FOR ALL USING (true);
-CREATE POLICY "Allow all for authenticated" ON clickup_tasks FOR ALL USING (true);
+CREATE POLICY "Allow all for authenticated" ON notion_tasks FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated" ON email_synthesis FOR ALL USING (true);
 CREATE POLICY "Allow all for authenticated" ON api_usage FOR ALL USING (true);

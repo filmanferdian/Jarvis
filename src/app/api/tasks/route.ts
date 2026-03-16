@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
-// GET: Fetch ClickUp tasks (due today or this week, ordered by priority)
+// GET: Fetch Notion tasks (due today or this week, ordered by priority)
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
     // Use WIB timezone (UTC+7)
@@ -18,11 +18,10 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const weekEnd = endOfWeek.toISOString().split('T')[0];
 
     const { data, error } = await supabase
-      .from('clickup_tasks')
+      .from('notion_tasks')
       .select('*')
       .lte('due_date', weekEnd)
-      .not('status', 'eq', 'closed')
-      .order('priority', { ascending: true })
+      .not('status', 'in', '("Done","Archived")')
       .order('due_date', { ascending: true });
 
     if (error) throw error;

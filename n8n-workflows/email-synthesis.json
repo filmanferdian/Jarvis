@@ -1,0 +1,166 @@
+{
+  "name": "Jarvis — Email Synthesis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily 07:00 WIB",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 30,
+        "filters": {
+          "includeSpamTrash": false,
+          "labelIds": ["INBOX"],
+          "q": "newer_than:1d"
+        },
+        "options": {
+          "format": "metadata"
+        }
+      },
+      "id": "fetch-emails",
+      "name": "Fetch Recent Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [440, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract email metadata for synthesis\nconst items = $input.all();\nconst emails = items.map(item => {\n  const headers = item.json.payload?.headers || [];\n  const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';\n  \n  return {\n    from: getHeader('From'),\n    subject: getHeader('Subject'),\n    date: getHeader('Date'),\n    snippet: item.json.snippet || ''\n  };\n});\n\nconst today = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  timeZone: 'Asia/Jakarta'\n});\n\nlet emailList = 'No new emails.';\nif (emails.length > 0) {\n  emailList = emails.map((e, i) => \n    `${i + 1}. From: ${e.from}\\n   Subject: ${e.subject}\\n   Preview: ${e.snippet}`\n  ).join('\\n\\n');\n}\n\nconst prompt = `You are Jarvis, a personal executive assistant. Synthesize the following emails received in the last 24 hours for ${today}.\n\nProvide:\n1. A brief summary (2-3 sentences) of the overall email activity\n2. List any IMPORTANT items that need attention (action required, decisions needed)\n3. List any DEADLINES mentioned in the emails\n4. Flag anything that looks urgent\n\nKeep it concise and actionable. Under 200 words total.\n\n--- EMAILS (${emails.length} total) ---\n\n${emailList}\n\nIMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate information.`;\n\nreturn [{\n  json: {\n    prompt,\n    emailCount: emails.length,\n    today\n  }\n}];"
+      },
+      "id": "prepare-prompt",
+      "name": "Prepare Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 400,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.prompt) }}\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "claude-synthesis",
+      "name": "Call Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst synthesisText = response.content?.[0]?.text || response.text || JSON.stringify(response);\nconst today = new Date().toISOString().split('T')[0];\n\n// Count important items and deadlines from the synthesis\nconst importantMatch = synthesisText.match(/important|action required|urgent|attention/gi);\nconst deadlineMatch = synthesisText.match(/deadline|due|by (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|end of)/gi);\n\nreturn [{\n  json: {\n    date: today,\n    synthesis_text: synthesisText,\n    important_count: importantMatch ? Math.min(importantMatch.length, 10) : 0,\n    deadline_count: deadlineMatch ? Math.min(deadlineMatch.length, 10) : 0,\n    created_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "format-synthesis",
+      "name": "Format Synthesis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO email_synthesis (date, synthesis_text, important_count, deadline_count, created_at) VALUES ('{{ $json.date }}', '{{ $json.synthesis_text.replace(/'/g, \"''\") }}', {{ $json.important_count }}, {{ $json.deadline_count }}, '{{ $json.created_at }}') ON CONFLICT (date) DO UPDATE SET synthesis_text = EXCLUDED.synthesis_text, important_count = EXCLUDED.important_count, deadline_count = EXCLUDED.deadline_count, created_at = EXCLUDED.created_at;"
+      },
+      "id": "save-synthesis",
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1400, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Supabase"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 07:00 WIB": {
+      "main": [
+        [
+          { "node": "Fetch Recent Emails", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Recent Emails": {
+      "main": [
+        [
+          { "node": "Prepare Prompt", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Prompt": {
+      "main": [
+        [
+          { "node": "Call Claude API", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Claude API": {
+      "main": [
+        [
+          { "node": "Format Synthesis", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Synthesis": {
+      "main": [
+        [
+          { "node": "Save to Supabase", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "jarvis" }
+  ]
+}

@@ -29,7 +29,12 @@ const FALLBACK_DOMAINS = [
   'Spiritual', 'Family', 'Learning', 'Networking', 'Personal branding',
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const [domains, setDomains] = useState<Domain[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,10 +62,29 @@ export default function Sidebar() {
   const yellowCount = domains?.filter((d) => d.healthStatus === 'yellow').length ?? 0;
 
   return (
-    <aside className="w-[280px] border-r border-jarvis-border p-4 hidden md:block overflow-y-auto">
-      <h2 className="text-xs uppercase tracking-wider text-jarvis-text-muted mb-4">
-        Life Domains
-      </h2>
+    <aside
+      className={`w-[280px] border-r border-jarvis-border p-4 overflow-y-auto bg-jarvis-bg transition-transform duration-200 ${
+        mobileOpen
+          ? 'fixed inset-y-0 left-0 z-50 translate-x-0'
+          : 'hidden md:block'
+      }`}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xs uppercase tracking-wider text-jarvis-text-muted">
+          Life Domains
+        </h2>
+        {mobileOpen && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1 rounded hover:bg-jarvis-bg-card text-jarvis-text-muted"
+            aria-label="Close sidebar"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="space-y-2">

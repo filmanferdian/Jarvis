@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import BriefingCard from '@/components/BriefingCard';
@@ -9,12 +10,21 @@ import EmailCard from '@/components/EmailCard';
 import AuthGate from '@/components/AuthGate';
 
 export default function Dashboard() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <AuthGate>
       <div className="flex flex-col h-screen">
-        <TopBar />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
+        <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Mobile sidebar overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <main className="flex-1 overflow-y-auto p-6 space-y-6">
             <BriefingCard />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

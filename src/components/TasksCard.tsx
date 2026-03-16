@@ -2,28 +2,28 @@
 
 import { useEffect, useState } from 'react';
 
-interface ClickUpTask {
+interface NotionTask {
   id: string;
-  task_id: string;
+  notion_page_id: string;
   name: string;
   due_date: string | null;
-  priority: number | null;
+  priority: 'Low' | 'Medium' | 'High' | null;
   status: string;
-  list_name: string | null;
+  project_name: string | null;
+  tags: string[] | null;
 }
 
-const PRIORITY_LABELS: Record<number, { label: string; color: string }> = {
-  1: { label: 'Urgent', color: 'text-red-400' },
-  2: { label: 'High', color: 'text-jarvis-warn' },
-  3: { label: 'Normal', color: 'text-jarvis-text-secondary' },
-  4: { label: 'Low', color: 'text-jarvis-text-dim' },
+const PRIORITY_STYLES: Record<string, { label: string; color: string }> = {
+  High: { label: 'High', color: 'text-red-400' },
+  Medium: { label: 'Med', color: 'text-jarvis-warn' },
+  Low: { label: 'Low', color: 'text-jarvis-text-dim' },
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  'in progress': 'bg-jarvis-accent',
-  'to do': 'bg-jarvis-text-dim',
-  open: 'bg-jarvis-text-dim',
-  review: 'bg-jarvis-warn',
+  'In Progress': 'bg-jarvis-accent',
+  'Not Started': 'bg-jarvis-text-dim',
+  Done: 'bg-emerald-400',
+  Archived: 'bg-jarvis-text-dim',
 };
 
 function isOverdue(dateStr: string | null): boolean {
@@ -47,7 +47,7 @@ function formatDueDate(dateStr: string | null): string {
 }
 
 export default function TasksCard() {
-  const [tasks, setTasks] = useState<ClickUpTask[]>([]);
+  const [tasks, setTasks] = useState<NotionTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -134,10 +134,9 @@ export default function TasksCard() {
   );
 }
 
-function TaskRow({ task }: { task: ClickUpTask }) {
-  const priority = task.priority ? PRIORITY_LABELS[task.priority] : null;
-  const statusColor =
-    STATUS_COLORS[task.status?.toLowerCase()] || 'bg-jarvis-text-dim';
+function TaskRow({ task }: { task: NotionTask }) {
+  const priority = task.priority ? PRIORITY_STYLES[task.priority] : null;
+  const statusColor = STATUS_COLORS[task.status] || 'bg-jarvis-text-dim';
   const overdue = isOverdue(task.due_date);
 
   return (
@@ -146,9 +145,9 @@ function TaskRow({ task }: { task: ClickUpTask }) {
       <span className="text-sm text-jarvis-text-secondary truncate flex-1">
         {task.name}
       </span>
-      {task.list_name && (
-        <span className="text-xs text-jarvis-text-dim hidden group-hover:inline">
-          {task.list_name}
+      {task.project_name && (
+        <span className="text-xs text-jarvis-text-dim hidden group-hover:inline truncate max-w-[120px]">
+          {task.project_name}
         </span>
       )}
       {priority && (
