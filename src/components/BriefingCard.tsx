@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { usePolling } from '@/lib/usePolling';
+import { fetchAuth } from '@/lib/fetchAuth';
 import TTSButton from './TTSButton';
 
 interface BriefingData {
@@ -23,7 +25,6 @@ function parseBriefing(text: string): BriefingSection[] {
   let currentContent: string[] = [];
 
   for (const line of lines) {
-    // Match numbered section headers like "1. Calendar overview:"
     const headerMatch = line.match(/^\d+\.\s+(.+?):\s*(.*)$/);
     if (headerMatch) {
       if (currentTitle) {
@@ -38,7 +39,6 @@ function parseBriefing(text: string): BriefingSection[] {
     } else if (currentTitle) {
       currentContent.push(line);
     } else {
-      // Content before first header
       currentContent.push(line);
     }
   }
@@ -51,7 +51,6 @@ function parseBriefing(text: string): BriefingSection[] {
     });
   }
 
-  // If no sections were parsed, treat the whole thing as one section
   if (sections.length === 0 && text.trim()) {
     sections.push({
       title: 'Briefing',
@@ -64,30 +63,14 @@ function parseBriefing(text: string): BriefingSection[] {
 }
 
 export default function BriefingCard() {
-  const [data, setData] = useState<BriefingData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = usePolling<BriefingData>(
+    () => fetchAuth('/api/briefing'),
+    5 * 60 * 1000
+  );
+
   const [expandedSections, setExpandedSections] = useState<Set<number>>(
     new Set()
   );
-
-  useEffect(() => {
-    async function fetchBriefing() {
-      try {
-        const token = localStorage.getItem('jarvis_token') || '';
-        const res = await fetch('/api/briefing', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setData(await res.json());
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBriefing();
-  }, []);
 
   const toggleSection = (index: number) => {
     setExpandedSections((prev) => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { usePolling } from '@/lib/usePolling';
+import { fetchAuth } from '@/lib/fetchAuth';
 
 interface NotionTask {
   id: string;
@@ -11,6 +12,12 @@ interface NotionTask {
   status: string;
   project_name: string | null;
   tags: string[] | null;
+}
+
+interface TasksData {
+  date: string;
+  tasks: NotionTask[];
+  count: number;
 }
 
 const PRIORITY_STYLES: Record<string, { label: string; color: string }> = {
@@ -47,28 +54,12 @@ function formatDueDate(dateStr: string | null): string {
 }
 
 export default function TasksCard() {
-  const [tasks, setTasks] = useState<NotionTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = usePolling<TasksData>(
+    () => fetchAuth('/api/tasks'),
+    5 * 60 * 1000
+  );
 
-  useEffect(() => {
-    async function fetchTasks() {
-      try {
-        const token = localStorage.getItem('jarvis_token') || '';
-        const res = await fetch('/api/tasks', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setTasks(data.tasks);
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchTasks();
-  }, []);
+  const tasks = data?.tasks ?? [];
 
   if (loading) {
     return (

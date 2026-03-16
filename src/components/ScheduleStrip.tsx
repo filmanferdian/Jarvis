@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { usePolling } from '@/lib/usePolling';
+import { fetchAuth } from '@/lib/fetchAuth';
 
 interface CalendarEvent {
   id: string;
@@ -11,29 +12,19 @@ interface CalendarEvent {
   is_all_day: boolean;
 }
 
-export default function ScheduleStrip() {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+interface CalendarData {
+  date: string;
+  events: CalendarEvent[];
+  count: number;
+}
 
-  useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const token = localStorage.getItem('jarvis_token') || '';
-        const res = await fetch('/api/calendar', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setEvents(data.events);
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchEvents();
-  }, []);
+export default function ScheduleStrip() {
+  const { data, loading } = usePolling<CalendarData>(
+    () => fetchAuth('/api/calendar'),
+    5 * 60 * 1000
+  );
+
+  const events = data?.events ?? [];
 
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-US', {

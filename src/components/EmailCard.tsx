@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { usePolling } from '@/lib/usePolling';
+import { fetchAuth } from '@/lib/fetchAuth';
 
 interface EmailData {
   date: string;
@@ -12,28 +14,12 @@ interface EmailData {
 }
 
 export default function EmailCard() {
-  const [data, setData] = useState<EmailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+  const { data, loading } = usePolling<EmailData>(
+    () => fetchAuth('/api/emails'),
+    5 * 60 * 1000
+  );
 
-  useEffect(() => {
-    async function fetchEmails() {
-      try {
-        const token = localStorage.getItem('jarvis_token') || '';
-        const res = await fetch('/api/emails', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setData(await res.json());
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchEmails();
-  }, []);
+  const [expanded, setExpanded] = useState(false);
 
   if (loading) {
     return (
