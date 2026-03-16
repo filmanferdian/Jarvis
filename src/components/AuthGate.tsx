@@ -15,11 +15,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setChecking(false);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
-      localStorage.setItem('jarvis_token', input.trim());
-      setToken(input.trim());
+    setError('');
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    try {
+      const res = await fetch('/api/calendar', {
+        headers: { Authorization: `Bearer ${trimmed}` },
+      });
+      if (res.ok) {
+        localStorage.setItem('jarvis_token', trimmed);
+        setToken(trimmed);
+      } else {
+        setError('Invalid token');
+      }
+    } catch {
+      // If health endpoint doesn't require auth, just accept the token
+      localStorage.setItem('jarvis_token', trimmed);
+      setToken(trimmed);
     }
   };
 
@@ -47,6 +64,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             className="w-full px-4 py-3 rounded-lg bg-jarvis-bg border border-jarvis-border text-jarvis-text-primary placeholder-jarvis-text-dim focus:border-jarvis-accent focus:outline-none"
             autoFocus
           />
+          {error && (
+            <p className="text-sm text-red-400 text-center">{error}</p>
+          )}
           <button
             type="submit"
             className="w-full py-3 rounded-lg bg-jarvis-accent/10 border border-jarvis-accent/30 text-jarvis-accent hover:bg-jarvis-accent/20 transition-colors"
