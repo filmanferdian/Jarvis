@@ -63,7 +63,7 @@ function parseBriefing(text: string): BriefingSection[] {
 }
 
 export default function BriefingCard() {
-  const { data, loading } = usePolling<BriefingData>(
+  const { data, loading, refetch } = usePolling<BriefingData>(
     () => fetchAuth('/api/briefing'),
     5 * 60 * 1000
   );
@@ -71,6 +71,25 @@ export default function BriefingCard() {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(
     new Set()
   );
+  const [regenerating, setRegenerating] = useState(false);
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const token = localStorage.getItem('jarvis_token') || '';
+      const res = await fetch('/api/briefing/regenerate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        await refetch();
+      }
+    } catch {
+      // Silently fail — existing briefing stays
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const toggleSection = (index: number) => {
     setExpandedSections((prev) => {
@@ -99,11 +118,33 @@ export default function BriefingCard() {
   if (!data?.briefing) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-        <h2 className="text-sm font-medium text-jarvis-text-muted mb-2">
-          Morning Briefing
-        </h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-medium text-jarvis-text-muted">
+            Morning Briefing
+          </h2>
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="text-xs text-jarvis-accent hover:text-jarvis-accent/80 disabled:opacity-50 flex items-center gap-1"
+          >
+            <svg
+              className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {regenerating ? 'Generating...' : 'Generate now'}
+          </button>
+        </div>
         <p className="text-sm text-jarvis-text-dim">
-          {data?.message || 'No briefing available yet. Check back after 07:30 WIB.'}
+          {data?.message || 'No briefing available yet. Click "Generate now" or check back after 07:30 WIB.'}
         </p>
       </div>
     );
@@ -127,6 +168,26 @@ export default function BriefingCard() {
               })}
             </span>
           )}
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="p-1.5 rounded-lg hover:bg-jarvis-border/50 text-jarvis-text-muted hover:text-jarvis-accent transition-colors disabled:opacity-50"
+            title="Regenerate briefing"
+          >
+            <svg
+              className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
           <TTSButton text={data.briefing} />
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 
@@ -33,6 +34,8 @@ const STATUS_COLORS: Record<string, string> = {
   Archived: 'bg-jarvis-text-dim',
 };
 
+const STATUS_CYCLE = ['Not Started', 'In Progress', 'Done'];
+
 function isOverdue(dateStr: string | null): boolean {
   if (!dateStr) return false;
   const today = new Date();
@@ -54,12 +57,65 @@ function formatDueDate(dateStr: string | null): string {
 }
 
 export default function TasksCard() {
-  const { data, loading } = usePolling<TasksData>(
+  const { data, loading, refetch } = usePolling<TasksData>(
     () => fetchAuth('/api/tasks'),
     5 * 60 * 1000
   );
 
+  const [showForm, setShowForm] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<string>('Medium');
+  const [submitting, setSubmitting] = useState(false);
+
   const tasks = data?.tasks ?? [];
+
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskName.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem('jarvis_token') || '';
+      const res = await fetch('/api/tasks/create', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newTaskName.trim(),
+          priority: newTaskPriority,
+        }),
+      });
+
+      if (res.ok) {
+        setNewTaskName('');
+        setShowForm(false);
+        await refetch();
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStatusToggle = async (task: NotionTask) => {
+    try {
+      const token = localStorage.getItem('jarvis_token') || '';
+      await fetch('/api/tasks/update', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notionPageId: task.notion_page_id }),
+      });
+      await refetch();
+    } catch {
+      // Silently fail
+    }
+  };
 
   if (loading) {
     return (
@@ -83,10 +139,60 @@ export default function TasksCard() {
         <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider">
           Tasks This Week
         </h2>
-        <span className="text-xs text-jarvis-text-dim font-mono">
-          {tasks.length} task{tasks.length !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-jarvis-text-dim font-mono">
+            {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="text-jarvis-accent hover:text-jarvis-accent/80 transition-colors"
+            title="Add task"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Quick-add form */}
+      {showForm && (
+        <form onSubmit={handleAddTask} className="mb-4 space-y-2">
+          <input
+            type="text"
+            value={newTaskName}
+            onChange={(e) => setNewTaskName(e.target.value)}
+            placeholder="Task name..."
+            className="w-full px-3 py-2 text-sm rounded-lg border border-jarvis-border bg-jarvis-bg text-jarvis-text-primary placeholder-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <select
+              value={newTaskPriority}
+              onChange={(e) => setNewTaskPriority(e.target.value)}
+              className="px-2 py-1 text-xs rounded border border-jarvis-border bg-jarvis-bg text-jarvis-text-secondary focus:outline-none focus:border-jarvis-accent"
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+            <button
+              type="submit"
+              disabled={submitting || !newTaskName.trim()}
+              className="px-3 py-1 text-xs rounded bg-jarvis-accent text-jarvis-bg font-medium hover:bg-jarvis-accent/80 disabled:opacity-50 transition-colors"
+            >
+              {submitting ? 'Adding...' : 'Add'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-3 py-1 text-xs rounded border border-jarvis-border text-jarvis-text-muted hover:text-jarvis-text-secondary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       {tasks.length === 0 ? (
         <p className="text-sm text-jarvis-text-dim">No tasks due this week.</p>
@@ -99,7 +205,7 @@ export default function TasksCard() {
               </p>
               <div className="space-y-1">
                 {overdueTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
+                  <TaskRow key={task.id} task={task} onStatusToggle={handleStatusToggle} />
                 ))}
               </div>
             </div>
@@ -114,7 +220,7 @@ export default function TasksCard() {
               )}
               <div className="space-y-1">
                 {upcomingTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
+                  <TaskRow key={task.id} task={task} onStatusToggle={handleStatusToggle} />
                 ))}
               </div>
             </div>
@@ -125,15 +231,20 @@ export default function TasksCard() {
   );
 }
 
-function TaskRow({ task }: { task: NotionTask }) {
+function TaskRow({ task, onStatusToggle }: { task: NotionTask; onStatusToggle: (task: NotionTask) => void }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority] : null;
   const statusColor = STATUS_COLORS[task.status] || 'bg-jarvis-text-dim';
   const overdue = isOverdue(task.due_date);
+  const nextStatus = STATUS_CYCLE[(STATUS_CYCLE.indexOf(task.status) + 1) % STATUS_CYCLE.length];
 
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-jarvis-bg-card group">
-      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor}`} />
-      <span className="text-sm text-jarvis-text-secondary truncate flex-1">
+      <button
+        onClick={() => onStatusToggle(task)}
+        className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
+        title={`Click to change to: ${nextStatus}`}
+      />
+      <span className={`text-sm truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
         {task.name}
       </span>
       {task.project_name && (

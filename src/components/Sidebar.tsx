@@ -58,8 +58,16 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     fetchDomains();
   }, []);
 
-  const redCount = domains?.filter((d) => d.healthStatus === 'red').length ?? 0;
+  const total = domains?.length ?? 0;
+  const greenCount = domains?.filter((d) => d.healthStatus === 'green').length ?? 0;
   const yellowCount = domains?.filter((d) => d.healthStatus === 'yellow').length ?? 0;
+  const redCount = domains?.filter((d) => d.healthStatus === 'red').length ?? 0;
+
+  // Compute conic gradient for donut chart
+  const healthScore = total > 0 ? Math.round((greenCount / total) * 100) : 0;
+  const greenPct = total > 0 ? (greenCount / total) * 100 : 0;
+  const yellowPct = total > 0 ? (yellowCount / total) * 100 : 0;
+  const redPct = total > 0 ? (redCount / total) * 100 : 0;
 
   return (
     <aside
@@ -85,6 +93,75 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </button>
         )}
       </div>
+
+      {/* Health Ring Donut */}
+      {domains && total > 0 && (
+        <div className="flex flex-col items-center mb-5">
+          <div className="relative w-24 h-24">
+            <svg viewBox="0 0 36 36" className="w-24 h-24 -rotate-90">
+              {/* Background ring */}
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke="rgba(0,180,216,0.08)"
+                strokeWidth="4"
+              />
+              {/* Green segment */}
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke="#34d399"
+                strokeWidth="4"
+                strokeDasharray={`${greenPct * 0.88} ${88 - greenPct * 0.88}`}
+                strokeDashoffset="0"
+                strokeLinecap="round"
+              />
+              {/* Yellow segment */}
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke="#ef9f27"
+                strokeWidth="4"
+                strokeDasharray={`${yellowPct * 0.88} ${88 - yellowPct * 0.88}`}
+                strokeDashoffset={`${-(greenPct * 0.88)}`}
+                strokeLinecap="round"
+              />
+              {/* Red segment */}
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke="#f87171"
+                strokeWidth="4"
+                strokeDasharray={`${redPct * 0.88} ${88 - redPct * 0.88}`}
+                strokeDashoffset={`${-((greenPct + yellowPct) * 0.88)}`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-lg font-semibold text-jarvis-text-primary font-mono">
+                {healthScore}%
+              </span>
+              <span className="text-[9px] text-jarvis-text-dim uppercase tracking-wider">
+                healthy
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-2 text-[10px] text-jarvis-text-muted">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              {greenCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-jarvis-warn" />
+              {yellowCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              {redCount}
+            </span>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-2">
