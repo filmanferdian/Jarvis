@@ -97,28 +97,27 @@ All cron jobs use header `x-cron-secret` for authentication.
 
 ## Suggested Sprint 5 scope
 
-### P0 — Stability & Polish
+### P0 — Briefing v2 + TTS
+- [ ] Briefing redesign: 3 min max (~450 words), structured sections (Calendar, Tasks, Health, Emails). Skip empty sections.
+- [ ] TTS upgrade: `tts-1-hd`, speed `0.95`, A/B test onyx vs fable (British Jarvis)
+- [ ] Briefing prompt: spoken-word style output (no markdown, no bullets, declarative sentences)
+- [ ] Logo: replace favicon/PWA icon with arc reactor design
+
+### P1 — Stability & Alerting
 - [ ] Monitor cron jobs for 1 week — check Supabase data freshness daily
-- [ ] Add error alerting (cron failures → notification)
-- [ ] Fix any HealthCard rendering issues found during mobile testing
+- [ ] Error alerting: if cron fails 3x → notification (Telegram bot or email)
 - [ ] Google Calendar re-auth if tokens expire (refresh token flow)
 
-### P1 — Cross-domain insights
+### P2 — Cross-domain Insights
 - [ ] `/api/insights` — Claude analyzes across all domains (calendar + tasks + health + emails)
 - [ ] InsightsCard.tsx — Weekly patterns, correlations (sleep vs productivity, etc.)
+- [ ] Weekly digest: Sunday evening summary across all domains
 - [ ] Domain scoring — Automated health scores based on KPI targets
 
-### P2 — UX improvements
-- [ ] Dark mode / theme toggle
-- [ ] Mobile-responsive layout improvements
-- [ ] Notification preferences (which alerts to receive)
-- [ ] Historical data views (week/month trends for health metrics)
-
-### P3 — Data enrichment
-- [ ] Garmin activity details (GPS tracks, splits, zones)
-- [ ] Calendar analytics (meeting load, focus time blocks)
-- [ ] Task completion trends from Notion
-- [ ] Financial domain integration (if applicable)
+### P3 — UX & PWA
+- [ ] PWA manifest — add to home screen on iPhone with arc reactor logo
+- [ ] Mobile-responsive layout refinements
+- [ ] Historical data views (TBD — scope to be refined)
 
 ---
 
