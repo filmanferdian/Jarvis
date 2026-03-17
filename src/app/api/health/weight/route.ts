@@ -6,11 +6,46 @@ import { supabase } from '@/lib/supabase';
 export const POST = withAuth(async (req: NextRequest) => {
   try {
     const body = await req.json();
-    const { weight_kg, date } = body as { weight_kg?: number; date?: string };
+    const { date } = body as { weight_kg?: unknown; date?: string };
 
-    if (!weight_kg || typeof weight_kg !== 'number' || weight_kg <= 0) {
+    // Extract numeric weight from whatever iOS Shortcuts sends
+    console.log('weight raw body:', JSON.stringify(body));
+
+    function extractNumber(val: unknown): number {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') return parseFloat(val.replace(/[^0-9.]/g, ''));
+      if (val && typeof val === 'object') {
+        const obj = val as Record<string, unknown>;
+        // Check common property names iOS Shortcuts might use
+        for (const key of ['value', 'quantity', 'Value', 'Quantity', 'number']) {
+          if (obj[key] !== undefined) return extractNumber(obj[key]);
+        }
+        // Try first numeric value in the object
+        for (const v of Object.values(obj)) {
+          const n = extractNumber(v);
+          if (!isNaN(n) && n > 0) return n;
+        }
+      }
+      return NaN;
+    }
+
+    let weight_kg = extractNumber(body.weight_kg);
+
+    // Fallback: scan entire body for a weight-like number (30-300 kg range)
+    if (isNaN(weight_kg) || weight_kg <= 0) {
+      for (const [key, val] of Object.entries(body)) {
+        if (key === 'date') continue;
+        const n = extractNumber(val);
+        if (!isNaN(n) && n >= 30 && n <= 300) {
+          weight_kg = n;
+          break;
+        }
+      }
+    }
+
+    if (!weight_kg || isNaN(weight_kg) || weight_kg <= 0) {
       return NextResponse.json(
-        { error: 'weight_kg is required and must be a positive number' },
+        { error: 'weight_kg is required and must be a positive number', received: body },
         { status: 400 },
       );
     }
