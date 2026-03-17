@@ -1,26 +1,41 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Lazy-init to avoid crashing at build time when env vars aren't available
+// Lazy-init to avoid crashing at build time when env vars aren't available.
+// Next.js "Collecting page data" phase executes route modules during build,
+// so we must not call createClient() until an actual request hits at runtime.
 let _supabase: SupabaseClient | null = null;
 
-export function getSupabase(): SupabaseClient {
+function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !supabaseServiceKey) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
       throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
     }
-    _supabase = createClient(supabaseUrl, supabaseServiceKey);
+    _supabase = createClient(url, key);
   }
   return _supabase;
 }
 
-// Convenience export — kept as getter for backwards compat with `import { supabase }`
+// Proxy defers all property access to the lazily-created client.
+// During build, if the proxy is accessed but env vars are missing, we return
+// a chainable stub so that module evaluation doesn't throw.
+const isBuild = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_target, prop: string) {
-    const client = getSupabase();
-    const value = (client as never as Record<string, unknown>)[prop];
-    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(client) : value;
-  },
+const buildStub: any = new Proxy(() => buildStub, {
+  get: () => buildStub,
+  apply: () => buildStub,
 });
+
+export const supabase: SupabaseClient = isBuild
+  ? buildStub
+  : new Proxy({} as SupabaseClient, {
+      get(_target, prop: string) {
+        const client = getSupabase();
+        const value = (client as never as Record<string, unknown>)[prop];
+        return typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown).bind(client)
+          : value;
+      },
+    });
