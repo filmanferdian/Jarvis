@@ -115,39 +115,37 @@ All in `.env.local` (MUST exist in both repo root AND worktree):
 | `google_tokens` | Google OAuth tokens (multi) | id (email-based), email, access/refresh_token |
 | `top_kpis` | KPI display order | deprecated, not used |
 
-## Sprint 4 proposed features
+## Sprint 4 Scope
 
-### P0 — Ship to production
+### P0 — Deploy to Production + Cron
 | Feature | Effort | Notes |
 |---------|--------|-------|
-| Deploy to Railway | Medium | Next.js app + env vars. Update OAuth redirect URIs to production URL. |
-| Cron jobs (replace n8n) | Medium | Move Google Calendar sync, Notion sync, morning briefing, email synthesis to Next.js cron routes or Railway cron. |
-| Auto-sync on dashboard load | Small | Trigger sync endpoints when user opens dashboard (debounced). |
+| Deploy to Railway | Medium | Next.js app + all env vars. Update Microsoft & Google OAuth redirect URIs to production URL (keep localhost as secondary). |
+| Cron jobs (replace n8n) | Medium | Move Google Calendar sync (15-min), Notion sync (30-min), morning briefing (daily 07:30 WIB), email synthesis (daily 07:00 WIB) to Next.js cron routes or Railway cron. Goal: fully eliminate n8n dependency. |
+| Auto-sync on dashboard load | Small | Trigger sync endpoints when user opens dashboard (debounced, max 1x per 15 min). |
 
-### P1 — Deepen domain integrations
+### P1 — Health & Fitness Integration (Garmin + Apple Health)
+| Feature | Effort | Notes |
+|---------|--------|-------|
+| Garmin Connect integration | Large | Primary fitness data source. Garmin Connect API (or Garmin Health API) for: daily steps, heart rate (resting + zones), sleep score/duration, Body Battery, stress level, VO2 max, active minutes, calories burned, workout history (running, cycling, gym). Needs Garmin developer app registration. Consider using unofficial garmin-connect npm package if official API requires partner approval. |
+| Apple Health integration (weight) | Medium | Weight is tracked on Apple Health (likely via smart scale). Apple Health has no direct API — options: (a) Apple HealthKit via Shortcuts automation exporting to Supabase, (b) use the scale's own cloud API (Withings, Xiaomi, etc.), (c) manual weight input in dashboard. Ask user which scale they use. |
+| Health & Fitness dashboard card | Medium | New `HealthCard.tsx` component showing: today's steps, resting HR, sleep score, Body Battery, last workout, weight trend chart. Replaces placeholder KPIs for Health + Fitness domains. |
+| Supabase schema for health data | Small | New tables: `garmin_daily_summary` (date, steps, resting_hr, sleep_score, body_battery, stress, vo2max, active_minutes, calories), `garmin_activities` (activity_id, type, duration, distance, avg_hr, calories, date), `weight_log` (date, weight_kg). |
+| Health KPI auto-update | Small | Update domain_kpis for Health + Fitness domains automatically from Garmin/weight data. |
+
+### P1 — Other Domain Quick Wins (if time permits)
 | Feature | Domain | Effort | Notes |
 |---------|--------|--------|-------|
-| Health & Fitness tracking | Health, Fitness | Large | Apple Health / Google Fit API, or manual logging. Steps, sleep, workouts. |
-| Financial dashboard | Wealth | Large | Bank API (if available) or manual input. Budget tracking, spending categories. |
-| Learning tracker | Learning | Medium | Track books, courses, articles. Goodreads API or manual. |
-| Spiritual habit tracker | Spiritual | Small | Daily check-in (meditation, prayer, gratitude). Simple toggle UI. |
-| Family touchpoint tracker | Family | Small | Log last contact with family members. Alert when overdue. |
-| Networking CRM | Networking | Medium | Track contacts, last interaction, follow-up reminders. |
+| Learning tracker | Learning | Medium | Track books, courses, articles. Manual input or Goodreads API. |
+| Networking CRM | Networking | Medium | Track key contacts, last interaction, follow-up reminders. |
+| Side project tracker | Side projects | Small | GitHub activity feed via GitHub API. |
+| Financial dashboard | Wealth | Large | Budget tracking. Manual input or bank API if available. |
 | Personal branding metrics | Personal branding | Medium | LinkedIn/Twitter follower counts, post frequency. |
-| Side project tracker | Side projects | Small | Link to GitHub repos, track commits/activity. |
 
-### P2 — Intelligence layer
-| Feature | Effort | Notes |
-|---------|--------|-------|
-| Cross-domain insights | Large | Claude analyzes all domains weekly, suggests actions |
-| Weekly review generation | Medium | Auto-generate PDF/email summary of the week |
-| Smart alerts | Medium | Push notifications when KPI drops or domain goes red |
-| Goal setting & tracking | Medium | Weekly/monthly targets per domain with progress |
-
-### P3 — UX polish
-| Feature | Effort | Notes |
-|---------|--------|-------|
-| Dashboard customization | Medium | Drag-and-drop card ordering, show/hide domains |
-| Dark/light theme toggle | Small | Currently dark only |
-| Desktop notifications | Small | Browser push for alerts |
-| Keyboard shortcuts | Small | Quick actions without clicking |
+### Deferred (not in Sprint 4)
+- Spiritual habit tracker
+- Family touchpoint tracker
+- Cross-domain insights engine
+- Weekly review generation
+- Smart alerts / push notifications
+- Dashboard customization / theming
