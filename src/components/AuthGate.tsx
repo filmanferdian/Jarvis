@@ -3,19 +3,20 @@
 import { useState, useEffect } from 'react';
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [input, setInput] = useState('');
   const [checking, setChecking] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('jarvis_token');
-    if (stored) {
-      setToken(stored);
-    }
-    setChecking(false);
+    // Check if we have a valid session cookie by making an authenticated request
+    fetch('/api/calendar', { credentials: 'include' })
+      .then((res) => {
+        if (res.ok) setAuthenticated(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
   }, []);
-
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,19 +25,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!trimmed) return;
 
     try {
-      const res = await fetch('/api/calendar', {
-        headers: { Authorization: `Bearer ${trimmed}` },
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: trimmed }),
+        credentials: 'include',
       });
       if (res.ok) {
-        localStorage.setItem('jarvis_token', trimmed);
-        setToken(trimmed);
+        setAuthenticated(true);
       } else {
         setError('Invalid token');
       }
     } catch {
-      // If health endpoint doesn't require auth, just accept the token
-      localStorage.setItem('jarvis_token', trimmed);
-      setToken(trimmed);
+      setError('Login failed');
     }
   };
 
@@ -48,7 +49,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!token) {
+  if (!authenticated) {
     return (
       <div className="flex items-center justify-center h-screen">
         <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-6">

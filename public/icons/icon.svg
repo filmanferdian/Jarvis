@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#bae6fd"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0a0e17"/>
+
+  <!-- Outer glow -->
+  <circle cx="256" cy="256" r="200" fill="url(#glow)"/>
+
+  <!-- Outer ring -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#38bdf8" stroke-width="6" opacity="0.6"/>
+
+  <!-- Middle ring -->
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#38bdf8" stroke-width="4" opacity="0.4"/>
+
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#7dd3fc" stroke-width="5" opacity="0.7"/>
+
+  <!-- Radial lines (reactor segments) -->
+  <g stroke="#38bdf8" stroke-width="3" opacity="0.5">
+    <line x1="256" y1="76" x2="256" y2="156"/>
+    <line x1="256" y1="356" x2="256" y2="436"/>
+    <line x1="76" y1="256" x2="156" y2="256"/>
+    <line x1="356" y1="256" x2="436" y2="256"/>
+    <!-- Diagonal lines -->
+    <line x1="129" y1="129" x2="185" y2="185"/>
+    <line x1="383" y1="129" x2="327" y2="185"/>
+    <line x1="129" y1="383" x2="185" y2="327"/>
+    <line x1="383" y1="383" x2="327" y2="327"/>
+  </g>
+
+  <!-- Segment arcs on outer ring -->
+  <g fill="none" stroke="#7dd3fc" stroke-width="8" stroke-linecap="round" opacity="0.6">
+    <path d="M 256 78 A 178 178 0 0 1 410 150"/>
+    <path d="M 434 256 A 178 178 0 0 1 362 410"/>
+    <path d="M 256 434 A 178 178 0 0 1 102 362"/>
+    <path d="M 78 256 A 178 178 0 0 1 150 102"/>
+  </g>
+
+  <!-- Inner core glow -->
+  <circle cx="256" cy="256" r="55" fill="url(#core)" opacity="0.9"/>
+
+  <!-- Core center (bright white) -->
+  <circle cx="256" cy="256" r="25" fill="white" opacity="0.95"/>
+
+  <!-- Triangle detail in core -->
+  <polygon points="256,228 274,268 238,268" fill="none" stroke="#0a0e17" stroke-width="2.5" opacity="0.5"/>
+</svg>

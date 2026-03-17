@@ -51,13 +51,10 @@ export default function TTSButton({ text }: TTSButtonProps) {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem('jarvis_token') || '';
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ text }),
       });
 

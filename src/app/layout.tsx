@@ -7,6 +7,10 @@ export const metadata: Metadata = {
     'Voice-first personal command center for managing priorities across 10 life domains.',
   manifest: '/manifest.json',
   icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/icons/icon.svg', type: 'image/svg+xml' },
+    ],
     apple: '/icons/icon-192.png',
   },
 };

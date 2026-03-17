@@ -76,10 +76,9 @@ export default function BriefingCard() {
   const handleRegenerate = async () => {
     setRegenerating(true);
     try {
-      const token = localStorage.getItem('jarvis_token') || '';
       const res = await fetch('/api/briefing/regenerate', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (res.ok) {
         await refetch();

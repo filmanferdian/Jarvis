@@ -121,8 +121,9 @@ export const POST = withAuth(async (_req: NextRequest) => {
       timestamp: now,
     });
   } catch (err) {
+    console.error('[API Error] Notion sync failed:', err);
     return NextResponse.json(
-      { error: 'Notion sync failed', details: String(err) },
+      { error: 'Notion sync failed' },
       { status: 500 }
     );
   }

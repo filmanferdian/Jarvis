@@ -169,9 +169,9 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       timestamp: now.toISOString(),
     });
   } catch (err) {
-    console.error('Email sync error:', err);
+    console.error('[API Error] Email sync failed:', err);
     return NextResponse.json(
-      { error: 'Email sync failed', details: String(err) },
+      { error: 'Email sync failed' },
       { status: 500 },
     );
   }

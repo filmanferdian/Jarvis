@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { UpdateTaskSchema } from '@/lib/validation';
+import { safeError } from '@/lib/errors';
 
-const STATUS_CYCLE = ['Not Started', 'In Progress', 'Done'];
+const STATUS_CYCLE = ['Not Started', 'In Progress', 'Done'] as const;
 
 // PATCH: Update task status (cycles through statuses) in Notion + local cache
 export const PATCH = withAuth(async (req: NextRequest) => {
   try {
-    const { notionPageId, status } = await req.json();
-
-    if (!notionPageId) {
+    const body = await req.json();
+    const parsed = UpdateTaskSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'notionPageId is required' },
-        { status: 400 }
+        { error: 'Invalid input', issues: parsed.error.issues },
+        { status: 400 },
       );
     }
+    const { notionPageId, status } = parsed.data;
 
     // Determine new status: use provided status or cycle to next
     let newStatus = status;
@@ -74,9 +77,6 @@ export const PATCH = withAuth(async (req: NextRequest) => {
       status: newStatus,
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: 'Failed to update task', details: String(err) },
-      { status: 500 }
-    );
+    return safeError('Failed to update task', err);
   }
 });

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
+import { VoiceIntentSchema } from '@/lib/validation';
+import { safeError } from '@/lib/errors';
 
 // POST: Parse voice transcript into intent + generate response
 export const POST = withAuth(async (req: NextRequest) => {
@@ -14,14 +16,15 @@ export const POST = withAuth(async (req: NextRequest) => {
       );
     }
 
-    const { transcript } = await req.json();
-
-    if (!transcript || typeof transcript !== 'string') {
+    const body = await req.json();
+    const parsed = VoiceIntentSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'transcript is required' },
-        { status: 400 }
+        { error: 'Invalid input', issues: parsed.error.issues },
+        { status: 400 },
       );
     }
+    const { transcript } = parsed.data;
 
     const prompt = `You are Jarvis, a personal executive assistant (think Iron Man's Jarvis — professional, warm, concise, dry wit).
 
@@ -64,11 +67,11 @@ User said: "${transcript}"`;
 
     // Extract JSON from response (handle markdown code blocks)
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    let parsed;
+    let intentParsed;
     try {
-      parsed = JSON.parse(jsonMatch?.[0] || '{}');
+      intentParsed = JSON.parse(jsonMatch?.[0] || '{}');
     } catch {
-      parsed = {
+      intentParsed = {
         intent: 'unknown',
         response: "I didn't quite catch that. Could you try again?",
         action: { type: 'unknown', params: {} },
@@ -78,22 +81,19 @@ User said: "${transcript}"`;
     // Log to voice_log table
     await supabase.from('voice_log').insert({
       transcript,
-      intent: parsed.intent,
-      action_taken: JSON.stringify(parsed.action),
-      response_text: parsed.response,
+      intent: intentParsed.intent,
+      action_taken: JSON.stringify(intentParsed.action),
+      response_text: intentParsed.response,
     });
 
     await incrementUsage();
 
     return NextResponse.json({
-      intent: parsed.intent,
-      response: parsed.response,
-      action: parsed.action,
+      intent: intentParsed.intent,
+      response: intentParsed.response,
+      action: intentParsed.action,
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: 'Failed to process voice input', details: String(err) },
-      { status: 500 }
-    );
+    return safeError('Failed to process voice input', err);
   }
 });

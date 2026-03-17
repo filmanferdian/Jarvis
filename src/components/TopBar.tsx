@@ -33,8 +33,8 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('jarvis_token');
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     window.location.reload();
   };
 

@@ -120,8 +120,9 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       deadlineCount: deadlineMatch ? Math.min(deadlineMatch.length, 10) : 0,
     });
   } catch (err) {
+    console.error('[API Error] Failed to synthesize emails:', err);
     return NextResponse.json(
-      { error: 'Failed to synthesize emails', details: String(err) },
+      { error: 'Failed to synthesize emails' },
       { status: 500 }
     );
   }

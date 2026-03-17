@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
-
-const MAX_TEXT_LENGTH = 4096;
+import { TtsSchema } from '@/lib/validation';
+import { safeError } from '@/lib/errors';
 
 export const POST = withAuth(async (req: NextRequest) => {
   try {
-    const { text } = await req.json();
-
-    if (!text || typeof text !== 'string') {
-      return NextResponse.json({ error: 'text is required' }, { status: 400 });
-    }
-
-    if (text.length > MAX_TEXT_LENGTH) {
+    const body = await req.json();
+    const parsed = TtsSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: `Text too long (max ${MAX_TEXT_LENGTH} chars)` },
-        { status: 400 }
+        { error: 'Invalid input', issues: parsed.error.issues },
+        { status: 400 },
       );
     }
+    const { text } = parsed.data;
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -43,8 +40,9 @@ export const POST = withAuth(async (req: NextRequest) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        voice: 'onyx',
+        model: 'tts-1-hd',
+        voice: 'fable',
+        speed: 0.95,
         input: text,
         response_format: 'mp3',
       }),
@@ -67,9 +65,6 @@ export const POST = withAuth(async (req: NextRequest) => {
       },
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: 'TTS generation failed', details: String(err) },
-      { status: 500 }
-    );
+    return safeError('TTS generation failed', err);
   }
 });

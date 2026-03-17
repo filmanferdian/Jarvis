@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { CreateTaskSchema } from '@/lib/validation';
+import { safeError } from '@/lib/errors';
 
 // POST: Create a new task in Notion and cache locally
 export const POST = withAuth(async (req: NextRequest) => {
   try {
-    const { name, priority, dueDate } = await req.json();
-
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'name is required' }, { status: 400 });
+    const body = await req.json();
+    const parsed = CreateTaskSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', issues: parsed.error.issues },
+        { status: 400 },
+      );
     }
+    const { name, priority, dueDate } = parsed.data;
 
     const notionApiKey = process.env.NOTION_API_KEY;
     const notionDbId = process.env.NOTION_TASKS_DB_ID;
@@ -27,7 +33,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       Status: { status: { name: 'Not Started' } },
     };
 
-    if (priority && ['Low', 'Medium', 'High'].includes(priority)) {
+    if (priority) {
       properties.Priority = { select: { name: priority } };
     }
 
@@ -75,9 +81,6 @@ export const POST = withAuth(async (req: NextRequest) => {
       dueDate: dueDate || null,
     }, { status: 201 });
   } catch (err) {
-    return NextResponse.json(
-      { error: 'Failed to create task', details: String(err) },
-      { status: 500 }
-    );
+    return safeError('Failed to create task', err);
   }
 });

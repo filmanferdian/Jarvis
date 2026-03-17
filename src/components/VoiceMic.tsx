@@ -46,13 +46,10 @@ export default function VoiceMic() {
       setProcessing(true);
 
       try {
-        const token = localStorage.getItem('jarvis_token') || '';
         const res = await fetch('/api/voice/intent', {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ transcript }),
         });
 

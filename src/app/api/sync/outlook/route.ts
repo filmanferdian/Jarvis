@@ -62,9 +62,9 @@ export const POST = withAuth(async (_req: NextRequest) => {
       timestamp: now.toISOString(),
     });
   } catch (err) {
-    console.error('Outlook sync error:', err);
+    console.error('[API Error] Outlook sync failed:', err);
     return NextResponse.json(
-      { error: 'Outlook sync failed', details: String(err) },
+      { error: 'Outlook sync failed' },
       { status: 500 },
     );
   }

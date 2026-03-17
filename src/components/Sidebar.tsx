@@ -41,10 +41,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   useEffect(() => {
     async function fetchDomains() {
       try {
-        const token = localStorage.getItem('jarvis_token') || '';
-        const res = await fetch('/api/domains', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch('/api/domains', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           setDomains(data.domains);

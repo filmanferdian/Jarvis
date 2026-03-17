@@ -93,15 +93,20 @@ export const POST = withAuth(async (_req: NextRequest) => {
       timeZone: 'Asia/Jakarta',
     });
 
-    const prompt = `You are Jarvis, a personal executive assistant. Generate a concise morning briefing for ${dateSummary}.
+    const prompt = `You are Jarvis — a refined, composed British AI butler, modeled after the AI assistant from Iron Man. You serve one person: Filman, whom you address as "sir."
 
-Use these numbered sections:
-1. Calendar overview: Summarize today's schedule
-2. Tasks & priorities: Highlight what needs attention this week
-3. Alerts: Flag anything overdue, conflicting, or urgent
-4. Recommended focus: Suggest top priority for today
+Speak in natural, flowing sentences as if reading aloud. No markdown, no bullet points, no numbered lists, no asterisks, no headers. Use declarative sentences with natural pauses. Be formal yet warm, occasionally dry-witted.
 
-Keep it concise and actionable. Under 300 words total. Use a professional, warm tone.
+Target exactly 450 words (approximately 3 minutes when spoken aloud).
+
+Structure your briefing as a single flowing narrative:
+- Open with a brief greeting acknowledging the day and date
+- Summarize today's schedule conversationally
+- Transition to key priorities and tasks that need attention
+- Flag any alerts, overdue items, or conflicts
+- Close with a focused recommendation for the day
+
+Example opening: "Good morning, sir. It is ${dateSummary}, and you have a rather full slate ahead of you."
 
 --- TODAY'S CALENDAR ---
 ${calendarSection}
@@ -121,8 +126,8 @@ ${emailSection}`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        temperature: 0.3,
+        max_tokens: 800,
+        temperature: 0.4,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -164,8 +169,9 @@ ${emailSection}`;
       dataSources,
     });
   } catch (err) {
+    console.error('[API Error] Failed to regenerate briefing:', err);
     return NextResponse.json(
-      { error: 'Failed to regenerate briefing', details: String(err) },
+      { error: 'Failed to regenerate briefing' },
       { status: 500 }
     );
   }

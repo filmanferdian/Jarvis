@@ -7,8 +7,9 @@ export async function GET() {
     const authUrl = buildAuthUrl();
     return NextResponse.redirect(authUrl);
   } catch (err) {
+    console.error('[API Error] Failed to build Google auth URL:', err);
     return NextResponse.json(
-      { error: 'Failed to build Google auth URL', details: String(err) },
+      { error: 'Failed to build Google auth URL' },
       { status: 500 },
     );
   }

@@ -76,13 +76,10 @@ export default function TasksCard() {
 
     setSubmitting(true);
     try {
-      const token = localStorage.getItem('jarvis_token') || '';
       const res = await fetch('/api/tasks/create', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           name: newTaskName.trim(),
           priority: newTaskPriority,
@@ -103,13 +100,10 @@ export default function TasksCard() {
 
   const handleStatusToggle = async (task: NotionTask) => {
     try {
-      const token = localStorage.getItem('jarvis_token') || '';
       await fetch('/api/tasks/update', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ notionPageId: task.notion_page_id }),
       });
       await refetch();
@@ -122,10 +116,9 @@ export default function TasksCard() {
     if (syncing) return;
     setSyncing(true);
     try {
-      const token = localStorage.getItem('jarvis_token') || '';
       const res = await fetch('/api/sync/notion', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (res.ok) {
         await refetch();
