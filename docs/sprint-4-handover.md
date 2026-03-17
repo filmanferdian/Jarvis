@@ -149,3 +149,15 @@ All in `.env.local` (MUST exist in both repo root AND worktree):
 - Weekly review generation
 - Smart alerts / push notifications
 - Dashboard customization / theming
+
+## End-of-Sprint Checklist
+
+Every sprint must end with:
+1. **Commit all code** and push to GitHub
+2. **Update Notion documentation** — Sprint logs, Retrospective log, and Project Jarvis status page. Notion pages to update:
+   - `Sprint logs` (page ID: `322c674aecec8193954acb0648fbddb0`) — add new sprint summary
+   - `Retrospective log` (page ID: `322c674aecec81de9e85f5dceca130ae`) — add what was built, key decisions, what went wrong
+   - `Project Jarvis` (page ID: `322c674aecec81c2986cef59e388c8f4`) — update status line
+   - `Delivery` (page ID: `322c674aecec81b793d4d69e163b0a23`) — update phase status
+3. **Write handover doc** in `docs/` for the next session
+4. **Sync both `.env.local` files** if env vars changed
