@@ -1,42 +1,112 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface TTSButtonProps {
   text: string;
 }
 
 export default function TTSButton({ text }: TTSButtonProps) {
-  const [isSupported, setIsSupported] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
+  // Cleanup object URL on unmount
   useEffect(() => {
-    setIsSupported(typeof window !== 'undefined' && 'speechSynthesis' in window);
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
   }, []);
 
-  if (!isSupported) return null;
+  const stopPlayback = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    window.speechSynthesis?.cancel();
+    setIsPlaying(false);
+  };
 
-  const handleToggle = () => {
+  const fallbackToWebSpeech = () => {
+    if (!('speechSynthesis' in window)) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => setIsPlaying(false);
+    utterance.onerror = () => setIsPlaying(false);
+    window.speechSynthesis.speak(utterance);
+    setIsPlaying(true);
+  };
+
+  const handleToggle = async () => {
     if (isPlaying) {
-      window.speechSynthesis.cancel();
-      setIsPlaying(false);
-    } else {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.onend = () => setIsPlaying(false);
-      utterance.onerror = () => setIsPlaying(false);
-      window.speechSynthesis.speak(utterance);
+      stopPlayback();
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const token = localStorage.getItem('jarvis_token') || '';
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
+
+      const blob = await res.blob();
+
+      // Revoke previous URL
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => setIsPlaying(false);
+      audio.onerror = () => setIsPlaying(false);
+
+      await audio.play();
       setIsPlaying(true);
+    } catch {
+      // Fallback to Web Speech API
+      fallbackToWebSpeech();
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <button
       onClick={handleToggle}
-      className="p-2 rounded-lg border border-jarvis-border hover:border-jarvis-accent transition-colors"
+      disabled={isLoading}
+      className="p-2 rounded-lg border border-jarvis-border hover:border-jarvis-accent transition-colors disabled:opacity-50"
       aria-label={isPlaying ? 'Stop reading' : 'Read briefing aloud'}
       title={isPlaying ? 'Stop reading' : 'Read briefing aloud'}
     >
-      {isPlaying ? (
+      {isLoading ? (
+        <svg
+          className="w-4 h-4 text-jarvis-accent animate-spin"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      ) : isPlaying ? (
         <svg
           className="w-4 h-4 text-jarvis-accent"
           fill="currentColor"

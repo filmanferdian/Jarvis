@@ -1,0 +1,211 @@
+import { supabase } from './supabase';
+import type { EmailSummary } from './microsoft';
+
+// OAuth endpoints
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GMAIL_BASE_URL = 'https://gmail.googleapis.com/gmail/v1';
+const SCOPES = 'openid email https://www.googleapis.com/auth/gmail.readonly';
+
+// --- Types ---
+
+interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  scope: string;
+}
+
+interface GoogleUserInfo {
+  email: string;
+}
+
+// --- Helpers ---
+
+function getClientId(): string {
+  const id = process.env.GOOGLE_CLIENT_ID;
+  if (!id) throw new Error('GOOGLE_CLIENT_ID not configured');
+  return id;
+}
+
+function getClientSecret(): string {
+  const secret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!secret) throw new Error('GOOGLE_CLIENT_SECRET not configured');
+  return secret;
+}
+
+export function getRedirectUri(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL not configured');
+  return `${appUrl}/api/auth/google/callback`;
+}
+
+// --- OAuth ---
+
+export function buildAuthUrl(): string {
+  const params = new URLSearchParams({
+    client_id: getClientId(),
+    response_type: 'code',
+    redirect_uri: getRedirectUri(),
+    scope: SCOPES,
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+  return `${GOOGLE_AUTH_URL}?${params.toString()}`;
+}
+
+export async function exchangeCodeForTokens(code: string): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    client_id: getClientId(),
+    client_secret: getClientSecret(),
+    code,
+    redirect_uri: getRedirectUri(),
+    grant_type: 'authorization_code',
+  });
+
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Google token exchange failed: ${res.status} ${err}`);
+  }
+
+  return res.json();
+}
+
+export async function getUserEmail(accessToken: string): Promise<string> {
+  const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) throw new Error('Failed to get Google user info');
+  const info: GoogleUserInfo = await res.json();
+  return info.email;
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    client_id: getClientId(),
+    client_secret: getClientSecret(),
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  });
+
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Google token refresh failed: ${res.status} ${err}`);
+  }
+
+  return res.json();
+}
+
+export async function getValidAccessToken(accountId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('google_tokens')
+    .select('*')
+    .eq('id', accountId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`NO_GOOGLE_TOKENS:${accountId}`);
+  }
+
+  // If token expires in more than 5 minutes, use it
+  const expiresAt = new Date(data.expires_at).getTime();
+  const bufferMs = 5 * 60 * 1000;
+  if (Date.now() + bufferMs < expiresAt) {
+    return data.access_token;
+  }
+
+  // Refresh
+  const tokens = await refreshAccessToken(data.refresh_token);
+  const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+
+  await supabase.from('google_tokens').upsert({
+    id: accountId,
+    email: data.email,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token || data.refresh_token,
+    expires_at: newExpiresAt,
+    scope: tokens.scope || data.scope,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'id' });
+
+  return tokens.access_token;
+}
+
+// --- Gmail API ---
+
+export async function getAllConnectedAccounts(): Promise<{ id: string; email: string }[]> {
+  const { data, error } = await supabase
+    .from('google_tokens')
+    .select('id, email');
+
+  if (error || !data) return [];
+  return data;
+}
+
+export async function fetchRecentEmails(
+  accessToken: string,
+  email: string,
+  sinceHours: number = 24,
+  limit: number = 30,
+): Promise<EmailSummary[]> {
+  // Search for recent emails
+  const sinceDate = new Date(Date.now() - sinceHours * 60 * 60 * 1000);
+  const afterTimestamp = Math.floor(sinceDate.getTime() / 1000);
+  const query = `after:${afterTimestamp}`;
+
+  const listUrl =
+    `${GMAIL_BASE_URL}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`;
+
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!listRes.ok) {
+    const errText = await listRes.text();
+    throw new Error(`Gmail list error: ${listRes.status} ${errText}`);
+  }
+
+  const listData = await listRes.json();
+  const messageIds: string[] = (listData.messages || []).map((m: { id: string }) => m.id);
+
+  if (messageIds.length === 0) return [];
+
+  // Fetch each message metadata (batch up to limit)
+  const emails: EmailSummary[] = [];
+  for (const msgId of messageIds.slice(0, limit)) {
+    const msgRes = await fetch(
+      `${GMAIL_BASE_URL}/users/me/messages/${msgId}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+
+    if (!msgRes.ok) continue;
+
+    const msg = await msgRes.json();
+    const headers: { name: string; value: string }[] = msg.payload?.headers || [];
+    const fromHeader = headers.find((h: { name: string }) => h.name === 'From')?.value || 'unknown';
+    const subjectHeader = headers.find((h: { name: string }) => h.name === 'Subject')?.value || '(No subject)';
+
+    emails.push({
+      from: fromHeader,
+      subject: subjectHeader,
+      snippet: (msg.snippet || '').slice(0, 200),
+      date: new Date(Number(msg.internalDate)).toISOString(),
+      source: `gmail:${email}`,
+    });
+  }
+
+  return emails;
+}

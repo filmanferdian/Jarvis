@@ -43,7 +43,7 @@
       "position": [440, 300],
       "credentials": {
         "googleCalendarOAuth2Api": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "id": "VQo95Gsxh2ibgi34",
           "name": "Google Calendar"
         }
       }
@@ -88,47 +88,97 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "DELETE FROM calendar_events WHERE start_time::date = CURRENT_DATE AND source = 'google-1';"
+        "method": "DELETE",
+        "url": "https://voycxhchxtggncosfzuf.supabase.co/rest/v1/calendar_events",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "source",
+              "value": "eq.google-1"
+            },
+            {
+              "name": "start_time",
+              "value": "=gte.{{ $now.startOf('day').toISO() }}"
+            },
+            {
+              "name": "start_time",
+              "value": "=lt.{{ $now.plus({days:1}).startOf('day').toISO() }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REPLACE_WITH_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_SUPABASE_ANON_KEY"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "clear-today",
       "name": "Clear Today Events",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [1100, 300],
-      "credentials": {
-        "supabaseApi": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
-          "name": "Supabase"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300]
     },
     {
       "parameters": {
-        "tableId": "calendar_events",
-        "fieldsUi": {
-          "fieldValues": [
-            { "fieldName": "event_id", "fieldValue": "={{ $json.event_id }}" },
-            { "fieldName": "title", "fieldValue": "={{ $json.title }}" },
-            { "fieldName": "start_time", "fieldValue": "={{ $json.start_time }}" },
-            { "fieldName": "end_time", "fieldValue": "={{ $json.end_time }}" },
-            { "fieldName": "is_all_day", "fieldValue": "={{ $json.is_all_day }}" },
-            { "fieldName": "last_synced", "fieldValue": "={{ $json.last_synced }}" },
-            { "fieldName": "source", "fieldValue": "={{ $json.source }}" }
+        "method": "POST",
+        "url": "https://voycxhchxtggncosfzuf.supabase.co/rest/v1/calendar_events",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "event_id"
+            }
           ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REPLACE_WITH_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $json.event_id, title: $json.title, start_time: $json.start_time, end_time: $json.end_time, is_all_day: $json.is_all_day, last_synced: $json.last_synced, source: $json.source }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 100
+            }
+          }
         }
       },
       "id": "upsert-events",
       "name": "Upsert to Supabase",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [1320, 300],
-      "credentials": {
-        "supabaseApi": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
-          "name": "Supabase"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 300]
     }
   ],
   "connections": {

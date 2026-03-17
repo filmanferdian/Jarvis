@@ -39,7 +39,7 @@
       "position": [440, 300],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "id": "VQo95Gsxh2ibgi34",
           "name": "Gmail OAuth2"
         }
       }
@@ -87,7 +87,7 @@
       "position": [940, 300],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "id": "Gr32CPVOEbIOZK7M",
           "name": "Anthropic API Key"
         }
       }
@@ -104,20 +104,48 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "=INSERT INTO email_synthesis (date, synthesis_text, important_count, deadline_count, created_at) VALUES ('{{ $json.date }}', '{{ $json.synthesis_text.replace(/'/g, \"''\") }}', {{ $json.important_count }}, {{ $json.deadline_count }}, '{{ $json.created_at }}') ON CONFLICT (date) DO UPDATE SET synthesis_text = EXCLUDED.synthesis_text, important_count = EXCLUDED.important_count, deadline_count = EXCLUDED.deadline_count, created_at = EXCLUDED.created_at;"
+        "method": "POST",
+        "url": "https://voycxhchxtggncosfzuf.supabase.co/rest/v1/email_synthesis",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "date"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REPLACE_WITH_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ date: $json.date, synthesis_text: $json.synthesis_text, important_count: $json.important_count, deadline_count: $json.deadline_count, created_at: $json.created_at }) }}",
+        "options": {}
       },
       "id": "save-synthesis",
       "name": "Save to Supabase",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [1400, 300],
-      "credentials": {
-        "supabaseApi": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
-          "name": "Supabase"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 300]
     }
   ],
   "connections": {

@@ -66,6 +66,7 @@ export default function TasksCard() {
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<string>('Medium');
   const [submitting, setSubmitting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const tasks = data?.tasks ?? [];
 
@@ -117,6 +118,25 @@ export default function TasksCard() {
     }
   };
 
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const token = localStorage.getItem('jarvis_token') || '';
+      const res = await fetch('/api/sync/notion', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        await refetch();
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
@@ -143,6 +163,16 @@ export default function TasksCard() {
           <span className="text-xs text-jarvis-text-dim font-mono">
             {tasks.length} task{tasks.length !== 1 ? 's' : ''}
           </span>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="text-jarvis-text-muted hover:text-jarvis-accent transition-colors disabled:opacity-50"
+            title="Sync from Notion"
+          >
+            <svg className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
           <button
             onClick={() => setShowForm(!showForm)}
             className="text-jarvis-accent hover:text-jarvis-accent/80 transition-colors"
