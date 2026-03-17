@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
-import { syncOutlookCalendar } from '@/lib/sync/outlookCalendar';
+import { syncGoogleCalendar } from '@/lib/sync/googleCalendar';
 
-// POST: Sync today's Outlook calendar events to Supabase
+// POST: Sync today's Google Calendar events to Supabase
 export const POST = withAuth(async (_req: NextRequest) => {
   try {
-    const result = await syncOutlookCalendar();
+    const result = await syncGoogleCalendar();
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message === 'NO_TOKENS' || message.includes('refresh failed')) {
+    if (message.includes('NO_GOOGLE_TOKENS')) {
       return NextResponse.json(
-        { error: 'Microsoft auth required', authUrl: '/api/auth/microsoft' },
+        { error: 'Google auth required', authUrl: '/api/auth/google' },
         { status: 401 },
       );
     }
-    console.error('Outlook sync error:', err);
+    console.error('Google Calendar sync error:', err);
     return NextResponse.json(
-      { error: 'Outlook sync failed', details: message },
+      { error: 'Google Calendar sync failed', details: message },
       { status: 500 },
     );
   }

@@ -5,7 +5,8 @@ import type { EmailSummary } from './microsoft';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_BASE_URL = 'https://gmail.googleapis.com/gmail/v1';
-const SCOPES = 'openid email https://www.googleapis.com/auth/gmail.readonly';
+const CALENDAR_BASE_URL = 'https://www.googleapis.com/calendar/v3';
+const SCOPES = 'openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly';
 
 // --- Types ---
 
@@ -208,4 +209,77 @@ export async function fetchRecentEmails(
   }
 
   return emails;
+}
+
+// --- Google Calendar API ---
+
+interface GoogleCalendarEvent {
+  id: string;
+  summary?: string;
+  start: { dateTime?: string; date?: string; timeZone?: string };
+  end: { dateTime?: string; date?: string; timeZone?: string };
+}
+
+export interface CalendarEventRow {
+  event_id: string;
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  is_all_day: boolean;
+  source: string;
+  last_synced: string;
+}
+
+export function transformGoogleEvent(event: GoogleCalendarEvent, source: string): CalendarEventRow {
+  const now = new Date().toISOString();
+  const isAllDay = !event.start.dateTime;
+
+  let startTime: string;
+  let endTime: string | null;
+
+  if (isAllDay) {
+    startTime = `${event.start.date}T00:00:00+07:00`;
+    endTime = event.end.date ? `${event.end.date}T00:00:00+07:00` : null;
+  } else {
+    startTime = event.start.dateTime!;
+    endTime = event.end.dateTime || null;
+  }
+
+  return {
+    event_id: event.id,
+    title: event.summary || '(No title)',
+    start_time: startTime,
+    end_time: endTime,
+    is_all_day: isAllDay,
+    source,
+    last_synced: now,
+  };
+}
+
+export async function fetchCalendarEvents(
+  accessToken: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GoogleCalendarEvent[]> {
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '50',
+    timeZone: 'Asia/Jakarta',
+  });
+
+  const url = `${CALENDAR_BASE_URL}/calendars/primary/events?${params.toString()}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Google Calendar API error: ${res.status} ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.items || [];
 }

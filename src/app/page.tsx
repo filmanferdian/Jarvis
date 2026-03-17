@@ -1,18 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import BriefingCard from '@/components/BriefingCard';
 import ScheduleStrip from '@/components/ScheduleStrip';
 import TasksCard from '@/components/TasksCard';
 import EmailCard from '@/components/EmailCard';
+import HealthCard from '@/components/HealthCard';
 import KpiRow from '@/components/KpiRow';
 import VoiceMic from '@/components/VoiceMic';
 import AuthGate from '@/components/AuthGate';
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Auto-sync on dashboard load (fire-and-forget, debounced server-side)
+  useEffect(() => {
+    const token = localStorage.getItem('jarvis_token');
+    if (!token) return;
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {}); // silently ignore errors
+  }, []);
 
   return (
     <AuthGate>
@@ -35,6 +46,7 @@ export default function Dashboard() {
               <TasksCard />
             </div>
             <EmailCard />
+            <HealthCard />
 
             <VoiceMic />
           </main>

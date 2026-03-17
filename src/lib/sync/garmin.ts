@@ -1,0 +1,237 @@
+import { GarminConnect } from 'garmin-connect';
+import { supabase } from '@/lib/supabase';
+
+export interface GarminSyncResult {
+  date: string;
+  metrics: Record<string, unknown>;
+  activitiesSynced: number;
+  timestamp: string;
+}
+
+function formatDate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function getWibToday(): string {
+  const now = new Date();
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const wibDate = new Date(now.getTime() + wibOffset);
+  return formatDate(wibDate);
+}
+
+async function createClient(): Promise<GarminConnect> {
+  const email = process.env.GARMIN_EMAIL;
+  const password = process.env.GARMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error('GARMIN_EMAIL and GARMIN_PASSWORD must be configured');
+  }
+
+  const client = new GarminConnect({ username: email, password });
+  await client.login();
+  return client;
+}
+
+export async function syncGarmin(): Promise<GarminSyncResult> {
+  const client = await createClient();
+  const today = getWibToday();
+  const dateObj = new Date(`${today}T00:00:00+07:00`);
+
+  // Fetch data from multiple endpoints in parallel where possible
+  const [
+    steps,
+    sleepData,
+    heartRate,
+    activities,
+  ] = await Promise.allSettled([
+    client.getSteps(dateObj),
+    client.getSleepData(dateObj),
+    client.getHeartRate(dateObj),
+    client.getActivities(0, 5),
+  ]);
+
+  // Fetch additional metrics via generic API (these endpoints may vary)
+  const apiBase = `https://connectapi.garmin.com`;
+  const [
+    dailySummary,
+    bodyBattery,
+    stressData,
+    hrvData,
+    trainingReadiness,
+    trainingStatus,
+  ] = await Promise.allSettled([
+    client.get(`${apiBase}/usersummary-service/usersummary/daily/${today}`),
+    client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${today}/${today}`),
+    client.get(`${apiBase}/wellness-service/wellness/dailyStress/${today}`),
+    client.get(`${apiBase}/hrv-service/hrv/${today}`),
+    client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${today}`),
+    client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${today}`),
+  ]);
+
+  // Extract values safely
+  const summary = dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {};
+  const bb = bodyBattery.status === 'fulfilled' ? bodyBattery.value as unknown[] : [];
+  const stress = stressData.status === 'fulfilled' ? stressData.value as Record<string, unknown> : {};
+  const hrv = hrvData.status === 'fulfilled' ? hrvData.value as Record<string, unknown> : {};
+  const tr = trainingReadiness.status === 'fulfilled' ? trainingReadiness.value as Record<string, unknown>[] : [];
+  const ts = trainingStatus.status === 'fulfilled' ? trainingStatus.value as Record<string, unknown> : {};
+  const hr = heartRate.status === 'fulfilled' ? heartRate.value as unknown as Record<string, unknown> : {};
+  const sleep = sleepData.status === 'fulfilled' ? sleepData.value as unknown as Record<string, unknown> : {};
+  const stepsVal = steps.status === 'fulfilled' ? steps.value as number : null;
+
+  // Parse nested structures from actual Garmin API responses
+  const sleepDTO = (sleep.dailySleepDTO as Record<string, unknown>) ?? {};
+  const hrvSummary = (hrv.hrvSummary as Record<string, unknown>) ?? {};
+
+  // VO2 Max is nested: mostRecentVO2Max.generic.vo2MaxValue
+  const recentVO2Generic = ((ts.mostRecentVO2Max as Record<string, unknown>)?.generic as Record<string, unknown>) ?? {};
+
+  // Training status is nested by device ID: mostRecentTrainingStatus.latestTrainingStatusData[deviceId]
+  const trainingStatusMap = ((ts.mostRecentTrainingStatus as Record<string, unknown>)?.latestTrainingStatusData as Record<string, Record<string, unknown>>) ?? {};
+  const firstTrainingStatus = Object.values(trainingStatusMap)[0] ?? {};
+  const acuteDTO = (firstTrainingStatus.acuteTrainingLoadDTO as Record<string, unknown>) ?? {};
+
+  // Body battery: tuples are [timestamp, status_string, battery_level, change]
+  const bbArray = (stress.bodyBatteryValuesArray as unknown[][] | null) ?? [];
+  const lastBB = bbArray.length > 0 ? bbArray[bbArray.length - 1] : null;
+  const bodyBatteryChange = (sleep.bodyBatteryChange as number) ?? null;
+
+  // Sleep score: { overall: { value: 60, qualifierKey: "FAIR" }, ... }
+  const sleepScoresOverall = ((sleepDTO.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>) ?? {};
+
+  // Training status feedback phrase like "PRODUCTIVE_1" → extract status name
+  const trainingFeedback = (firstTrainingStatus.trainingStatusFeedbackPhrase as string) ?? null;
+  const trainingStatusLabel = trainingFeedback ? trainingFeedback.replace(/_\d+$/, '') : null;
+
+  // Build garmin_daily record
+  const dailyRecord = {
+    date: today,
+    steps: stepsVal ?? null,
+    steps_goal: null as number | null,
+    resting_hr: (hr.restingHeartRate as number) ?? null,
+    stress_level: (stress.avgStressLevel as number) ?? null,
+    hrv_status: (hrvSummary.status as string) ?? (sleep.hrvStatus as string) ?? null,
+    hrv_7d_avg: (hrvSummary.weeklyAvg as number) ?? (sleep.avgOvernightHrv as number) ?? null,
+    sleep_score: (sleepScoresOverall.value as number) ?? null,
+    sleep_duration_seconds: (sleepDTO.sleepTimeSeconds as number) ?? null,
+    body_battery: lastBB ? (lastBB[2] as number) : null,
+    body_battery_charged: bodyBatteryChange != null ? Math.abs(bodyBatteryChange) : null,
+    body_battery_drained: null as number | null,
+    training_readiness: Array.isArray(tr) && tr.length > 0 ? (tr[0].score as number) ?? null : null,
+    training_status: trainingStatusLabel,
+    vo2_max: (recentVO2Generic.vo2MaxValue as number) ?? null,
+    calories_active: null as number | null,
+    calories_resting: null as number | null,
+    calories_total: null as number | null,
+    fitness_age: (recentVO2Generic.fitnessAge as number) ?? null,
+    endurance_score: null as number | null,
+    training_load_acute: (acuteDTO.dailyTrainingLoadAcute as number) ?? null,
+    training_load_chronic: (acuteDTO.dailyTrainingLoadChronic as number) ?? null,
+    raw_json: { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep },
+    last_synced: new Date().toISOString(),
+  };
+
+  // Upsert daily record (delete-then-insert for date-unique tables)
+  await supabase.from('garmin_daily').delete().eq('date', today);
+  const { error: dailyErr } = await supabase.from('garmin_daily').insert(dailyRecord);
+  if (dailyErr) throw dailyErr;
+
+  // Sync recent activities
+  let activitiesSynced = 0;
+  if (activities.status === 'fulfilled' && Array.isArray(activities.value)) {
+    const actRecords = (activities.value as unknown as Record<string, unknown>[]).map((act) => ({
+      activity_id: String(act.activityId),
+      activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
+      distance_meters: (act.distance as number) ?? null,
+      duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
+      avg_pace: (act.averageSpeed as number)
+        ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
+        : null,
+      avg_hr: (act.averageHR as number) ?? null,
+      calories: (act.calories as number) ?? null,
+      started_at: act.startTimeGMT ? new Date(act.startTimeGMT as string).toISOString() : null,
+      raw_json: act,
+      last_synced: new Date().toISOString(),
+    }));
+
+    for (const rec of actRecords) {
+      const { error } = await supabase
+        .from('garmin_activities')
+        .upsert(rec, { onConflict: 'activity_id' });
+      if (!error) activitiesSynced++;
+    }
+  }
+
+  // Auto-update domain KPIs for Health & Fitness
+  await updateHealthKpis(dailyRecord);
+
+  return {
+    date: today,
+    metrics: {
+      steps: dailyRecord.steps,
+      resting_hr: dailyRecord.resting_hr,
+      sleep_score: dailyRecord.sleep_score,
+      stress_level: dailyRecord.stress_level,
+      body_battery: dailyRecord.body_battery,
+      training_readiness: dailyRecord.training_readiness,
+      vo2_max: dailyRecord.vo2_max,
+    },
+    activitiesSynced,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
+  // Look up Health and Fitness domain IDs
+  const { data: domains } = await supabase
+    .from('domains')
+    .select('id, name')
+    .in('name', ['Health', 'Fitness']);
+
+  if (!domains) return;
+
+  const healthDomain = domains.find((d) => d.name === 'Health');
+  const fitnessDomain = domains.find((d) => d.name === 'Fitness');
+  const now = new Date().toISOString();
+
+  const kpis: { domain_id: string; kpi_name: string; kpi_value: number | null; kpi_unit: string; last_updated: string }[] = [];
+
+  if (healthDomain) {
+    if (daily.resting_hr != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Resting Heart Rate', kpi_value: daily.resting_hr as number, kpi_unit: 'bpm', last_updated: now });
+    if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now });
+    if (daily.stress_level != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Stress Level', kpi_value: daily.stress_level as number, kpi_unit: '/100', last_updated: now });
+    if (daily.hrv_7d_avg != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'HRV 7d Average', kpi_value: daily.hrv_7d_avg as number, kpi_unit: 'ms', last_updated: now });
+  }
+
+  if (fitnessDomain) {
+    if (daily.vo2_max != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'VO2 Max', kpi_value: daily.vo2_max as number, kpi_unit: 'ml/kg/min', last_updated: now });
+    if (daily.training_readiness != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Training Readiness', kpi_value: daily.training_readiness as number, kpi_unit: '/100', last_updated: now });
+    if (daily.steps != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: daily.steps as number, kpi_unit: 'steps', last_updated: now });
+    if (daily.endurance_score != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Endurance Score', kpi_value: daily.endurance_score as number, kpi_unit: 'score', last_updated: now });
+  }
+
+  // Upsert KPIs — match on domain_id + kpi_name
+  for (const kpi of kpis) {
+    // Check if KPI exists
+    const { data: existing } = await supabase
+      .from('domain_kpis')
+      .select('id')
+      .eq('domain_id', kpi.domain_id)
+      .eq('kpi_name', kpi.kpi_name)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('domain_kpis')
+        .update({ kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated })
+        .eq('id', existing.id);
+    } else {
+      await supabase.from('domain_kpis').insert({
+        domain_id: kpi.domain_id,
+        kpi_name: kpi.kpi_name,
+        kpi_value: String(kpi.kpi_value),
+        kpi_unit: kpi.kpi_unit,
+        last_updated: kpi.last_updated,
+      });
+    }
+  }
+}

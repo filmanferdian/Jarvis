@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth';
+import { withCronAuth } from '@/lib/cronAuth';
 import { syncNotionTasks } from '@/lib/sync/notionTasks';
 
-// POST: Sync all tasks from Notion to local Supabase cache
-export const POST = withAuth(async (_req: NextRequest) => {
+export const GET = withCronAuth(async (_req: NextRequest) => {
   try {
     const result = await syncNotionTasks();
     return NextResponse.json(result);
   } catch (err) {
+    console.error('Cron: Notion sync error:', err);
     return NextResponse.json(
       { error: 'Notion sync failed', details: String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
