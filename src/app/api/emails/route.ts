@@ -32,6 +32,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
     return NextResponse.json({
       date: today,
       synthesis: data.synthesis_text,
+      voiceover: data.voiceover_text || data.synthesis_text,
       importantCount: data.important_count,
       deadlineCount: data.deadline_count,
       createdAt: data.created_at,

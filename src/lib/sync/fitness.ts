@@ -1,0 +1,342 @@
+import { supabase } from '@/lib/supabase';
+
+// Notion page IDs for the transformation program
+const PROGRAM_PAGE_ID = '2f2c674a-ecec-819d-ac40-c78f9fb5a517';
+const PARENT_PAGE_ID = '2f2c674a-ecec-8078-9657-f4858a35305d';
+
+export interface FitnessContext {
+  current_week: number;
+  current_phase: string;
+  phase_end_week: number;
+  phase_tone: string;
+  training_day_map: Record<string, TrainingDay>;
+  cardio_schedule: Record<string, string>;
+  macro_training: MacroTargets;
+  macro_rest: MacroTargets;
+  eating_window: EatingWindow;
+  milestones: Milestone[];
+  next_deload_week: number;
+  daily_habits: DailyHabits;
+  special_notes: string;
+  active_subpages: string[];
+}
+
+interface TrainingDay {
+  type: string;
+  focus: string;
+  exercises: Exercise[];
+  total_sets: number;
+  duration: string;
+}
+
+interface Exercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: string;
+  notes?: string;
+}
+
+interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface EatingWindow {
+  open: string;
+  close: string;
+  pre_workout?: string;
+}
+
+interface Milestone {
+  week: number;
+  weight: string;
+  marker: string;
+}
+
+interface DailyHabits {
+  wake_time: string;
+  cardio_time: string;
+  training_time: string;
+  sleep_target: string;
+  wind_down: string;
+  lights_out: string;
+}
+
+async function fetchNotionPage(pageId: string): Promise<string> {
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey) throw new Error('NOTION_API_KEY not configured');
+
+  // Fetch page blocks (content)
+  const blocks: string[] = [];
+  let hasMore = true;
+  let startCursor: string | undefined;
+
+  while (hasMore) {
+    const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
+    url.searchParams.set('page_size', '100');
+    if (startCursor) url.searchParams.set('start_cursor', startCursor);
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${notionApiKey}`,
+        'Notion-Version': '2022-06-28',
+      },
+    });
+
+    if (!res.ok) throw new Error(`Notion API error: ${res.status}`);
+    const data = await res.json();
+
+    for (const block of data.results) {
+      const text = extractBlockText(block);
+      if (text) blocks.push(text);
+    }
+
+    hasMore = data.has_more;
+    startCursor = data.next_cursor || undefined;
+  }
+
+  return blocks.join('\n');
+}
+
+function extractBlockText(block: Record<string, unknown>): string {
+  const type = block.type as string;
+  const content = block[type] as Record<string, unknown> | undefined;
+  if (!content) return '';
+
+  const richText = content.rich_text as Array<{ plain_text: string }> | undefined;
+  if (richText) {
+    const text = richText.map((t) => t.plain_text).join('');
+    if (type === 'heading_1') return `# ${text}`;
+    if (type === 'heading_2') return `## ${text}`;
+    if (type === 'heading_3') return `### ${text}`;
+    if (type === 'bulleted_list_item') return `- ${text}`;
+    if (type === 'numbered_list_item') return `- ${text}`;
+    return text;
+  }
+
+  return '';
+}
+
+async function fetchChildPages(): Promise<{ title: string; id: string }[]> {
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey) throw new Error('NOTION_API_KEY not configured');
+
+  const res = await fetch(`https://api.notion.com/v1/blocks/${PARENT_PAGE_ID}/children?page_size=100`, {
+    headers: {
+      Authorization: `Bearer ${notionApiKey}`,
+      'Notion-Version': '2022-06-28',
+    },
+  });
+
+  if (!res.ok) throw new Error(`Notion API error: ${res.status}`);
+  const data = await res.json();
+
+  return data.results
+    .filter((b: Record<string, unknown>) => b.type === 'child_page')
+    .map((b: Record<string, unknown>) => ({
+      title: (b.child_page as { title: string })?.title || '',
+      id: b.id as string,
+    }));
+}
+
+async function fetchPageLastEdited(pageId: string): Promise<string> {
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey) throw new Error('NOTION_API_KEY not configured');
+
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    headers: {
+      Authorization: `Bearer ${notionApiKey}`,
+      'Notion-Version': '2022-06-28',
+    },
+  });
+
+  if (!res.ok) throw new Error(`Notion API error: ${res.status}`);
+  const data = await res.json();
+  return data.last_edited_time;
+}
+
+async function extractWithClaude(programContent: string, subpageContents: string[]): Promise<FitnessContext> {
+  const apiKey = process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('Anthropic API key not configured');
+
+  const subpageText = subpageContents.length > 0
+    ? `\n\n--- ACTIVE SUB-PAGES (overrides) ---\n${subpageContents.join('\n\n---\n\n')}`
+    : '';
+
+  const prompt = `You are extracting structured fitness program data from a Notion page. Extract the following JSON structure from the program content below. Be precise with numbers and exercise details.
+
+IMPORTANT: Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
+
+Return ONLY valid JSON matching this exact structure:
+{
+  "current_week": <number — calculate from program start date, or use the most recent week mentioned in sub-pages/adjustments>,
+  "current_phase": "<string — e.g. 'Phase 1: Foundation'>",
+  "phase_end_week": <number>,
+  "phase_tone": "<one of: encouraging_foundational, momentum_consistency, empathetic_grind, celebratory_finish>",
+  "training_day_map": {
+    "monday": { "type": "<e.g. Lower Strength>", "focus": "<brief>", "exercises": [{"name": "<exercise>", "sets": <n>, "reps": "<range>", "rest": "<time>", "notes": "<optional>"}], "total_sets": <n>, "duration": "<range>" },
+    "tuesday": { ... },
+    "wednesday": { "type": "Rest", "focus": "Cardio only" },
+    "thursday": { ... },
+    "friday": { ... },
+    "saturday": { "type": "Rest", "focus": "Cardio only" },
+    "sunday": { "type": "Rest", "focus": "Optional cardio" }
+  },
+  "cardio_schedule": {
+    "monday": "<e.g. 30min walk>",
+    "tuesday": "<e.g. 30min walk>",
+    "wednesday": "<e.g. 30min run @ 130-143 BPM>",
+    "thursday": "<e.g. 30min walk>",
+    "friday": "<e.g. 30min walk>",
+    "saturday": "<e.g. 55min run @ 130-143 BPM>",
+    "sunday": "<e.g. 30min walk or REST>"
+  },
+  "macro_training": { "calories": <n>, "protein": <n>, "carbs": <n>, "fat": <n> },
+  "macro_rest": { "calories": <n>, "protein": <n>, "carbs": <n>, "fat": <n> },
+  "eating_window": { "open": "<HH:MM>", "close": "<HH:MM>", "pre_workout": "<HH:MM or null>" },
+  "milestones": [{ "week": <n>, "weight": "<target>", "marker": "<description>" }, ...],
+  "next_deload_week": <number — the next upcoming deload week>,
+  "daily_habits": {
+    "wake_time": "<HH:MM>",
+    "cardio_time": "<HH:MM>",
+    "training_time": "<HH:MM>",
+    "sleep_target": "<hours>",
+    "wind_down": "<HH:MM>",
+    "lights_out": "<HH:MM>"
+  },
+  "special_notes": "<any current adaptations, overrides, or important context>"
+}
+
+--- PROGRAM CONTENT ---
+${programContent}
+${subpageText}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Claude API error: ${err}`);
+  }
+
+  const data = await res.json();
+  const rawText = data.content?.[0]?.text || '{}';
+
+  // Extract JSON from response
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Failed to extract JSON from Claude response');
+
+  return JSON.parse(jsonMatch[0]) as FitnessContext;
+}
+
+export interface FitnessSyncResult {
+  synced: boolean;
+  skipped: boolean;
+  current_week: number;
+  current_phase: string;
+  timestamp: string;
+}
+
+export async function syncFitness(force = false): Promise<FitnessSyncResult> {
+  const timestamp = new Date().toISOString();
+
+  // Check last edit time
+  const lastEdited = await fetchPageLastEdited(PROGRAM_PAGE_ID);
+
+  if (!force) {
+    const { data: existing } = await supabase
+      .from('fitness_context')
+      .select('notion_last_edited')
+      .order('synced_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (existing?.notion_last_edited === lastEdited) {
+      return {
+        synced: false,
+        skipped: true,
+        current_week: 0,
+        current_phase: '',
+        timestamp,
+      };
+    }
+  }
+
+  // Fetch program content
+  const programContent = await fetchNotionPage(PROGRAM_PAGE_ID);
+
+  // Fetch child pages to detect active sub-pages
+  const childPages = await fetchChildPages();
+  const activeSubpages = childPages
+    .filter((p) => p.title !== 'Transformation program' && p.title !== 'Checkpoint')
+    .map((p) => p.title);
+
+  // Fetch content of active sub-pages (limit to most relevant ones)
+  const relevantSubpages = childPages.filter((p) =>
+    p.title.includes('Cardio Adjustments') ||
+    p.title.includes('Ramadan') ||
+    p.title.includes('VO2 Max') ||
+    p.title.includes('Phase')
+  );
+
+  const subpageContents: string[] = [];
+  for (const sp of relevantSubpages.slice(0, 3)) {
+    try {
+      const content = await fetchNotionPage(sp.id);
+      subpageContents.push(`## ${sp.title}\n${content}`);
+    } catch {
+      // Skip sub-pages that fail to fetch
+    }
+  }
+
+  // Extract structured data via Claude
+  const context = await extractWithClaude(programContent, subpageContents);
+
+  // Upsert to Supabase (delete old, insert new — single row)
+  await supabase.from('fitness_context').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+  const { error } = await supabase.from('fitness_context').insert({
+    current_week: context.current_week,
+    current_phase: context.current_phase,
+    phase_end_week: context.phase_end_week,
+    phase_tone: context.phase_tone,
+    training_day_map: context.training_day_map,
+    cardio_schedule: context.cardio_schedule,
+    macro_training: context.macro_training,
+    macro_rest: context.macro_rest,
+    eating_window: context.eating_window,
+    milestones: context.milestones,
+    next_deload_week: context.next_deload_week,
+    daily_habits: context.daily_habits,
+    special_notes: context.special_notes,
+    active_subpages: activeSubpages,
+    notion_page_id: PROGRAM_PAGE_ID,
+    notion_last_edited: lastEdited,
+    synced_at: timestamp,
+  });
+
+  if (error) throw error;
+
+  return {
+    synced: true,
+    skipped: false,
+    current_week: context.current_week,
+    current_phase: context.current_phase,
+    timestamp,
+  };
+}

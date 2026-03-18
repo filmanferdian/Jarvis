@@ -26,10 +26,22 @@ export const GET = withAuth(async (_req: NextRequest) => {
 
     if (error) throw error;
 
+    // Filter out obsolete/test tasks that haven't been archived in Notion
+    const TASK_BLACKLIST = [
+      'create performance marketing plan',
+      'create social media plan',
+      'test task from jarvis',
+    ];
+    const filtered = (data ?? []).filter(
+      (t: { name?: string }) => !TASK_BLACKLIST.some(
+        (b) => (t.name || '').toLowerCase().includes(b)
+      )
+    );
+
     return NextResponse.json({
       date: today,
-      tasks: data ?? [],
-      count: data?.length ?? 0,
+      tasks: filtered,
+      count: filtered.length,
     });
   } catch {
     return NextResponse.json(

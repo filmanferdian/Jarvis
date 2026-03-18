@@ -29,7 +29,7 @@ export const VoiceIntentSchema = z.object({
 });
 
 export const TtsSchema = z.object({
-  text: z.string().min(1, 'text is required').max(4096),
+  text: z.string().min(1, 'text is required').max(5000),
 });
 
 export const WeightSchema = z.object({

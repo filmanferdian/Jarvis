@@ -106,7 +106,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
       })
       .filter((t) => t.status !== 'Done' && t.status !== 'Archived');
 
-    // Upsert to Supabase
+    // Upsert active tasks to Supabase
     if (tasks.length > 0) {
       const { error: dbError } = await supabase
         .from('notion_tasks')
@@ -115,8 +115,36 @@ export const POST = withAuth(async (_req: NextRequest) => {
       if (dbError) throw dbError;
     }
 
+    // Clean up: remove tasks from Supabase that no longer exist in Notion
+    // (deleted or moved to Done/Archived in Notion)
+    const activePageIds = tasks.map((t) => t.notion_page_id);
+    const { data: localTasks } = await supabase
+      .from('notion_tasks')
+      .select('notion_page_id');
+
+    let deletedCount = 0;
+    if (localTasks) {
+      const toDelete = localTasks
+        .filter((t) => !activePageIds.includes(t.notion_page_id))
+        .map((t) => t.notion_page_id);
+
+      if (toDelete.length > 0) {
+        const { error: delError } = await supabase
+          .from('notion_tasks')
+          .delete()
+          .in('notion_page_id', toDelete);
+
+        if (delError) {
+          console.error('[Notion Sync] Failed to delete stale tasks:', delError);
+        } else {
+          deletedCount = toDelete.length;
+        }
+      }
+    }
+
     return NextResponse.json({
       synced: tasks.length,
+      deleted: deletedCount,
       total_in_notion: allPages.length,
       timestamp: now,
     });

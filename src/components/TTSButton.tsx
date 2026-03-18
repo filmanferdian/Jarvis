@@ -4,33 +4,51 @@ import { useState, useRef, useEffect } from 'react';
 
 interface TTSButtonProps {
   text: string;
+  voice?: '1' | '2';
 }
 
-export default function TTSButton({ text }: TTSButtonProps) {
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Cleanup object URL on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      abortRef.current?.abort();
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      if (audioRef.current) audioRef.current.pause();
     };
   }, []);
 
   const stopPlayback = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    // Abort in-flight fetch
+    abortRef.current?.abort();
+    abortRef.current = null;
+
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';   // Force stop on Mobile Safari
+        audioRef.current.load();     // Reset the audio element
+        audioRef.current = null;
+      }
+    } catch { /* ignore mobile Safari quirks */ }
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
     }
     window.speechSynthesis?.cancel();
     setIsPlaying(false);
+    setIsLoading(false);
   };
 
   const fallbackToWebSpeech = () => {
@@ -42,43 +60,108 @@ export default function TTSButton({ text }: TTSButtonProps) {
     setIsPlaying(true);
   };
 
-  const handleToggle = async () => {
-    if (isPlaying) {
-      stopPlayback();
-      return;
+  // Streaming playback: start playing as chunks arrive (non-iOS only)
+  const playStreaming = async (controller: AbortController) => {
+    const res = await fetch(`/api/tts?stream=true&voice=${voice}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
+    if (!res.body) throw new Error('No response body for streaming');
+
+    // Collect chunks into an array, start playback after first chunk
+    const reader = res.body.getReader();
+    const chunks: ArrayBuffer[] = [];
+    let firstChunkPlayed = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value.buffer as ArrayBuffer);
+
+      // After accumulating ~20KB, start playback for faster time-to-audio
+      if (!firstChunkPlayed && chunks.reduce((s, c) => s + c.byteLength, 0) > 20000) {
+        firstChunkPlayed = true;
+        const partial = new Blob(chunks, { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(partial);
+        objectUrlRef.current = url;
+
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => setIsPlaying(false);
+        audio.onerror = () => setIsPlaying(false);
+        await audio.play();
+        setIsPlaying(true);
+        setIsLoading(false);
+      }
     }
 
-    setIsLoading(true);
-
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
-
-      const blob = await res.blob();
-
-      // Revoke previous URL
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
-
+    // If we never started early playback (short audio), play the full blob
+    if (!firstChunkPlayed) {
+      const blob = new Blob(chunks, { type: 'audio/mpeg' });
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
 
       const audio = new Audio(url);
       audioRef.current = audio;
-
       audio.onended = () => setIsPlaying(false);
       audio.onerror = () => setIsPlaying(false);
-
       await audio.play();
       setIsPlaying(true);
-    } catch {
+      setIsLoading(false);
+    }
+  };
+
+  // Non-streaming playback: fetch full audio then play (iOS fallback)
+  const playBlob = async (controller: AbortController) => {
+    const res = await fetch(`/api/tts?voice=${voice}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
+
+    const blob = await res.blob();
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+
+    const url = URL.createObjectURL(blob);
+    objectUrlRef.current = url;
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.onended = () => setIsPlaying(false);
+    audio.onerror = () => setIsPlaying(false);
+    await audio.play();
+    setIsPlaying(true);
+  };
+
+  const handleToggle = async () => {
+    if (isPlaying || isLoading) {
+      stopPlayback();
+      return;
+    }
+
+    setIsLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      // Use streaming on non-iOS for faster time-to-audio
+      if (!isIOS()) {
+        await playStreaming(controller);
+      } else {
+        await playBlob(controller);
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       // Fallback to Web Speech API
       fallbackToWebSpeech();
     } finally {
@@ -89,10 +172,9 @@ export default function TTSButton({ text }: TTSButtonProps) {
   return (
     <button
       onClick={handleToggle}
-      disabled={isLoading}
-      className="p-2 rounded-lg border border-jarvis-border hover:border-jarvis-accent transition-colors disabled:opacity-50"
-      aria-label={isPlaying ? 'Stop reading' : 'Read briefing aloud'}
-      title={isPlaying ? 'Stop reading' : 'Read briefing aloud'}
+      className="p-2 rounded-lg border border-jarvis-border hover:border-jarvis-accent transition-colors"
+      aria-label={isPlaying || isLoading ? 'Stop reading' : 'Read briefing aloud'}
+      title={isPlaying || isLoading ? 'Stop reading' : 'Read briefing aloud'}
     >
       {isLoading ? (
         <svg

@@ -32,6 +32,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
     return NextResponse.json({
       date: today,
       briefing: data.briefing_text,
+      voiceover: data.voiceover_text || data.briefing_text,
       generatedAt: data.generated_at,
       dataSources: data.data_sources_used,
     });

@@ -4,6 +4,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { TtsSchema } from '@/lib/validation';
 import { safeError } from '@/lib/errors';
 
+// ElevenLabs TTS with OpenAI fallback
 export const POST = withAuth(async (req: NextRequest) => {
   try {
     const body = await req.json();
@@ -16,13 +17,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     }
     const { text } = parsed.data;
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
-      );
-    }
+    const useStream = req.nextUrl.searchParams.get('stream') === 'true';
 
     // Rate limit check (shares daily quota with other Claude/AI calls)
     const { allowed, remaining } = await checkRateLimit();
@@ -33,10 +28,79 @@ export const POST = withAuth(async (req: NextRequest) => {
       );
     }
 
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+    const voiceParam = req.nextUrl.searchParams.get('voice'); // "1" or "2"
+    const voiceId = voiceParam === '2'
+      ? process.env.ELEVENLABS_VOICE_ID_2
+      : process.env.ELEVENLABS_VOICE_ID;
+
+    if (elevenLabsKey && voiceId) {
+      // ElevenLabs primary path
+      const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
+      const endpoint = useStream
+        ? `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`
+        : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
+      const ttsRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': elevenLabsKey,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: modelId,
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.4,
+          },
+        }),
+      });
+
+      if (!ttsRes.ok) {
+        const err = await ttsRes.text();
+        console.error(`ElevenLabs TTS error: ${ttsRes.status} ${err}`);
+        // Fall through to OpenAI fallback
+      } else {
+        await incrementUsage();
+
+        if (useStream && ttsRes.body) {
+          // Streaming response — pass through chunks
+          return new NextResponse(ttsRes.body, {
+            status: 200,
+            headers: {
+              'Content-Type': 'audio/mpeg',
+              'Transfer-Encoding': 'chunked',
+            },
+          });
+        }
+
+        const audioBuffer = await ttsRes.arrayBuffer();
+        return new NextResponse(audioBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Content-Length': String(audioBuffer.byteLength),
+          },
+        });
+      }
+    }
+
+    // OpenAI fallback
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) {
+      return NextResponse.json(
+        { error: 'No TTS API key configured (ElevenLabs or OpenAI)' },
+        { status: 500 }
+      );
+    }
+
     const ttsRes = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -56,7 +120,6 @@ export const POST = withAuth(async (req: NextRequest) => {
     await incrementUsage();
 
     const audioBuffer = await ttsRes.arrayBuffer();
-
     return new NextResponse(audioBuffer, {
       status: 200,
       headers: {

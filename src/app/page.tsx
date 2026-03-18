@@ -7,6 +7,8 @@ import BriefingCard from '@/components/BriefingCard';
 import ScheduleStrip from '@/components/ScheduleStrip';
 import TasksCard from '@/components/TasksCard';
 import EmailCard from '@/components/EmailCard';
+import FitnessCard from '@/components/FitnessCard';
+import HealthCard from '@/components/HealthCard';
 import KpiRow from '@/components/KpiRow';
 import VoiceMic from '@/components/VoiceMic';
 import AuthGate from '@/components/AuthGate';
@@ -35,6 +37,10 @@ export default function Dashboard() {
               <TasksCard />
             </div>
             <EmailCard />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <FitnessCard />
+              <HealthCard />
+            </div>
 
             <VoiceMic />
           </main>

@@ -44,13 +44,21 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     const prompt = `You are Jarvis, a personal executive assistant. Synthesize the following emails received recently for ${today}.
 
-Provide:
-1. A brief summary (2-3 sentences) of the overall email activity
-2. List any IMPORTANT items that need attention (action required, decisions needed)
-3. List any DEADLINES mentioned in the emails
-4. Flag anything that looks urgent
+Generate TWO versions separated by the exact marker ===VOICEOVER=== on its own line.
 
-Keep it concise and actionable. Under 200 words total.
+=== VERSION 1: WRITTEN SUMMARY ===
+Direct, scannable. No fluff. Include:
+1. Brief summary (2-3 sentences) of overall email activity
+2. IMPORTANT items needing attention (actions, decisions)
+3. DEADLINES mentioned
+4. Urgent flags
+
+Keep it under 200 words. No markdown.
+
+===VOICEOVER===
+
+=== VERSION 2: VOICEOVER ===
+2-3 spoken sentences summarizing the email situation. Natural, conversational. For TTS playback.
 
 --- EMAILS (${emails.length} total) ---
 
@@ -68,7 +76,7 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
+        max_tokens: 600,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -79,8 +87,12 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
     }
 
     const claudeData = await claudeRes.json();
-    const synthesisText =
-      claudeData.content?.[0]?.text || 'Unable to generate synthesis';
+    const rawOutput = claudeData.content?.[0]?.text || 'Unable to generate synthesis';
+
+    // Split dual-script output
+    const parts = rawOutput.split('===VOICEOVER===');
+    const synthesisText = parts[0].trim();
+    const voiceoverText = parts.length > 1 ? parts[1].trim() : synthesisText;
 
     // Count important items and deadlines
     const importantMatch = synthesisText.match(
@@ -92,11 +104,12 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
 
     const dateStr = new Date().toISOString().split('T')[0];
 
-    // Save to Supabase
+    // Save to Supabase (written + voiceover)
     const { error: dbError } = await supabase.from('email_synthesis').upsert(
       {
         date: dateStr,
         synthesis_text: synthesisText,
+        voiceover_text: voiceoverText,
         important_count: importantMatch
           ? Math.min(importantMatch.length, 10)
           : 0,
@@ -114,6 +127,7 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
     return NextResponse.json({
       date: dateStr,
       synthesis: synthesisText,
+      voiceover: voiceoverText,
       importantCount: importantMatch
         ? Math.min(importantMatch.length, 10)
         : 0,

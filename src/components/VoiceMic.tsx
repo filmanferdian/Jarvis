@@ -10,6 +10,7 @@ export default function VoiceMic() {
   const [processing, setProcessing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const recognitionRef = useRef<InstanceType<SpeechRecognitionType> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const handleDismiss = useCallback(() => setToast(null), []);
 
@@ -45,12 +46,16 @@ export default function VoiceMic() {
       setListening(false);
       setProcessing(true);
 
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       try {
         const res = await fetch('/api/voice/intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ transcript }),
+          signal: controller.signal,
         });
 
         if (res.ok) {
@@ -59,9 +64,14 @@ export default function VoiceMic() {
         } else {
           setToast('Sorry, I had trouble processing that.');
         }
-      } catch {
-        setToast('Connection error. Please try again.');
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setToast('Cancelled.');
+        } else {
+          setToast('Connection error. Please try again.');
+        }
       } finally {
+        abortRef.current = null;
         setProcessing(false);
       }
     };
@@ -87,25 +97,28 @@ export default function VoiceMic() {
     setListening(false);
   };
 
+  const cancelProcessing = () => {
+    abortRef.current?.abort();
+    setProcessing(false);
+  };
+
   return (
     <>
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
         <button
-          onClick={listening ? stopListening : startListening}
-          disabled={processing}
+          onClick={processing ? cancelProcessing : listening ? stopListening : startListening}
           className={`w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all ${
             listening
               ? 'border-jarvis-accent bg-jarvis-accent/10 animate-pulse'
               : processing
                 ? 'border-jarvis-warn bg-jarvis-warn/5'
                 : 'border-jarvis-border hover:border-jarvis-accent/50'
-          } disabled:opacity-50`}
-          aria-label={listening ? 'Stop listening' : 'Start voice input'}
+          }`}
+          aria-label={processing ? 'Cancel' : listening ? 'Stop listening' : 'Start voice input'}
         >
           {processing ? (
-            <svg className="w-6 h-6 text-jarvis-warn animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <svg className="w-6 h-6 text-jarvis-warn" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="1" />
             </svg>
           ) : (
             <svg
