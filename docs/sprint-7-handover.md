@@ -110,7 +110,21 @@
 
 ## Sprint 7 candidates
 
-- Test and tune ElevenLabs voice quality (voice_settings: stability, similarity_boost, style)
-- Writing style refinement after real-world dual-script testing
+### P0 — Fixes from Sprint 6 testing
+- Fix fitness extraction accuracy: Claude extracted Week 13/Phase 2 but user is on Week 8. Extraction prompt needs to identify the *current active* week, not future phases. File: `src/lib/sync/fitness.ts`
+- Add fitness sync cron job to cron-job.org (weekly trigger)
+
+### P1 — New features
+- **Delta briefing**: on-demand mid-day update showing what changed since 7:30 AM briefing (new emails, calendar changes, task updates). Compare current state vs morning baseline.
+- **56-day Garmin retention**: keep 8 weeks of `garmin_daily` records instead of overwriting daily. Prune older than 56 days. On first run, backfill last 56 days from Garmin API.
+- **Weekly/monthly health comparisons**: "avg sleep this week vs last week", "workout adherence this month vs last". Feed into briefing.
+
+### P2 — Polish
+- ElevenLabs voice tuning: Morgan stability 0.7-0.8 for tone consistency. Paul needs better training samples.
+- Writing style refinement after real dual-script output
 - Garmin Connect+ nutrition tracking investigation
-- Domain sharpening (TBD from Sprint 6 scope)
+- Domain sharpening (TBD)
+
+### User context
+- Filman is finishing Week 8 of transformation program. Week 9 starts Monday March 23, 2026.
+- Currently Phase 1 (not Phase 2 as extracted). Fix extraction before next Monday.
