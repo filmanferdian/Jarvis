@@ -93,6 +93,7 @@
 11. **ElevenLabs fallback** — If `ELEVENLABS_API_KEY` is missing, TTS falls back to OpenAI `tts-1-hd` automatically.
 12. **Dual-script splitting** — If Claude doesn't produce `===VOICEOVER===` delimiter, the full output is used as both written and voiceover (graceful degradation).
 13. **ElevenLabs credits** — Starter plan is 30k chars/month. ~2,500 chars per briefing. Monitor usage.
+14. **Branch discipline** — Railway deploys from `main` only. Every session must merge worktree to main and push before ending. See CLAUDE.md.
 
 ---
 

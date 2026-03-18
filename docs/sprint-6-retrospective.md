@@ -89,3 +89,7 @@
 - Test streaming latency improvement on desktop
 - Consider Garmin Connect+ nutrition tracking (deferred from Sprint 6)
 - Writing style refinement — may need prompt tuning after seeing real dual-script output
+
+## Post-sprint fix: branch unification
+
+After sprint close, discovered Railway was deploying from `claude/recursing-borg` (Sprint 4 branch) instead of `main`. The two branches had diverged — 10 commits on recursing-borg not on main. Merged recursing-borg into main, resolved 7 conflicts, added v1.6 version label to TopBar, added branch discipline rules to CLAUDE.md. Railway now deploys from `main` only.
