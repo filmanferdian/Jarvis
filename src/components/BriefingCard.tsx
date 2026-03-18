@@ -235,9 +235,15 @@ export default function BriefingCard() {
                 </span>
               </button>
               {isExpanded && (
-                <p className="mt-2 text-sm text-jarvis-text-secondary whitespace-pre-line">
-                  {section.content}
-                </p>
+                <div
+                  className="mt-2 text-sm text-jarvis-text-secondary whitespace-pre-line"
+                  dangerouslySetInnerHTML={{
+                    __html: section.content
+                      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
+                      .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
+                  }}
+                >
+                </div>
               )}
             </div>
           );
