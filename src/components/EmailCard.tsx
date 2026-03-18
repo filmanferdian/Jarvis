@@ -84,9 +84,14 @@ export default function EmailCard() {
       </button>
 
       {expanded && (
-        <p className="mt-3 text-sm text-jarvis-text-secondary whitespace-pre-line border-l-2 border-jarvis-accent pl-4">
-          {data.synthesis}
-        </p>
+        <div
+          className="mt-3 text-sm text-jarvis-text-secondary whitespace-pre-line border-l-2 border-jarvis-accent pl-4"
+          dangerouslySetInnerHTML={{
+            __html: data.synthesis
+              .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
+              .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
+          }}
+        />
       )}
     </div>
   );
