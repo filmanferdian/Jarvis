@@ -26,7 +26,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     return NextResponse.json(result);
   } catch (err) {
     console.error('[API Error] Fitness sync failed:', err);
-    const message = err instanceof Error ? err.message : String(err);
+    const message = err instanceof Error ? err.message : JSON.stringify(err);
     return NextResponse.json(
       { error: 'Fitness sync failed', details: message },
       { status: 500 }
