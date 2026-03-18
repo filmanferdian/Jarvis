@@ -60,7 +60,8 @@ export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
     setIsPlaying(true);
   };
 
-  // Streaming playback: start playing as chunks arrive (non-iOS only)
+  // Streaming fetch: uses ElevenLabs streaming endpoint for faster server response,
+  // but collects all chunks before playing (partial blobs cause early cutoff)
   const playStreaming = async (controller: AbortController) => {
     const res = await fetch(`/api/tts?stream=true&voice=${voice}`, {
       method: 'POST',
@@ -73,48 +74,28 @@ export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
     if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
     if (!res.body) throw new Error('No response body for streaming');
 
-    // Collect chunks into an array, start playback after first chunk
+    // Collect ALL chunks, then play the complete audio
     const reader = res.body.getReader();
     const chunks: ArrayBuffer[] = [];
-    let firstChunkPlayed = false;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       chunks.push(value.buffer as ArrayBuffer);
-
-      // After accumulating ~20KB, start playback for faster time-to-audio
-      if (!firstChunkPlayed && chunks.reduce((s, c) => s + c.byteLength, 0) > 20000) {
-        firstChunkPlayed = true;
-        const partial = new Blob(chunks, { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(partial);
-        objectUrlRef.current = url;
-
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => setIsPlaying(false);
-        audio.onerror = () => setIsPlaying(false);
-        await audio.play();
-        setIsPlaying(true);
-        setIsLoading(false);
-      }
     }
 
-    // If we never started early playback (short audio), play the full blob
-    if (!firstChunkPlayed) {
-      const blob = new Blob(chunks, { type: 'audio/mpeg' });
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
+    const blob = new Blob(chunks, { type: 'audio/mpeg' });
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    objectUrlRef.current = url;
 
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => setIsPlaying(false);
-      audio.onerror = () => setIsPlaying(false);
-      await audio.play();
-      setIsPlaying(true);
-      setIsLoading(false);
-    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.onended = () => setIsPlaying(false);
+    audio.onerror = () => setIsPlaying(false);
+    await audio.play();
+    setIsPlaying(true);
+    setIsLoading(false);
   };
 
   // Non-streaming playback: fetch full audio then play (iOS fallback)
