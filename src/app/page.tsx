@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import BriefingCard from '@/components/BriefingCard';
@@ -15,6 +15,16 @@ import AuthGate from '@/components/AuthGate';
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Auto-sync on dashboard load (fire-and-forget, debounced server-side)
+  useEffect(() => {
+    const token = localStorage.getItem('jarvis_token');
+    if (!token) return;
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {}); // silently ignore errors
+  }, []);
 
   return (
     <AuthGate>
