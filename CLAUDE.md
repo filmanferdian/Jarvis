@@ -15,6 +15,13 @@
 6. **Garmin raw_json** — Always store raw API responses
 7. **Cookie auth** — Browser uses httpOnly cookie, external callers use `x-cron-secret` header
 
+## Branch Discipline
+- Railway deploys from `main`. Never point it at a worktree branch.
+- Every Claude Code session MUST merge its worktree branch to `main` and push before ending.
+- Never leave working code on a side branch. If the session is interrupted, the next session's first task is to merge pending worktree work into main.
+- After merging, push to origin/main immediately so Railway deploys.
+- Clean up old worktree branches periodically.
+
 ## Sprint Definition of Done
 Before closing any sprint, ALL of the following must be complete:
 1. **Code Integration** — All feature branches merged to `main`. No dangling branches.
