@@ -60,6 +60,9 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
         <span className="text-xs text-jarvis-text-muted hidden sm:inline">
           Personal Command Center
         </span>
+        <span className="text-[10px] text-jarvis-text-dim font-mono">
+          v1.6
+        </span>
       </div>
       <div className="flex items-center gap-4">
         {usage && (
