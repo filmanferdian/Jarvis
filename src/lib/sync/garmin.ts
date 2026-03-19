@@ -19,6 +19,52 @@ function getWibToday(): string {
   return formatDate(wibDate);
 }
 
+// --- Garmin session caching in Supabase ---
+// Avoids re-login on every sync (Garmin aggressively rate-limits logins)
+
+interface GarminTokens {
+  oauth1: { oauth_token: string; oauth_token_secret: string };
+  oauth2: Record<string, unknown>;
+}
+
+async function loadCachedTokens(): Promise<GarminTokens | null> {
+  const { data } = await supabase
+    .from('sync_status')
+    .select('last_error')
+    .eq('sync_type', 'garmin-tokens')
+    .single();
+
+  if (!data?.last_error) return null;
+
+  try {
+    const tokens = JSON.parse(data.last_error) as GarminTokens;
+    // Check if OAuth2 token is expired (with 5 min buffer)
+    // Token may be expired, but garmin-connect auto-refreshes using oauth1 + refresh_token
+    // So we always return cached tokens and let the library handle refresh
+    return tokens;
+  } catch {
+    return null;
+  }
+}
+
+async function saveCachedTokens(client: GarminConnect): Promise<void> {
+  try {
+    const tokens = client.exportToken();
+    // Store tokens in sync_status.last_error field (reusing existing table, no migration needed)
+    await supabase.from('sync_status').upsert(
+      {
+        sync_type: 'garmin-tokens',
+        last_synced_at: new Date().toISOString(),
+        last_result: 'success',
+        last_error: JSON.stringify(tokens),
+      },
+      { onConflict: 'sync_type' },
+    );
+  } catch (err) {
+    console.error('Failed to cache Garmin tokens:', err);
+  }
+}
+
 async function createClient(retries = 3): Promise<GarminConnect> {
   const email = process.env.GARMIN_EMAIL;
   const password = process.env.GARMIN_PASSWORD;
@@ -26,20 +72,36 @@ async function createClient(retries = 3): Promise<GarminConnect> {
     throw new Error('GARMIN_EMAIL and GARMIN_PASSWORD must be configured');
   }
 
+  const client = new GarminConnect({ username: email, password });
+
+  // Try cached session first
+  const cached = await loadCachedTokens();
+  if (cached) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      client.loadToken(cached.oauth1, cached.oauth2 as any);
+      // Verify the session works with a lightweight API call
+      await client.getUserProfile();
+      console.log('Garmin: restored session from cache');
+      return client;
+    } catch (err) {
+      console.log('Garmin: cached session expired, will re-login:', (err as Error).message);
+    }
+  }
+
+  // Fresh login with retries
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const client = new GarminConnect({ username: email, password });
       await client.login();
-      if (attempt > 1) {
-        console.log(`Garmin login succeeded on attempt ${attempt}`);
-      }
+      console.log(`Garmin: fresh login succeeded${attempt > 1 ? ` on attempt ${attempt}` : ''}`);
+      // Cache the new session
+      await saveCachedTokens(client);
       return client;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.error(`Garmin login attempt ${attempt}/${retries} failed:`, lastError.message);
       if (attempt < retries) {
-        // Exponential backoff: 2s, 4s
         const delay = Math.pow(2, attempt) * 1000;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -184,6 +246,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
 
   // Prune records older than 56 days
   await pruneOldRecords();
+
+  // Refresh cached tokens after successful sync
+  await saveCachedTokens(client);
 
   return {
     date: today,

@@ -112,5 +112,6 @@ ALTER TABLE briefing_cache ADD COLUMN IF NOT EXISTS baseline_snapshot JSONB;
 INSERT INTO sync_status (sync_type, last_synced_at, last_result)
 VALUES
   ('garmin', '1970-01-01T00:00:00Z', 'pending'),
-  ('fitness', '1970-01-01T00:00:00Z', 'pending')
+  ('fitness', '1970-01-01T00:00:00Z', 'pending'),
+  ('garmin-tokens', '1970-01-01T00:00:00Z', 'pending')
 ON CONFLICT (sync_type) DO NOTHING;
