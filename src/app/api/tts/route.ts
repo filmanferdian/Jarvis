@@ -69,9 +69,9 @@ export const POST = withAuth(async (req: NextRequest) => {
           text,
           model_id: modelId,
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.4,
+            stability: 0.75,
+            similarity_boost: 0.8,
+            style: 0,
           },
         }),
       });
