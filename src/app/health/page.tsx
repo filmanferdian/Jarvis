@@ -6,6 +6,7 @@ import TopBar from '@/components/TopBar';
 import OkrCard from '@/components/health/OkrCard';
 import BloodWorkPanel from '@/components/health/BloodWorkPanel';
 import ManualEntryForm from '@/components/health/ManualEntryForm';
+import HealthInsights from '@/components/health/HealthInsights';
 
 interface KrProgress {
   key_result: string;
@@ -156,6 +157,9 @@ export default function HealthPage() {
               ))}
           </div>
         )}
+
+        {/* AI Health Insights */}
+        <HealthInsights />
 
         {/* Blood Work Panel (O4) */}
         <BloodWorkPanel entries={bloodWork} lastTestDate={lastBloodDate} />

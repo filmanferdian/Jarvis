@@ -246,6 +246,15 @@ ${subpageText}`;
   const data = await res.json();
   const rawText = data.content?.[0]?.text || '{}';
 
+  // Track Claude API usage
+  try {
+    const { trackServiceUsage } = await import('@/lib/rateLimit');
+    await trackServiceUsage('claude', {
+      tokens_input: data.usage?.input_tokens ?? 0,
+      tokens_output: data.usage?.output_tokens ?? 0,
+    });
+  } catch { /* non-critical */ }
+
   // Extract JSON from response
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Failed to extract JSON from Claude response');

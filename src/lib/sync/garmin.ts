@@ -250,6 +250,12 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   // Refresh cached tokens after successful sync
   await saveCachedTokens(client);
 
+  // Track Garmin API usage
+  try {
+    const { trackServiceUsage } = await import('@/lib/rateLimit');
+    await trackServiceUsage('garmin');
+  } catch { /* non-critical */ }
+
   return {
     date: today,
     metrics: {

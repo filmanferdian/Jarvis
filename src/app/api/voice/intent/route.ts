@@ -127,6 +127,15 @@ User said: "${transcript}"`;
     const claudeData = await claudeRes.json();
     const rawText = claudeData.content?.[0]?.text || '{}';
 
+    // Track Claude API usage
+    try {
+      const { trackServiceUsage } = await import('@/lib/rateLimit');
+      await trackServiceUsage('claude', {
+        tokens_input: claudeData.usage?.input_tokens ?? 0,
+        tokens_output: claudeData.usage?.output_tokens ?? 0,
+      });
+    } catch { /* non-critical */ }
+
     // Extract JSON from response (handle markdown code blocks)
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     let intentParsed;

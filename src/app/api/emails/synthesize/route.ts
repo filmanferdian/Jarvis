@@ -89,6 +89,15 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
     const claudeData = await claudeRes.json();
     const rawOutput = claudeData.content?.[0]?.text || 'Unable to generate synthesis';
 
+    // Track Claude API usage
+    try {
+      const { trackServiceUsage } = await import('@/lib/rateLimit');
+      await trackServiceUsage('claude', {
+        tokens_input: claudeData.usage?.input_tokens ?? 0,
+        tokens_output: claudeData.usage?.output_tokens ?? 0,
+      });
+    } catch { /* non-critical */ }
+
     // Split dual-script output
     const parts = rawOutput.split('===VOICEOVER===');
     const synthesisText = parts[0].trim();

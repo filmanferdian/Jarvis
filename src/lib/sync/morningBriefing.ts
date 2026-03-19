@@ -138,6 +138,15 @@ ${emailSection}`;
   const claudeData = await claudeRes.json();
   const briefingText = claudeData.content?.[0]?.text || 'Unable to generate briefing';
 
+  // Track Claude API usage
+  try {
+    const { trackServiceUsage } = await import('@/lib/rateLimit');
+    await trackServiceUsage('claude', {
+      tokens_input: claudeData.usage?.input_tokens ?? 0,
+      tokens_output: claudeData.usage?.output_tokens ?? 0,
+    });
+  } catch { /* non-critical */ }
+
   const dataSources = {
     calendar: !!(events && events.length > 0),
     notion_tasks: !!(tasks && tasks.length > 0),
