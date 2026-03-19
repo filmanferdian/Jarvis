@@ -172,16 +172,22 @@ async function extractWithClaude(programContent: string, subpageContents: string
   const wibDate = new Date(now.getTime() + wibOffset);
   const todayWib = wibDate.toISOString().split('T')[0];
 
+  // Program started Monday Jan 26, 2026. Calculate current week deterministically.
+  const programStart = new Date('2026-01-26T00:00:00+07:00');
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysSinceStart = Math.floor((wibDate.getTime() - programStart.getTime()) / msPerDay);
+  const currentWeek = Math.floor(daysSinceStart / 7) + 1;
+
   const prompt = `You are extracting structured fitness program data from a Notion page. Extract the following JSON structure from the program content below. Be precise with numbers and exercise details.
 
 IMPORTANT RULES:
 1. Today's date is ${todayWib} (WIB timezone).
-2. current_week MUST be the week that contains today's date. If the program started on a known date, compute: current_week = floor((today - start_date) / 7) + 1. Do NOT use week numbers from future phases or planned sections — only the week the user is currently in.
+2. current_week MUST be ${currentWeek}. The program started on 2026-01-26 (Monday). Today is day ${daysSinceStart + 1}, which is week ${currentWeek}. Do NOT override this with any week number you find in the content — use ${currentWeek} exactly.
 3. Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
 
 Return ONLY valid JSON matching this exact structure:
 {
-  "current_week": <number — the week containing today ${todayWib}, NOT a future week>,
+  "current_week": ${currentWeek},
   "current_phase": "<string — e.g. 'Phase 1: Foundation'>",
   "phase_end_week": <number>,
   "phase_tone": "<one of: encouraging_foundational, momentum_consistency, empathetic_grind, celebratory_finish>",
