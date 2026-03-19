@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
 import TopBar from '@/components/TopBar';
+import Sidebar from '@/components/Sidebar';
 import OkrCard from '@/components/health/OkrCard';
 import BloodWorkPanel from '@/components/health/BloodWorkPanel';
 import ManualEntryForm from '@/components/health/ManualEntryForm';
@@ -93,11 +94,21 @@ export default function HealthPage() {
 
   const lastBloodDate = bloodWork.length > 0 ? bloodWork[0].test_date : null;
 
-  return (
-    <div className="min-h-screen bg-jarvis-bg flex flex-col">
-      <TopBar />
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 space-y-6">
+  return (
+    <div className="flex flex-col h-screen">
+      <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <div className="flex flex-1 overflow-hidden relative">
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 max-w-5xl mx-auto w-full">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
           <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
@@ -167,6 +178,7 @@ export default function HealthPage() {
         {/* Manual Entry */}
         <ManualEntryForm onSaved={loadData} />
       </main>
+      </div>
     </div>
   );
 }
