@@ -4,9 +4,11 @@ import { shouldSync, markSynced } from '@/lib/syncTracker';
 import { syncGoogleCalendar } from '@/lib/sync/googleCalendar';
 import { syncOutlookCalendar } from '@/lib/sync/outlookCalendar';
 import { syncNotionTasks } from '@/lib/sync/notionTasks';
+import { syncFitness } from '@/lib/sync/fitness';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const THIRTY_MINUTES = 30 * 60 * 1000;
+const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 // POST: Trigger stale syncs on dashboard load (debounced)
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -52,6 +54,20 @@ export const POST = withAuth(async (_req: NextRequest) => {
     }
   } else {
     results['notion-tasks'] = 'skipped (recent)';
+  }
+
+  // Fitness Context — 6 hour interval
+  if (await shouldSync('fitness', SIX_HOURS)) {
+    try {
+      const r = await syncFitness();
+      await markSynced('fitness', 'success', r.synced ? 1 : 0);
+      results['fitness'] = r.skipped ? 'skipped (no changes)' : `synced week ${r.current_week}`;
+    } catch (err) {
+      await markSynced('fitness', 'error', 0, String(err));
+      results['fitness'] = `error: ${String(err).slice(0, 100)}`;
+    }
+  } else {
+    results['fitness'] = 'skipped (recent)';
   }
 
   return NextResponse.json({

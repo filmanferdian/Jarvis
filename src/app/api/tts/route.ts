@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
-import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
+import { checkRateLimit, incrementUsage, getMonthlyServiceUsage, trackServiceUsage } from '@/lib/rateLimit';
 import { TtsSchema } from '@/lib/validation';
 import { safeError } from '@/lib/errors';
 
-// ElevenLabs TTS with OpenAI fallback
+const ELEVENLABS_MONTHLY_CHAR_LIMIT = 30_000;
+const ELEVENLABS_CHAR_THRESHOLD = 29_000; // Switch to OpenAI when approaching limit
+
+// ElevenLabs TTS with OpenAI fallback (auto-failover on credit exhaustion)
 export const POST = withAuth(async (req: NextRequest) => {
   try {
     const body = await req.json();
@@ -34,7 +37,21 @@ export const POST = withAuth(async (req: NextRequest) => {
       ? process.env.ELEVENLABS_VOICE_ID_2
       : process.env.ELEVENLABS_VOICE_ID;
 
+    // Check ElevenLabs monthly credit before attempting
+    let elevenLabsExhausted = false;
     if (elevenLabsKey && voiceId) {
+      try {
+        const monthlyChars = await getMonthlyServiceUsage('elevenlabs', 'characters_used');
+        if (monthlyChars + text.length >= ELEVENLABS_CHAR_THRESHOLD) {
+          elevenLabsExhausted = true;
+          console.log(`ElevenLabs monthly chars ${monthlyChars}/${ELEVENLABS_MONTHLY_CHAR_LIMIT} — switching to OpenAI`);
+        }
+      } catch {
+        // If we can't check, proceed with ElevenLabs
+      }
+    }
+
+    if (elevenLabsKey && voiceId && !elevenLabsExhausted) {
       // ElevenLabs primary path
       const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
       const endpoint = useStream
@@ -65,6 +82,7 @@ export const POST = withAuth(async (req: NextRequest) => {
         // Fall through to OpenAI fallback
       } else {
         await incrementUsage();
+        await trackServiceUsage('elevenlabs', { characters: text.length });
 
         if (useStream && ttsRes.body) {
           // Streaming response — pass through chunks
@@ -118,6 +136,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     }
 
     await incrementUsage();
+    await trackServiceUsage('openai', { characters: text.length });
 
     const audioBuffer = await ttsRes.arrayBuffer();
     return new NextResponse(audioBuffer, {

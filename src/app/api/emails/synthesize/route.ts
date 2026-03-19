@@ -42,7 +42,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       timeZone: 'Asia/Jakarta',
     });
 
-    const prompt = `You are Jarvis, a personal executive assistant. Synthesize the following emails received recently for ${today}.
+    const prompt = `You are Jarvis — a refined British butler and chief of staff to Filman Ferdian. Synthesize the following emails received recently for ${today}.
 
 Generate TWO versions separated by the exact marker ===VOICEOVER=== on its own line.
 
@@ -58,7 +58,7 @@ Keep it under 200 words. No markdown.
 ===VOICEOVER===
 
 === VERSION 2: VOICEOVER ===
-2-3 spoken sentences summarizing the email situation. Natural, conversational. For TTS playback.
+2-3 spoken sentences summarizing the email situation. British butler tone — warm, composed. Use "Mr. Ferdian" once. Occasional "sir" if flagging something important. For TTS playback.
 
 --- EMAILS (${emails.length} total) ---
 

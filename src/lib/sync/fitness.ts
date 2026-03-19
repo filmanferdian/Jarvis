@@ -166,13 +166,22 @@ async function extractWithClaude(programContent: string, subpageContents: string
     ? `\n\n--- ACTIVE SUB-PAGES (overrides) ---\n${subpageContents.join('\n\n---\n\n')}`
     : '';
 
+  // Compute today's date in WIB for accurate week calculation
+  const now = new Date();
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const wibDate = new Date(now.getTime() + wibOffset);
+  const todayWib = wibDate.toISOString().split('T')[0];
+
   const prompt = `You are extracting structured fitness program data from a Notion page. Extract the following JSON structure from the program content below. Be precise with numbers and exercise details.
 
-IMPORTANT: Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
+IMPORTANT RULES:
+1. Today's date is ${todayWib} (WIB timezone).
+2. current_week MUST be the week that contains today's date. If the program started on a known date, compute: current_week = floor((today - start_date) / 7) + 1. Do NOT use week numbers from future phases or planned sections — only the week the user is currently in.
+3. Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
 
 Return ONLY valid JSON matching this exact structure:
 {
-  "current_week": <number — calculate from program start date, or use the most recent week mentioned in sub-pages/adjustments>,
+  "current_week": <number — the week containing today ${todayWib}, NOT a future week>,
   "current_phase": "<string — e.g. 'Phase 1: Foundation'>",
   "phase_end_week": <number>,
   "phase_tone": "<one of: encouraging_foundational, momentum_consistency, empathetic_grind, celebratory_finish>",
@@ -241,7 +250,16 @@ ${subpageText}`;
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Failed to extract JSON from Claude response');
 
-  return JSON.parse(jsonMatch[0]) as FitnessContext;
+  const parsed = JSON.parse(jsonMatch[0]) as FitnessContext;
+
+  // Sanity check: if extracted week is unreasonably far from today, clamp it
+  // Programs are 52 weeks max; current_week shouldn't exceed a reasonable upper bound
+  if (parsed.current_week > 52) {
+    console.warn(`Fitness extraction returned current_week=${parsed.current_week}, clamping to 52`);
+    parsed.current_week = 52;
+  }
+
+  return parsed;
 }
 
 export interface FitnessSyncResult {

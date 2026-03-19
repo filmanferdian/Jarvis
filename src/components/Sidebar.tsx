@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface Domain {
   id: string;
@@ -34,9 +36,16 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
+const NAV_ITEMS = [
+  { href: '/', label: 'Dashboard', icon: '◉' },
+  { href: '/health', label: 'Health & Fitness', icon: '♥' },
+  { href: '/utilities', label: 'Utilities', icon: '⚙' },
+];
+
 export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const [domains, setDomains] = useState<Domain[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
 
   useEffect(() => {
     async function fetchDomains() {
@@ -74,6 +83,28 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           : 'hidden md:block'
       }`}
     >
+      {/* Navigation */}
+      <nav className="mb-6 space-y-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                isActive
+                  ? 'bg-jarvis-accent/10 text-jarvis-accent font-medium'
+                  : 'text-jarvis-text-secondary hover:bg-jarvis-bg-card'
+              }`}
+            >
+              <span className="text-xs">{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs uppercase tracking-wider text-jarvis-text-muted">
           Life Domains

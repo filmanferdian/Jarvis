@@ -93,7 +93,7 @@ export async function generateBriefing(): Promise<BriefingResult> {
     timeZone: 'Asia/Jakarta',
   });
 
-  const prompt = `You are Jarvis, a personal executive assistant. Generate a concise morning briefing for ${dateSummary}.
+  const prompt = `You are Jarvis — a refined British butler and chief of staff to Filman Ferdian ("Mr. Ferdian"). Generate a concise morning briefing for ${dateSummary}.
 
 Use these numbered sections:
 1. Calendar overview: Summarize today's schedule
@@ -101,7 +101,7 @@ Use these numbered sections:
 3. Alerts: Flag anything overdue, conflicting, or urgent
 4. Recommended focus: Suggest top priority for today
 
-Keep it concise and actionable. Under 300 words total. Use a professional, warm tone.
+Keep it concise and actionable. Under 300 words total. Warm but composed tone — like Alfred Pennyworth briefing Bruce Wayne.
 
 --- TODAY'S CALENDAR ---
 ${calendarSection}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { VERSION } from '@/lib/version';
 
 interface UsageData {
   callCount: number;
@@ -13,8 +14,40 @@ interface TopBarProps {
   onToggleSidebar?: () => void;
 }
 
+function useWibClock() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    function tick() {
+      setNow(new Date());
+    }
+    tick();
+    const interval = setInterval(tick, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!now) return { time: '', date: '' };
+
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const wib = new Date(now.getTime() + wibOffset);
+  const hh = String(wib.getUTCHours()).padStart(2, '0');
+  const mm = String(wib.getUTCMinutes()).padStart(2, '0');
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayName = days[wib.getUTCDay()];
+  const day = wib.getUTCDate();
+  const month = months[wib.getUTCMonth()];
+  const year = wib.getUTCFullYear();
+
+  return {
+    time: `${hh}:${mm}`,
+    date: `${dayName}, ${day} ${month} ${year}`,
+  };
+}
+
 export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const [usage, setUsage] = useState<UsageData | null>(null);
+  const clock = useWibClock();
 
   useEffect(() => {
     async function fetchUsage() {
@@ -60,11 +93,18 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
         <span className="text-xs text-jarvis-text-muted hidden sm:inline">
           Personal Command Center
         </span>
-        <span className="text-[10px] text-jarvis-text-dim font-mono">
-          v1.6
+        <span className="text-xs font-semibold font-mono bg-jarvis-accent/10 text-jarvis-accent px-2 py-0.5 rounded-full">
+          v{VERSION.string}
         </span>
       </div>
       <div className="flex items-center gap-4">
+        {clock.time && (
+          <span className="text-xs font-mono text-jarvis-text-secondary">
+            <span className="hidden sm:inline">{clock.date} · </span>
+            {clock.time}
+            <span className="hidden sm:inline"> WIB</span>
+          </span>
+        )}
         {usage && (
           <span
             className={`text-xs font-mono ${

@@ -315,7 +315,14 @@ export const POST = withAuth(async (_req: NextRequest) => {
       .join('\n');
 
     // --- Dual-script prompt: generates both WRITTEN and VOICEOVER ---
-    const prompt = `You are Jarvis — a refined, composed British AI butler, modeled after the AI assistant from Iron Man. You serve one person: Filman, whom you address as "sir."
+    const prompt = `You are Jarvis — a blend of Alfred Pennyworth and the AI Jarvis from Iron Man. You are a refined British butler, chief of staff, and personal guardian to one person: Filman Ferdian. You genuinely care about his wellbeing, not just his schedule.
+
+Persona guidelines:
+- Always open the voiceover with "Good morning, Mr. Ferdian" (or appropriate greeting for time of day)
+- Use "sir" sparingly — once or twice per briefing, for emphasis or gentle course-correction (e.g., "If I may, sir, your sleep has been below target")
+- Tone: warm but composed, protective, occasionally wry. Think Alfred noticing Bruce hasn't slept enough.
+- Notice patterns and gently nudge. You don't just report data — you care about what it means.
+- Example phrases: "I've taken the liberty of...", "I would be remiss not to mention...", "If I may say so...", "A rather productive morning lies ahead — shall we?"
 
 ${phaseTone}
 
@@ -334,11 +341,11 @@ Target 400-500 words. No markdown formatting, no bullet points. Plain text with 
 ===VOICEOVER===
 
 === VERSION 2: VOICEOVER SCRIPT ===
-This version is read aloud by TTS. Natural spoken English — flowing sentences, conversational transitions between topics. British butler warmth with occasional dry wit. No section markers, no lists, no formatting. Just speech.
+This version is read aloud by TTS. Natural spoken English — flowing sentences, conversational transitions. British butler warmth with occasional dry wit. No section markers, no lists, no formatting. Just speech.
 
 Target 350-450 words (~3 minutes spoken). Cover the same content as the written version but optimized for listening.
 
-Example opening: "Good morning, sir. It is ${dateSummary}, and you have a rather full slate ahead of you."
+Opening: "Good morning, Mr. Ferdian. It is ${dateSummary}..." then flow naturally into the day's content.
 
 --- TODAY'S DATA ---
 
@@ -386,6 +393,15 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
 
     const claudeData = await claudeRes.json();
     const rawOutput = claudeData.content?.[0]?.text || 'Unable to generate briefing';
+
+    // Track Claude API usage
+    try {
+      const { trackServiceUsage } = await import('@/lib/rateLimit');
+      await trackServiceUsage('claude', {
+        tokens_input: claudeData.usage?.input_tokens ?? 0,
+        tokens_output: claudeData.usage?.output_tokens ?? 0,
+      });
+    } catch { /* non-critical */ }
 
     // Split dual-script output
     const parts = rawOutput.split('===VOICEOVER===');
