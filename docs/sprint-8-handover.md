@@ -59,7 +59,7 @@ None added in Sprint 7 (all new features use existing env vars).
 9. **Garmin sync tracking** — add `trackServiceUsage('garmin', ...)` to garmin sync for utilities page accuracy.
 
 ### P2 — Polish
-10. **ElevenLabs voice tuning** — Morgan stability 0.75, similarity_boost 0.8.
+10. **Font size increase** — all text too small on current deploy, increase by 1 level across the app.
 11. **Mobile verification** — test `/health` and `/utilities` page layouts on mobile.
 12. **Health page OKR progress in briefing** — add OKR summary to Sunday briefing context.
 
@@ -69,8 +69,16 @@ None added in Sprint 7 (all new features use existing env vars).
 - Apple Health shortcuts are configured and active.
 - Weight tracking via Apple Health webhook has been working since Sprint 5.
 
+## Voice Configuration
+- **Voice:** Christopher (`G17SuINrv2H9FC6nvetn`) from ElevenLabs library
+- **Model:** `eleven_multilingual_v2` (NOT turbo — turbo degrades voice quality)
+- **Settings:** stability 0.75, similarity_boost 0.8, style 0
+- **Env var:** `ELEVENLABS_VOICE_ID=G17SuINrv2H9FC6nvetn` on Railway
+
 ## Gotchas
 1. **Garmin rate limiting** — Cloudflare blocks Railway's IP after too many login attempts. Session caching mitigates this, but avoid calling backfill + cron simultaneously.
 2. **`sync_status.last_error`** stores Garmin tokens as JSON — don't clear this field thinking it's an error message.
 3. **OKR progress %** requires `baseline_value` in `okr_targets` — some KRs (waist, dead hang, etc.) have NULL baselines and won't show progress until first measurement is recorded.
 4. **Delta briefing** requires a morning briefing to have been generated first (needs `baseline_snapshot` in `briefing_cache`).
+5. **ElevenLabs model** — must use `eleven_multilingual_v2`, not turbo. Turbo makes library voices sound generic.
+6. **Auth token shell escaping** — token contains `!#@%$`; use Node.js `fetch()` instead of curl for API calls.

@@ -60,13 +60,22 @@
 3. **No AI insights section** — planned in the mockup but not implemented. The health page shows OKR progress but doesn't have Claude-generated insights yet.
 4. **Testing on mobile** — couldn't verify mobile layout on the deployed site during this sprint.
 
+## Late-Sprint Updates (same day)
+
+1. **Voice model fix** — switched from `eleven_turbo_v2_5` to `eleven_multilingual_v2` for voice fidelity
+2. **Voice settings tuned** — stability 0.75, similarity 0.8, style 0 (was 0.5/0.75/0.4)
+3. **Dropped custom voices** — Paul and Morgan clones were unstable; switched to ElevenLabs library voice "Christopher" (`G17SuINrv2H9FC6nvetn`)
+4. **Health AI insights** — implemented Claude-generated health observations on `/health` page
+5. **API usage instrumentation** — added `trackServiceUsage()` to briefing, TTS, email synthesis, and fitness routes
+6. **Scheduled Garmin retry** — auto-retry set for 11 PM WIB via Claude scheduled task
+
 ## Carry-Forward to Sprint 8
 
-1. **Garmin backfill** — retry `POST /api/sync/garmin/backfill` once rate limit clears
+1. **Garmin backfill** — retry `POST /api/sync/garmin/backfill` (scheduled for tonight, manual retry if needed)
 2. **Trend sparkline charts** — `TrendSparkline.tsx` component for health page
-3. **AI-generated health insights** — Claude analyzes recent data and surfaces observations
-4. **Health page improvements** — stale data warnings, quarterly lab reminders
-5. **ElevenLabs voice tuning** — Morgan stability 0.75 (P2, not implemented)
+3. **Font sizes** — increase by 1 level across the app (too small on current deploy)
+4. **Mobile layout verification** — test `/health` and `/utilities` on mobile
+5. **Training adherence auto-calc** — count Garmin activities vs expected sessions
 
 ## Key Decisions
 
@@ -74,3 +83,5 @@
 - OKR targets stored in database (`okr_targets` table) rather than hardcoded, allowing runtime updates
 - Kept `/api/health/weight` endpoint separate from the new `/api/health/measurements` for backward compatibility with existing iOS Shortcuts
 - Per-service API tracking uses a new `api_usage_v2` table alongside the existing `api_usage` table (no migration of existing data needed)
+- Dropped custom ElevenLabs voice clones in favor of library voice "Christopher" for consistency
+- Switched ElevenLabs model from turbo to multilingual v2 — turbo degrades cloned/library voices
