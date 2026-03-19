@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { VoiceIntentSchema } from '@/lib/validation';
 import { safeError } from '@/lib/errors';
+import { buildJarvisContext, allPages } from '@/lib/context';
 
 async function getFitnessContext(): Promise<string> {
   try {
@@ -80,7 +81,9 @@ export const POST = withAuth(async (req: NextRequest) => {
       fitnessContext = await getFitnessContext();
     }
 
-    const prompt = `You are Jarvis, a personal executive assistant (think Iron Man's Jarvis — professional, warm, concise, dry wit).
+    const ctx = await buildJarvisContext({ pages: allPages() });
+
+    const prompt = `${ctx.systemPrompt}
 
 The user just spoke to you. Parse their intent and respond.
 

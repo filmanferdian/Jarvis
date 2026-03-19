@@ -52,7 +52,7 @@ export default function KpiRow() {
   if (kpis.length === 0) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-        <p className="text-xs text-jarvis-text-dim text-center">
+        <p className="text-sm text-jarvis-text-dim text-center">
           No KPIs configured yet. Add KPIs via Supabase to see them here.
         </p>
       </div>
@@ -68,26 +68,26 @@ export default function KpiRow() {
             key={kpi.id}
             className="min-w-[180px] max-w-[220px] shrink-0 rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4"
           >
-            <p className="text-[10px] uppercase tracking-wider text-jarvis-text-muted mb-1 truncate">
+            <p className="text-xs uppercase tracking-wider text-jarvis-text-muted mb-1 truncate">
               {kpi.domainName}
             </p>
-            <p className="text-xs text-jarvis-text-secondary mb-2 truncate">
+            <p className="text-sm text-jarvis-text-secondary mb-2 truncate">
               {kpi.name}
             </p>
             <div className="flex items-baseline gap-1.5 mb-2">
-              <span className="text-xl font-semibold text-jarvis-text-primary font-mono">
+              <span className="text-2xl font-semibold text-jarvis-text-primary font-mono">
                 {kpi.value}
               </span>
               {kpi.unit && (
-                <span className="text-xs text-jarvis-text-dim">{kpi.unit}</span>
+                <span className="text-sm text-jarvis-text-dim">{kpi.unit}</span>
               )}
               {kpi.target !== null && (
-                <span className="text-xs text-jarvis-text-dim">
+                <span className="text-sm text-jarvis-text-dim">
                   / {kpi.target}
                 </span>
               )}
               {trend && (
-                <span className={`text-sm ${trend.color}`}>
+                <span className={`text-base ${trend.color}`}>
                   {trend.symbol}
                 </span>
               )}

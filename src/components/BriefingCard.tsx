@@ -119,13 +119,13 @@ export default function BriefingCard() {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium text-jarvis-text-muted">
+          <h2 className="text-base font-medium text-jarvis-text-muted">
             Morning Briefing
           </h2>
           <button
             onClick={handleRegenerate}
             disabled={regenerating}
-            className="text-xs text-jarvis-accent hover:text-jarvis-accent/80 disabled:opacity-50 flex items-center gap-1"
+            className="text-sm text-jarvis-accent hover:text-jarvis-accent/80 disabled:opacity-50 flex items-center gap-1"
           >
             <svg
               className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`}
@@ -143,7 +143,7 @@ export default function BriefingCard() {
             {regenerating ? 'Generating...' : 'Generate now'}
           </button>
         </div>
-        <p className="text-sm text-jarvis-text-dim">
+        <p className="text-base text-jarvis-text-dim">
           {data?.message || 'No briefing available yet. Click "Generate now" or check back after 07:30 WIB.'}
         </p>
       </div>
@@ -155,12 +155,12 @@ export default function BriefingCard() {
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider">
+        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
           Morning Briefing
         </h2>
         <div className="flex items-center gap-2">
           {data.generatedAt && (
-            <span className="text-xs text-jarvis-text-dim">
+            <span className="text-sm text-jarvis-text-dim">
               {new Date(data.generatedAt).toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -217,7 +217,7 @@ export default function BriefingCard() {
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 <span
-                  className={`text-sm font-medium ${
+                  className={`text-base font-medium ${
                     section.isAlert
                       ? 'text-jarvis-warn'
                       : 'text-jarvis-text-primary'
@@ -228,7 +228,7 @@ export default function BriefingCard() {
               </button>
               {isExpanded && (
                 <div
-                  className="mt-2 text-sm text-jarvis-text-secondary whitespace-pre-line"
+                  className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line"
                   dangerouslySetInnerHTML={{
                     __html: section.content
                       .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')

@@ -24,6 +24,12 @@ interface GarminDaily {
   endurance_score: number | null;
   training_load_acute: number | null;
   training_load_chronic: number | null;
+  sleep_qualifier: string | null;
+  stress_qualifier: string | null;
+  body_battery_qualifier: string | null;
+  training_readiness_qualifier: string | null;
+  hrv_qualifier: string | null;
+  resting_hr_qualifier: string | null;
 }
 
 interface Activity {
@@ -80,7 +86,7 @@ function StepsRing({ steps, goal }: { steps: number; goal: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-jarvis-text-primary">
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-jarvis-text-primary">
         {steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps}
       </span>
     </div>
@@ -116,14 +122,34 @@ function WeightSparkline({ data }: { data: WeightPoint[] }) {
   );
 }
 
-function Metric({ label, value, unit, color }: { label: string; value: string | number | null; unit?: string; color?: string }) {
+function qualifierColor(q: string): string {
+  const upper = q.toUpperCase();
+  const green = ['EXCELLENT', 'GOOD', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED'];
+  const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL'];
+  const red = ['POOR', 'LOW', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
+  if (green.includes(upper)) return 'text-emerald-400';
+  if (orange.includes(upper)) return 'text-jarvis-warn';
+  if (red.includes(upper)) return 'text-red-400';
+  return 'text-jarvis-text-dim';
+}
+
+function toSentenceCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function Metric({ label, value, unit, color, qualifier }: { label: string; value: string | number | null; unit?: string; color?: string; qualifier?: string | null }) {
   if (value == null) return null;
   return (
     <div className="flex flex-col">
-      <span className="text-[10px] text-jarvis-text-dim uppercase tracking-wider">{label}</span>
-      <span className={`text-sm font-semibold ${color || 'text-jarvis-text-primary'}`}>
-        {value}{unit && <span className="text-[10px] text-jarvis-text-muted ml-0.5">{unit}</span>}
+      <span className="text-xs text-jarvis-text-dim uppercase tracking-wider">{label}</span>
+      <span className={`text-base font-semibold ${color || 'text-jarvis-text-primary'}`}>
+        {value}{unit && <span className="text-xs text-jarvis-text-muted ml-0.5">{unit}</span>}
       </span>
+      {qualifier && (
+        <span className={`text-[10px] font-medium ${qualifierColor(qualifier)}`}>
+          {toSentenceCase(qualifier)}
+        </span>
+      )}
     </div>
   );
 }
@@ -157,10 +183,10 @@ export default function HealthCard() {
   if (!hasGarmin && !hasWeight) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-        <h2 className="text-sm font-medium text-jarvis-text-muted uppercase tracking-wider mb-2">
+        <h2 className="text-base font-medium text-jarvis-text-muted uppercase tracking-wider mb-2">
           Health & Fitness
         </h2>
-        <p className="text-sm text-jarvis-text-dim">
+        <p className="text-base text-jarvis-text-dim">
           No health data available yet. Garmin sync runs daily, or trigger it manually via /api/sync/garmin.
         </p>
       </div>
@@ -169,8 +195,13 @@ export default function HealthCard() {
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-      <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider mb-4">
+      <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider mb-4">
         Health & Fitness
+        {data?.date && (
+          <span className="text-jarvis-text-muted ml-2 text-sm normal-case">
+            · {new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        )}
       </h2>
 
       {/* Vitals row */}
@@ -179,16 +210,16 @@ export default function HealthCard() {
           {g.steps != null && g.steps_goal != null ? (
             <div className="flex flex-col items-center">
               <StepsRing steps={g.steps} goal={g.steps_goal} />
-              <span className="text-[10px] text-jarvis-text-dim mt-1">Steps</span>
+              <span className="text-xs text-jarvis-text-dim mt-1">Steps</span>
             </div>
           ) : (
             <Metric label="Steps" value={g.steps} />
           )}
-          <Metric label="Resting HR" value={g.resting_hr} unit="bpm" />
-          <Metric label="Sleep" value={g.sleep_score} unit="/100" />
-          <Metric label="Body Battery" value={g.body_battery} unit="/100" />
-          <Metric label="Stress" value={g.stress_level} unit="/100" />
-          <Metric label="HRV" value={g.hrv_status} />
+          <Metric label="Resting HR" value={g.resting_hr} unit="bpm" qualifier={g.resting_hr_qualifier} />
+          <Metric label="Sleep" value={g.sleep_score} unit="/100" qualifier={g.sleep_qualifier} />
+          <Metric label="Body Battery" value={g.body_battery} unit="/100" qualifier={g.body_battery_qualifier} />
+          <Metric label="Stress" value={g.stress_level} unit="/100" qualifier={g.stress_qualifier} />
+          <Metric label="HRV" value={g.hrv_status} qualifier={g.hrv_qualifier} />
         </div>
       )}
 
@@ -196,7 +227,7 @@ export default function HealthCard() {
       {g && (
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 mb-4">
           <Metric label="VO2 Max" value={g.vo2_max} />
-          <Metric label="Readiness" value={g.training_readiness} unit="/100" />
+          <Metric label="Readiness" value={g.training_readiness} unit="/100" qualifier={g.training_readiness_qualifier} />
           <Metric label="Status" value={g.training_status} />
           <Metric label="Endurance" value={g.endurance_score} />
           <Metric label="Fitness Age" value={g.fitness_age} />
@@ -216,20 +247,20 @@ export default function HealthCard() {
       {/* Last Activity */}
       {act && (
         <div className="border-t border-jarvis-border pt-3 mb-4">
-          <span className="text-[10px] text-jarvis-text-dim uppercase tracking-wider">Last Activity</span>
+          <span className="text-xs text-jarvis-text-dim uppercase tracking-wider">Last Activity</span>
           <div className="flex items-center gap-4 mt-1">
-            <span className="text-sm font-medium text-jarvis-text-primary capitalize">{act.activity_type}</span>
+            <span className="text-base font-medium text-jarvis-text-primary capitalize">{act.activity_type}</span>
             {act.distance_meters != null && (
-              <span className="text-sm text-jarvis-text-secondary">{formatDistance(act.distance_meters)}</span>
+              <span className="text-base text-jarvis-text-secondary">{formatDistance(act.distance_meters)}</span>
             )}
             {act.duration_seconds != null && (
-              <span className="text-sm text-jarvis-text-secondary">{formatDuration(act.duration_seconds)}</span>
+              <span className="text-base text-jarvis-text-secondary">{formatDuration(act.duration_seconds)}</span>
             )}
             {act.avg_pace && (
-              <span className="text-sm text-jarvis-text-muted">{act.avg_pace}</span>
+              <span className="text-base text-jarvis-text-muted">{act.avg_pace}</span>
             )}
             {act.avg_hr != null && (
-              <span className="text-sm text-jarvis-text-muted">{act.avg_hr} bpm</span>
+              <span className="text-base text-jarvis-text-muted">{act.avg_hr} bpm</span>
             )}
           </div>
         </div>
@@ -239,8 +270,8 @@ export default function HealthCard() {
       {weight && weight.current && (
         <div className="border-t border-jarvis-border pt-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-jarvis-text-dim uppercase tracking-wider">Weight</span>
-            <span className="text-sm font-semibold text-jarvis-text-primary">
+            <span className="text-xs text-jarvis-text-dim uppercase tracking-wider">Weight</span>
+            <span className="text-base font-semibold text-jarvis-text-primary">
               {weight.current.weight_kg} kg
             </span>
           </div>

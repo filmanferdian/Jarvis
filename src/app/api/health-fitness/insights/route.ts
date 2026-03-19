@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
+import { buildJarvisContext } from '@/lib/context';
 
 function getWibToday(): string {
   const now = new Date();
@@ -76,6 +77,8 @@ export const GET = withAuth(async () => {
       `${t.objective}/${t.key_result}: target=${t.target_value}${t.unit}, baseline=${t.baseline_value ?? 'n/a'}`
     ).join('\n');
 
+    const ctx = await buildJarvisContext({ pages: ['about_me'] });
+
     const apiKey = (process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY)!;
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -90,7 +93,9 @@ export const GET = withAuth(async () => {
         temperature: 0.3,
         messages: [{
           role: 'user',
-          content: `You are a health analytics assistant for Filman Ferdian's transformation program. Analyze the following 7-day health data and provide a concise executive summary.
+          content: `${ctx.systemPrompt}
+
+Analyze the following 7-day health data and provide a concise executive summary for the transformation program.
 
 CURRENT CONTEXT:
 ${fitness ? `Week ${fitness.current_week}, ${fitness.current_phase}` : 'Unknown week/phase'}

@@ -149,11 +149,11 @@ export default function TasksCard() {
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider">
+        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
           Tasks This Week
         </h2>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-jarvis-text-dim font-mono">
+          <span className="text-sm text-jarvis-text-dim font-mono">
             {tasks.length} task{tasks.length !== 1 ? 's' : ''}
           </span>
           <button
@@ -186,14 +186,14 @@ export default function TasksCard() {
             value={newTaskName}
             onChange={(e) => setNewTaskName(e.target.value)}
             placeholder="Task name..."
-            className="w-full px-3 py-2 text-sm rounded-lg border border-jarvis-border bg-jarvis-bg text-jarvis-text-primary placeholder-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
+            className="w-full px-3 py-2 text-base rounded-lg border border-jarvis-border bg-jarvis-bg text-jarvis-text-primary placeholder-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
             autoFocus
           />
           <div className="flex items-center gap-2">
             <select
               value={newTaskPriority}
               onChange={(e) => setNewTaskPriority(e.target.value)}
-              className="px-2 py-1 text-xs rounded border border-jarvis-border bg-jarvis-bg text-jarvis-text-secondary focus:outline-none focus:border-jarvis-accent"
+              className="px-2 py-1 text-sm rounded border border-jarvis-border bg-jarvis-bg text-jarvis-text-secondary focus:outline-none focus:border-jarvis-accent"
             >
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
@@ -202,14 +202,14 @@ export default function TasksCard() {
             <button
               type="submit"
               disabled={submitting || !newTaskName.trim()}
-              className="px-3 py-1 text-xs rounded bg-jarvis-accent text-jarvis-bg font-medium hover:bg-jarvis-accent/80 disabled:opacity-50 transition-colors"
+              className="px-3 py-1 text-sm rounded bg-jarvis-accent text-jarvis-bg font-medium hover:bg-jarvis-accent/80 disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Adding...' : 'Add'}
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-3 py-1 text-xs rounded border border-jarvis-border text-jarvis-text-muted hover:text-jarvis-text-secondary transition-colors"
+              className="px-3 py-1 text-sm rounded border border-jarvis-border text-jarvis-text-muted hover:text-jarvis-text-secondary transition-colors"
             >
               Cancel
             </button>
@@ -218,12 +218,12 @@ export default function TasksCard() {
       )}
 
       {tasks.length === 0 ? (
-        <p className="text-sm text-jarvis-text-dim">No tasks due this week.</p>
+        <p className="text-base text-jarvis-text-dim">No tasks due this week.</p>
       ) : (
         <div className="space-y-4">
           {overdueTasks.length > 0 && (
             <div>
-              <p className="text-xs text-red-400 font-medium mb-2 uppercase tracking-wider">
+              <p className="text-sm text-red-400 font-medium mb-2 uppercase tracking-wider">
                 Overdue
               </p>
               <div className="space-y-1">
@@ -237,7 +237,7 @@ export default function TasksCard() {
           {upcomingTasks.length > 0 && (
             <div>
               {overdueTasks.length > 0 && (
-                <p className="text-xs text-jarvis-text-muted font-medium mb-2 uppercase tracking-wider">
+                <p className="text-sm text-jarvis-text-muted font-medium mb-2 uppercase tracking-wider">
                   Upcoming
                 </p>
               )}
@@ -267,22 +267,22 @@ function TaskRow({ task, onStatusToggle }: { task: NotionTask; onStatusToggle: (
         className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
         title={`Click to change to: ${nextStatus}`}
       />
-      <span className={`text-sm truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
+      <span className={`text-base truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
         {task.name}
       </span>
       {task.project_name && (
-        <span className="text-xs text-jarvis-text-dim hidden group-hover:inline truncate max-w-[120px]">
+        <span className="text-sm text-jarvis-text-dim hidden group-hover:inline truncate max-w-[120px]">
           {task.project_name}
         </span>
       )}
       {priority && (
-        <span className={`text-xs font-mono ${priority.color}`}>
+        <span className={`text-sm font-mono ${priority.color}`}>
           {priority.label}
         </span>
       )}
       {task.due_date && (
         <span
-          className={`text-xs font-mono shrink-0 ${
+          className={`text-sm font-mono shrink-0 ${
             overdue ? 'text-red-400' : 'text-jarvis-text-muted'
           }`}
         >

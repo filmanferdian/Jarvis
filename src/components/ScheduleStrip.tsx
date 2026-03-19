@@ -52,11 +52,11 @@ export default function ScheduleStrip() {
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-      <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider mb-4">
+      <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider mb-4">
         Today&apos;s Schedule
       </h2>
       {events.length === 0 ? (
-        <p className="text-sm text-jarvis-text-dim">No events today.</p>
+        <p className="text-base text-jarvis-text-dim">No events today.</p>
       ) : (
         <div className="space-y-2">
           {events.map((event) => (
@@ -68,7 +68,7 @@ export default function ScheduleStrip() {
                   : 'hover:bg-jarvis-bg-card'
               }`}
             >
-              <span className="text-xs font-mono text-jarvis-text-muted w-14 shrink-0">
+              <span className="text-sm font-mono text-jarvis-text-muted w-14 shrink-0">
                 {event.is_all_day ? 'All day' : formatTime(event.start_time)}
               </span>
               <div
@@ -79,7 +79,7 @@ export default function ScheduleStrip() {
                 }`}
               />
               <span
-                className={`text-sm ${
+                className={`text-base ${
                   isDeepWork(event.title)
                     ? 'text-jarvis-accent'
                     : 'text-jarvis-text-secondary'
@@ -88,7 +88,7 @@ export default function ScheduleStrip() {
                 {event.title}
               </span>
               {event.end_time && !event.is_all_day && (
-                <span className="text-xs text-jarvis-text-dim ml-auto">
+                <span className="text-sm text-jarvis-text-dim ml-auto">
                   → {formatTime(event.end_time)}
                 </span>
               )}

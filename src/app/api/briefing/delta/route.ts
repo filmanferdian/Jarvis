@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
+import { buildJarvisContext, allPages } from '@/lib/context';
 
 function getWibToday(): string {
   const now = new Date();
@@ -116,6 +117,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
     }
 
     // Generate delta with Claude
+    const ctx = await buildJarvisContext({ pages: allPages() });
     const apiKey = (process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY)!;
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -130,7 +132,9 @@ export const POST = withAuth(async (_req: NextRequest) => {
         temperature: 0.3,
         messages: [{
           role: 'user',
-          content: `You are Jarvis, a British butler-style AI assistant. Provide a mid-day update for Mr. Ferdian.
+          content: `${ctx.systemPrompt}
+
+Provide a mid-day update for Mr. Ferdian.
 
 Since this morning's briefing, the following has changed:
 ${changeDetails.map(c => `- ${c}`).join('\n')}

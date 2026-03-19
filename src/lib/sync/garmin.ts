@@ -111,6 +111,66 @@ async function createClient(retries = 3): Promise<GarminConnect> {
   throw new Error(`Garmin login failed after ${retries} attempts: ${lastError?.message}`);
 }
 
+// Expected keys in raw_json when all endpoints are fetched
+const COMPLETE_RAW_KEYS = ['summary', 'bodyBattery', 'stress', 'hrv', 'trainingReadiness', 'trainingStatus', 'heartRate', 'sleep'];
+
+interface RawData {
+  summary: Record<string, unknown>;
+  bodyBattery: unknown[];
+  stress: Record<string, unknown>;
+  hrv: Record<string, unknown>;
+  trainingReadiness: Record<string, unknown>[];
+  trainingStatus: Record<string, unknown>;
+  heartRate: Record<string, unknown>;
+  sleep: Record<string, unknown>;
+}
+
+function buildDailyRecord(dateStr: string, raw: RawData, stepsOverride?: number | null) {
+  const { summary, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep } = raw;
+
+  const sleepDTO = (sleep.dailySleepDTO as Record<string, unknown>) ?? {};
+  const hrvSummary = (hrv.hrvSummary as Record<string, unknown>) ?? {};
+  const recentVO2Generic = ((ts.mostRecentVO2Max as Record<string, unknown>)?.generic as Record<string, unknown>) ?? {};
+  const trainingStatusMap = ((ts.mostRecentTrainingStatus as Record<string, unknown>)?.latestTrainingStatusData as Record<string, Record<string, unknown>>) ?? {};
+  const firstTrainingStatus = Object.values(trainingStatusMap)[0] ?? {};
+  const acuteDTO = (firstTrainingStatus.acuteTrainingLoadDTO as Record<string, unknown>) ?? {};
+  const bbArray = (stress.bodyBatteryValuesArray as unknown[][] | null) ?? [];
+  const lastBB = bbArray.length > 0 ? bbArray[bbArray.length - 1] : null;
+  const bodyBatteryChange = (sleep.bodyBatteryChange as number) ?? null;
+  const sleepScoresOverall = ((sleepDTO.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>) ?? {};
+  const trainingFeedback = (firstTrainingStatus.trainingStatusFeedbackPhrase as string) ?? null;
+  const trainingStatusLabel = trainingFeedback ? trainingFeedback.replace(/_\d+$/, '') : null;
+
+  const steps = stepsOverride ?? (summary.totalSteps as number) ?? null;
+
+  return {
+    date: dateStr,
+    steps,
+    steps_goal: null as number | null,
+    resting_hr: (hr.restingHeartRate as number) ?? null,
+    stress_level: (stress.avgStressLevel as number) ?? null,
+    hrv_status: (hrvSummary.status as string) ?? (sleep.hrvStatus as string) ?? null,
+    hrv_7d_avg: (hrvSummary.weeklyAvg as number) ?? (sleep.avgOvernightHrv as number) ?? null,
+    sleep_score: (sleepScoresOverall.value as number) ?? null,
+    sleep_duration_seconds: (sleepDTO.sleepTimeSeconds as number) ?? null,
+    body_battery: lastBB ? (lastBB[2] as number) : null,
+    body_battery_charged: bodyBatteryChange != null ? Math.abs(bodyBatteryChange) : null,
+    body_battery_drained: null as number | null,
+    training_readiness: Array.isArray(tr) && tr.length > 0 ? (tr[0].score as number) ?? null : null,
+    training_status: trainingStatusLabel,
+    vo2_max: (recentVO2Generic.vo2MaxValue as number) ?? null,
+    calories_active: null as number | null,
+    calories_resting: null as number | null,
+    calories_total: null as number | null,
+    fitness_age: (recentVO2Generic.fitnessAge as number) ?? null,
+    endurance_score: null as number | null,
+    training_load_acute: (acuteDTO.dailyTrainingLoadAcute as number) ?? null,
+    training_load_chronic: (acuteDTO.dailyTrainingLoadChronic as number) ?? null,
+    raw_json: raw,
+    last_synced: new Date().toISOString(),
+  };
+}
+
 export async function syncGarmin(): Promise<GarminSyncResult> {
   const client = await createClient();
   const today = getWibToday();
@@ -158,57 +218,8 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   const sleep = sleepData.status === 'fulfilled' ? sleepData.value as unknown as Record<string, unknown> : {};
   const stepsVal = steps.status === 'fulfilled' ? steps.value as number : null;
 
-  // Parse nested structures from actual Garmin API responses
-  const sleepDTO = (sleep.dailySleepDTO as Record<string, unknown>) ?? {};
-  const hrvSummary = (hrv.hrvSummary as Record<string, unknown>) ?? {};
-
-  // VO2 Max is nested: mostRecentVO2Max.generic.vo2MaxValue
-  const recentVO2Generic = ((ts.mostRecentVO2Max as Record<string, unknown>)?.generic as Record<string, unknown>) ?? {};
-
-  // Training status is nested by device ID: mostRecentTrainingStatus.latestTrainingStatusData[deviceId]
-  const trainingStatusMap = ((ts.mostRecentTrainingStatus as Record<string, unknown>)?.latestTrainingStatusData as Record<string, Record<string, unknown>>) ?? {};
-  const firstTrainingStatus = Object.values(trainingStatusMap)[0] ?? {};
-  const acuteDTO = (firstTrainingStatus.acuteTrainingLoadDTO as Record<string, unknown>) ?? {};
-
-  // Body battery: tuples are [timestamp, status_string, battery_level, change]
-  const bbArray = (stress.bodyBatteryValuesArray as unknown[][] | null) ?? [];
-  const lastBB = bbArray.length > 0 ? bbArray[bbArray.length - 1] : null;
-  const bodyBatteryChange = (sleep.bodyBatteryChange as number) ?? null;
-
-  // Sleep score: { overall: { value: 60, qualifierKey: "FAIR" }, ... }
-  const sleepScoresOverall = ((sleepDTO.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>) ?? {};
-
-  // Training status feedback phrase like "PRODUCTIVE_1" → extract status name
-  const trainingFeedback = (firstTrainingStatus.trainingStatusFeedbackPhrase as string) ?? null;
-  const trainingStatusLabel = trainingFeedback ? trainingFeedback.replace(/_\d+$/, '') : null;
-
-  // Build garmin_daily record
-  const dailyRecord = {
-    date: today,
-    steps: stepsVal ?? null,
-    steps_goal: null as number | null,
-    resting_hr: (hr.restingHeartRate as number) ?? null,
-    stress_level: (stress.avgStressLevel as number) ?? null,
-    hrv_status: (hrvSummary.status as string) ?? (sleep.hrvStatus as string) ?? null,
-    hrv_7d_avg: (hrvSummary.weeklyAvg as number) ?? (sleep.avgOvernightHrv as number) ?? null,
-    sleep_score: (sleepScoresOverall.value as number) ?? null,
-    sleep_duration_seconds: (sleepDTO.sleepTimeSeconds as number) ?? null,
-    body_battery: lastBB ? (lastBB[2] as number) : null,
-    body_battery_charged: bodyBatteryChange != null ? Math.abs(bodyBatteryChange) : null,
-    body_battery_drained: null as number | null,
-    training_readiness: Array.isArray(tr) && tr.length > 0 ? (tr[0].score as number) ?? null : null,
-    training_status: trainingStatusLabel,
-    vo2_max: (recentVO2Generic.vo2MaxValue as number) ?? null,
-    calories_active: null as number | null,
-    calories_resting: null as number | null,
-    calories_total: null as number | null,
-    fitness_age: (recentVO2Generic.fitnessAge as number) ?? null,
-    endurance_score: null as number | null,
-    training_load_acute: (acuteDTO.dailyTrainingLoadAcute as number) ?? null,
-    training_load_chronic: (acuteDTO.dailyTrainingLoadChronic as number) ?? null,
-    raw_json: { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep },
-    last_synced: new Date().toISOString(),
-  };
+  const rawData = { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep };
+  const dailyRecord = buildDailyRecord(today, rawData, stepsVal);
 
   // Upsert daily record (delete-then-insert for date-unique tables)
   await supabase.from('garmin_daily').delete().eq('date', today);
@@ -343,74 +354,140 @@ async function pruneOldRecords(): Promise<void> {
   ]);
 }
 
-export async function backfillGarmin(): Promise<{ days_synced: number; activities_synced: number }> {
+export interface BackfillResult {
+  days_synced: number;
+  days_enriched: number;
+  days_skipped: number;
+  days_failed: number;
+  activities_synced: number;
+}
+
+async function fetchAllEndpoints(client: GarminConnect, dateStr: string, dateObj: Date): Promise<RawData> {
+  const apiBase = 'https://connectapi.garmin.com';
+
+  const [dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus, heartRate, sleepData] =
+    await Promise.allSettled([
+      client.get(`${apiBase}/usersummary-service/usersummary/daily/${dateStr}`),
+      client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${dateStr}/${dateStr}`),
+      client.get(`${apiBase}/wellness-service/wellness/dailyStress/${dateStr}`),
+      client.get(`${apiBase}/hrv-service/hrv/${dateStr}`),
+      client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${dateStr}`),
+      client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${dateStr}`),
+      client.getHeartRate(dateObj),
+      client.getSleepData(dateObj),
+    ]);
+
+  return {
+    summary: dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {},
+    bodyBattery: bodyBattery.status === 'fulfilled' ? bodyBattery.value as unknown[] : [],
+    stress: stressData.status === 'fulfilled' ? stressData.value as Record<string, unknown> : {},
+    hrv: hrvData.status === 'fulfilled' ? hrvData.value as Record<string, unknown> : {},
+    trainingReadiness: trainingReadiness.status === 'fulfilled' ? trainingReadiness.value as Record<string, unknown>[] : [],
+    trainingStatus: trainingStatus.status === 'fulfilled' ? trainingStatus.value as Record<string, unknown> : {},
+    heartRate: heartRate.status === 'fulfilled' ? heartRate.value as unknown as Record<string, unknown> : {},
+    sleep: sleepData.status === 'fulfilled' ? sleepData.value as unknown as Record<string, unknown> : {},
+  };
+}
+
+function adaptiveDelay(baseMs: number, consecutiveFailures: number): Promise<void> {
+  const backoff = Math.min(baseMs * Math.pow(2, consecutiveFailures), 30000);
+  const jitter = Math.random() * 1500;
+  return new Promise((resolve) => setTimeout(resolve, backoff + jitter));
+}
+
+export async function backfillGarmin(force = false): Promise<BackfillResult> {
   const client = await createClient();
-  let daysSynced = 0;
-  let totalActivities = 0;
+  const result: BackfillResult = {
+    days_synced: 0,
+    days_enriched: 0,
+    days_skipped: 0,
+    days_failed: 0,
+    activities_synced: 0,
+  };
+  let consecutiveFailures = 0;
+
+  // Load existing records to classify dates
+  const { data: existingRows } = await supabase
+    .from('garmin_daily')
+    .select('date, raw_json')
+    .order('date', { ascending: true });
+
+  const existingMap = new Map<string, Record<string, unknown>>();
+  for (const row of existingRows ?? []) {
+    existingMap.set(row.date, row.raw_json as Record<string, unknown>);
+  }
 
   for (let i = RETENTION_DAYS; i >= 1; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = formatDate(date);
 
-    // Check if we already have data for this date
-    const { data: existing } = await supabase
-      .from('garmin_daily')
-      .select('date')
-      .eq('date', dateStr)
-      .single();
+    const existingRaw = existingMap.get(dateStr);
 
-    if (existing) continue;
+    if (!force && existingRaw) {
+      // Check if record is COMPLETE (has all expected raw_json keys)
+      const existingKeys = Object.keys(existingRaw);
+      const isComplete = COMPLETE_RAW_KEYS.every((k) => existingKeys.includes(k));
 
+      if (isComplete) {
+        result.days_skipped++;
+        continue;
+      }
+
+      // PARTIAL: re-extract from existing raw_json using buildDailyRecord
+      try {
+        const rawData: RawData = {
+          summary: (existingRaw.summary as Record<string, unknown>) ?? {},
+          bodyBattery: (existingRaw.bodyBattery as unknown[]) ?? [],
+          stress: (existingRaw.stress as Record<string, unknown>) ?? {},
+          hrv: (existingRaw.hrv as Record<string, unknown>) ?? {},
+          trainingReadiness: (existingRaw.trainingReadiness as Record<string, unknown>[]) ?? [],
+          trainingStatus: (existingRaw.trainingStatus as Record<string, unknown>) ?? {},
+          heartRate: (existingRaw.heartRate as Record<string, unknown>) ?? {},
+          sleep: (existingRaw.sleep as Record<string, unknown>) ?? {},
+        };
+
+        // Check which keys are missing and fetch only those
+        const missingKeys = COMPLETE_RAW_KEYS.filter((k) => !existingKeys.includes(k));
+        if (missingKeys.length > 0) {
+          // Fetch missing endpoints from API
+          const freshData = await fetchAllEndpoints(client, dateStr, date);
+          for (const key of missingKeys) {
+            (rawData as unknown as Record<string, unknown>)[key] = (freshData as unknown as Record<string, unknown>)[key];
+          }
+          await adaptiveDelay(3000, 0);
+        }
+
+        const record = buildDailyRecord(dateStr, rawData);
+        await supabase.from('garmin_daily').delete().eq('date', dateStr);
+        const { error } = await supabase.from('garmin_daily').insert(record);
+        if (!error) result.days_enriched++;
+        consecutiveFailures = 0;
+      } catch (err) {
+        console.error(`Backfill enrich error for ${dateStr}:`, err);
+        result.days_failed++;
+        consecutiveFailures++;
+        await adaptiveDelay(3000, consecutiveFailures);
+      }
+      continue;
+    }
+
+    // MISSING (or force): fetch all endpoints from API
     try {
-      // Fetch daily summary for this date
-      const apiBase = 'https://connectapi.garmin.com';
-      const [dailySummary, heartRate, sleepData] = await Promise.allSettled([
-        client.get(`${apiBase}/usersummary-service/usersummary/daily/${dateStr}`),
-        client.getHeartRate(date),
-        client.getSleepData(date),
-      ]);
+      const rawData = await fetchAllEndpoints(client, dateStr, date);
+      const record = buildDailyRecord(dateStr, rawData);
 
-      const summary = dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {};
-      const hr = heartRate.status === 'fulfilled' ? heartRate.value as unknown as Record<string, unknown> : {};
-      const sleep = sleepData.status === 'fulfilled' ? sleepData.value as unknown as Record<string, unknown> : {};
-      const sleepDTO = (sleep.dailySleepDTO as Record<string, unknown>) ?? {};
-      const sleepScoresOverall = ((sleepDTO.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>) ?? {};
-
-      const record = {
-        date: dateStr,
-        steps: (summary.totalSteps as number) ?? null,
-        steps_goal: null as number | null,
-        resting_hr: (hr.restingHeartRate as number) ?? null,
-        stress_level: null as number | null,
-        hrv_status: (sleep.hrvStatus as string) ?? null,
-        hrv_7d_avg: (sleep.avgOvernightHrv as number) ?? null,
-        sleep_score: (sleepScoresOverall.value as number) ?? null,
-        sleep_duration_seconds: (sleepDTO.sleepTimeSeconds as number) ?? null,
-        body_battery: null as number | null,
-        body_battery_charged: null as number | null,
-        body_battery_drained: null as number | null,
-        training_readiness: null as number | null,
-        training_status: null as string | null,
-        vo2_max: null as number | null,
-        calories_active: null as number | null,
-        calories_resting: null as number | null,
-        calories_total: null as number | null,
-        fitness_age: null as number | null,
-        endurance_score: null as number | null,
-        training_load_acute: null as number | null,
-        training_load_chronic: null as number | null,
-        raw_json: { summary, heartRate: hr, sleep },
-        last_synced: new Date().toISOString(),
-      };
-
+      await supabase.from('garmin_daily').delete().eq('date', dateStr);
       const { error } = await supabase.from('garmin_daily').insert(record);
-      if (!error) daysSynced++;
+      if (!error) result.days_synced++;
+      consecutiveFailures = 0;
 
-      // Rate limit: 2 seconds between requests
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await adaptiveDelay(3000, 0);
     } catch (err) {
-      console.error(`Backfill error for ${dateStr}:`, err);
+      console.error(`Backfill fetch error for ${dateStr}:`, err);
+      result.days_failed++;
+      consecutiveFailures++;
+      await adaptiveDelay(3000, consecutiveFailures);
     }
   }
 
@@ -437,12 +514,15 @@ export async function backfillGarmin(): Promise<{ days_synced: number; activitie
         const { error } = await supabase
           .from('garmin_activities')
           .upsert(rec, { onConflict: 'activity_id' });
-        if (!error) totalActivities++;
+        if (!error) result.activities_synced++;
       }
     }
   } catch (err) {
     console.error('Backfill activities error:', err);
   }
 
-  return { days_synced: daysSynced, activities_synced: totalActivities };
+  // Refresh tokens after successful backfill
+  await saveCachedTokens(client);
+
+  return result;
 }

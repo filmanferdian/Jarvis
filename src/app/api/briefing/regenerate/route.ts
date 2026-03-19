@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { detectRedFlags, RedFlag } from '@/lib/fitness/redflags';
+import { buildJarvisContext, allPages } from '@/lib/context';
 
 // POST: Regenerate today's morning briefing using real calendar + tasks + fitness data
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -340,9 +341,11 @@ export const POST = withAuth(async (_req: NextRequest) => {
       .join('\n');
 
     // --- Dual-script prompt: generates both WRITTEN and VOICEOVER ---
-    const prompt = `You are Jarvis — a blend of Alfred Pennyworth and the AI Jarvis from Iron Man. You are a refined British butler, chief of staff, and personal guardian to one person: Filman Ferdian. You genuinely care about his wellbeing, not just his schedule.
+    const ctx = await buildJarvisContext({ pages: allPages() });
 
-Persona guidelines:
+    const prompt = `${ctx.systemPrompt}
+
+Persona guidelines for this briefing:
 - Always open the voiceover with "Good morning, Mr. Ferdian" (or appropriate greeting for time of day)
 - Use "sir" sparingly — once or twice per briefing, for emphasis or gentle course-correction (e.g., "If I may, sir, your sleep has been below target")
 - Tone: warm but composed, protective, occasionally wry. Think Alfred noticing Bruce hasn't slept enough.

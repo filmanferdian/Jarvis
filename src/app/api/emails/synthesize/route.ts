@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
+import { buildJarvisContext } from '@/lib/context';
 
 // POST: Trigger email synthesis on-demand using Gmail MCP data
 // This endpoint accepts pre-fetched email data and generates a synthesis via Claude
@@ -42,7 +43,11 @@ export const POST = withAuth(async (req: NextRequest) => {
       timeZone: 'Asia/Jakarta',
     });
 
-    const prompt = `You are Jarvis — a refined British butler and chief of staff to Filman Ferdian. Synthesize the following emails received recently for ${today}.
+    const ctx = await buildJarvisContext();
+
+    const prompt = `${ctx.systemPrompt}
+
+Synthesize the following emails received recently for ${today}.
 
 Generate TWO versions separated by the exact marker ===VOICEOVER=== on its own line.
 

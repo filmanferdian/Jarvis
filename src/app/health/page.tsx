@@ -99,7 +99,7 @@ export default function HealthPage() {
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 space-y-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-jarvis-text-muted">
+        <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
           <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
           <span>/</span>
           <span className="text-jarvis-text-primary">Health & Fitness</span>
@@ -108,7 +108,7 @@ export default function HealthPage() {
         {/* OKR Overview Bar */}
         <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-jarvis-text-primary">OKR Progress</h2>
+            <h2 className="text-base font-semibold text-jarvis-text-primary">OKR Progress</h2>
             {overallProgress != null && (
               <span className="text-lg font-mono font-semibold text-jarvis-accent">{overallProgress}%</span>
             )}
@@ -121,7 +121,7 @@ export default function HealthPage() {
               />
             </div>
           )}
-          <div className="flex gap-4 text-xs text-jarvis-text-muted">
+          <div className="flex gap-4 text-sm text-jarvis-text-muted">
             {fitnessCtx && (
               <>
                 <span>Week {fitnessCtx.current_week} of 52</span>

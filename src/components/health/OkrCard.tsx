@@ -76,20 +76,20 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <span className="text-[10px] font-mono text-jarvis-accent uppercase tracking-wider">{objective}</span>
-          <h3 className="text-sm font-semibold text-jarvis-text-primary">{label}</h3>
+          <span className="text-xs font-mono text-jarvis-accent uppercase tracking-wider">{objective}</span>
+          <h3 className="text-base font-semibold text-jarvis-text-primary">{label}</h3>
         </div>
         {overallPct != null ? (
           <span className="text-lg font-mono font-semibold text-jarvis-text-primary">{overallPct}%</span>
         ) : (
-          <span className="text-xs text-jarvis-text-dim">No data</span>
+          <span className="text-sm text-jarvis-text-dim">No data</span>
         )}
       </div>
 
       <div className="space-y-2">
         {keyResults.map((kr) => (
           <div key={kr.key_result} className="flex items-center gap-2">
-            <span className="text-xs text-jarvis-text-secondary w-24 shrink-0 truncate">
+            <span className="text-sm text-jarvis-text-secondary w-24 shrink-0 truncate">
               {KR_LABELS[kr.key_result] || kr.key_result}
             </span>
             <div className="flex-1 h-2 bg-jarvis-border rounded-full overflow-hidden">
@@ -100,7 +100,7 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
                 />
               )}
             </div>
-            <span className={`text-xs font-mono w-16 text-right ${STATUS_TEXT_COLORS[kr.status]}`}>
+            <span className={`text-sm font-mono w-16 text-right ${STATUS_TEXT_COLORS[kr.status]}`}>
               {kr.current_value != null ? (
                 <>
                   {formatValue(kr)}
@@ -116,7 +116,7 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
 
       {/* Stale data warning */}
       {keyResults.some((kr) => kr.status === 'no_data') && (
-        <p className="text-[10px] text-jarvis-warn mt-2">
+        <p className="text-xs text-jarvis-warn mt-2">
           ⚠ {keyResults.filter((kr) => kr.status === 'no_data').length} metric(s) have no data
         </p>
       )}

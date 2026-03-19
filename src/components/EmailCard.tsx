@@ -35,10 +35,10 @@ export default function EmailCard() {
   if (!data?.synthesis) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-        <h2 className="text-sm font-medium text-jarvis-text-muted mb-2">
+        <h2 className="text-base font-medium text-jarvis-text-muted mb-2">
           Email Digest
         </h2>
-        <p className="text-sm text-jarvis-text-dim">
+        <p className="text-base text-jarvis-text-dim">
           {data?.message || 'No email synthesis available yet.'}
         </p>
       </div>
@@ -48,17 +48,17 @@ export default function EmailCard() {
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-jarvis-accent uppercase tracking-wider">
+        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
           Email Digest
         </h2>
         <div className="flex items-center gap-3">
           {(data.importantCount ?? 0) > 0 && (
-            <span className="text-xs font-mono text-jarvis-warn">
+            <span className="text-sm font-mono text-jarvis-warn">
               {data.importantCount} important
             </span>
           )}
           {(data.deadlineCount ?? 0) > 0 && (
-            <span className="text-xs font-mono text-red-400">
+            <span className="text-sm font-mono text-red-400">
               {data.deadlineCount} deadline{data.deadlineCount !== 1 ? 's' : ''}
             </span>
           )}
@@ -78,14 +78,14 @@ export default function EmailCard() {
         >
           <path d="M8 5v14l11-7z" />
         </svg>
-        <span className="text-sm text-jarvis-text-secondary">
+        <span className="text-base text-jarvis-text-secondary">
           {expanded ? 'Hide synthesis' : 'Show synthesis'}
         </span>
       </button>
 
       {expanded && (
         <div
-          className="mt-3 text-sm text-jarvis-text-secondary whitespace-pre-line border-l-2 border-jarvis-accent pl-4"
+          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line border-l-2 border-jarvis-accent pl-4"
           dangerouslySetInnerHTML={{
             __html: data.synthesis
               .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')

@@ -36,8 +36,14 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-const NAV_ITEMS = [
-  { href: '/', label: 'Dashboard', icon: '◉' },
+const HOME_ICON = (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+  </svg>
+);
+
+const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
+  { href: '/', label: 'Dashboard', icon: HOME_ICON },
   { href: '/health', label: 'Health & Fitness', icon: '♥' },
   { href: '/utilities', label: 'Utilities', icon: '⚙' },
 ];
@@ -98,7 +104,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                   : 'text-jarvis-text-secondary hover:bg-jarvis-bg-card'
               }`}
             >
-              <span className="text-xs">{item.icon}</span>
+              <span className="text-xs flex items-center">{item.icon}</span>
               {item.label}
             </Link>
           );

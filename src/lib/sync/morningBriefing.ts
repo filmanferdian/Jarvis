@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
+import { buildJarvisContext, allPages } from '@/lib/context';
 
 export interface BriefingResult {
   date: string;
@@ -93,7 +94,11 @@ export async function generateBriefing(): Promise<BriefingResult> {
     timeZone: 'Asia/Jakarta',
   });
 
-  const prompt = `You are Jarvis — a refined British butler and chief of staff to Filman Ferdian ("Mr. Ferdian"). Generate a concise morning briefing for ${dateSummary}.
+  const ctx = await buildJarvisContext({ pages: allPages() });
+
+  const prompt = `${ctx.systemPrompt}
+
+Generate a concise morning briefing for ${dateSummary}.
 
 Use these numbered sections:
 1. Calendar overview: Summarize today's schedule

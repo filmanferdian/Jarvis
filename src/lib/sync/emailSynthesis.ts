@@ -10,6 +10,7 @@ import {
   getValidAccessToken as getGoogleToken,
   fetchRecentEmails as fetchGmailEmails,
 } from '@/lib/google';
+import { buildJarvisContext } from '@/lib/context';
 
 export interface SyncResult {
   synced: boolean;
@@ -77,7 +78,11 @@ export async function syncEmails(): Promise<SyncResult> {
     timeZone: 'Asia/Jakarta',
   });
 
-  const prompt = `You are Jarvis, a personal executive assistant. Synthesize the following emails received in the last 24 hours for ${today}.
+  const ctx = await buildJarvisContext();
+
+  const prompt = `${ctx.systemPrompt}
+
+Synthesize the following emails received in the last 24 hours for ${today}.
 
 The emails come from multiple inboxes:
 - outlook: Main work email (filman@infinid.id)
