@@ -158,6 +158,81 @@ async function fetchPageLastEdited(pageId: string): Promise<string> {
   return data.last_edited_time;
 }
 
+/**
+ * Parse the current week number from the Notion milestones table.
+ * The table has rows like: | 8 | Mar 16 – Mar 22, 2026 | 110kg | First 4kg lost |
+ * We find the row whose date range contains today's date.
+ * Falls back to hardcoded start date calculation if parsing fails.
+ */
+function parseCurrentWeekFromContent(content: string, todayWib: string): number {
+  const today = new Date(todayWib + 'T00:00:00Z');
+
+  // Month name to number mapping
+  const months: Record<string, number> = {
+    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+    'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+  };
+
+  // Match patterns like "Mar 16 – Mar 22, 2026" or "Jan 26 – Feb 1, 2026"
+  const dateRangeRegex = /(\w{3})\s+(\d{1,2})\s*[–—-]\s*(\w{3})\s+(\d{1,2}),?\s*(\d{4})/g;
+  const lines = content.split('\n');
+
+  let bestWeek: number | null = null;
+
+  for (const line of lines) {
+    // Look for lines that have both a week number and a date range
+    const weekMatch = line.match(/(?:^|\|)\s*(\d{1,2})\s*(?:\|)/);
+    if (!weekMatch) continue;
+
+    const weekNum = parseInt(weekMatch[1], 10);
+    if (weekNum < 1 || weekNum > 52) continue;
+
+    const rangeMatch = dateRangeRegex.exec(line);
+    dateRangeRegex.lastIndex = 0; // Reset for next iteration
+    if (!rangeMatch) continue;
+
+    const startMonth = months[rangeMatch[1].toLowerCase()];
+    const startDay = parseInt(rangeMatch[2], 10);
+    const endMonth = months[rangeMatch[3].toLowerCase()];
+    const endDay = parseInt(rangeMatch[4], 10);
+    const year = parseInt(rangeMatch[5], 10);
+
+    if (startMonth === undefined || endMonth === undefined) continue;
+
+    const rangeStart = new Date(Date.UTC(year, startMonth, startDay));
+    const rangeEnd = new Date(Date.UTC(year, endMonth, endDay, 23, 59, 59));
+
+    if (today >= rangeStart && today <= rangeEnd) {
+      bestWeek = weekNum;
+      break;
+    }
+
+    // If today is between this milestone and the next, interpolate
+    // e.g., if week 8 ends Mar 22 and today is Mar 25 (before week 12 starts),
+    // compute offset days from this milestone's start
+    if (today > rangeEnd) {
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const daysPastStart = Math.floor((today.getTime() - rangeStart.getTime()) / msPerDay);
+      const weeksOffset = Math.floor(daysPastStart / 7);
+      bestWeek = weekNum + weeksOffset;
+    }
+  }
+
+  // Fallback: calculate from hardcoded start date if no match found
+  if (bestWeek === null) {
+    const programStart = new Date('2026-01-26T00:00:00+07:00');
+    const wibDate = new Date(today.getTime() + 7 * 60 * 60 * 1000);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysSinceStart = Math.floor((wibDate.getTime() - programStart.getTime()) / msPerDay);
+    bestWeek = Math.floor(daysSinceStart / 7) + 1;
+    console.log(`[fitness] Week parsed from fallback calculation: ${bestWeek}`);
+  } else {
+    console.log(`[fitness] Week parsed from Notion milestones: ${bestWeek}`);
+  }
+
+  return bestWeek;
+}
+
 async function extractWithClaude(programContent: string, subpageContents: string[]): Promise<FitnessContext> {
   const apiKey = process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('Anthropic API key not configured');
@@ -172,17 +247,15 @@ async function extractWithClaude(programContent: string, subpageContents: string
   const wibDate = new Date(now.getTime() + wibOffset);
   const todayWib = wibDate.toISOString().split('T')[0];
 
-  // Program started Monday Jan 26, 2026. Calculate current week deterministically.
-  const programStart = new Date('2026-01-26T00:00:00+07:00');
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const daysSinceStart = Math.floor((wibDate.getTime() - programStart.getTime()) / msPerDay);
-  const currentWeek = Math.floor(daysSinceStart / 7) + 1;
+  // Parse current week from Notion milestones table (week-date mapping)
+  // Matches patterns like: "8" ... "Mar 16 – Mar 22, 2026" or "Week 8" ... date ranges
+  const currentWeek = parseCurrentWeekFromContent(programContent, todayWib);
 
   const prompt = `You are extracting structured fitness program data from a Notion page. Extract the following JSON structure from the program content below. Be precise with numbers and exercise details.
 
 IMPORTANT RULES:
 1. Today's date is ${todayWib} (WIB timezone).
-2. current_week MUST be ${currentWeek}. The program started on 2026-01-26 (Monday). Today is day ${daysSinceStart + 1}, which is week ${currentWeek}. Do NOT override this with any week number you find in the content — use ${currentWeek} exactly.
+2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
 3. Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
 
 Return ONLY valid JSON matching this exact structure:
