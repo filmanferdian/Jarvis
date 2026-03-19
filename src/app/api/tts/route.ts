@@ -88,6 +88,7 @@ export const POST = withAuth(async (req: NextRequest) => {
             headers: {
               'Content-Type': 'audio/mpeg',
               'Transfer-Encoding': 'chunked',
+              'Cache-Control': 'public, max-age=3600',
             },
           });
         }
@@ -98,6 +99,7 @@ export const POST = withAuth(async (req: NextRequest) => {
           headers: {
             'Content-Type': 'audio/mpeg',
             'Content-Length': String(audioBuffer.byteLength),
+            'Cache-Control': 'public, max-age=3600',
           },
         });
       }

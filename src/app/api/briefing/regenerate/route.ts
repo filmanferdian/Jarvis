@@ -80,9 +80,34 @@ export const POST = withAuth(async (_req: NextRequest) => {
     const events = eventsRes.data;
     const tasks = tasksRes.data;
     const emailData = emailRes.data;
-    const fitnessCtx = fitnessRes.data;
+    let fitnessCtx = fitnessRes.data;
     const garminDaily = garminRes.data;
     const recentWeights = weightRes.data;
+
+    // Defensive: if fitness context is stale (>7 days), force re-sync
+    if (fitnessCtx?.synced_at) {
+      const syncedAt = new Date(fitnessCtx.synced_at).getTime();
+      const daysSinceSync = (now.getTime() - syncedAt) / (1000 * 60 * 60 * 24);
+      if (daysSinceSync > 7) {
+        console.log(`[briefing] Fitness context is ${Math.round(daysSinceSync)} days stale, triggering re-sync`);
+        try {
+          const { syncFitness } = await import('@/lib/sync/fitness');
+          const result = await syncFitness(true);
+          if (result.synced) {
+            // Re-fetch updated context
+            const { data: refreshed } = await supabase
+              .from('fitness_context')
+              .select('*')
+              .order('synced_at', { ascending: false })
+              .limit(1)
+              .single();
+            if (refreshed) fitnessCtx = refreshed;
+          }
+        } catch (syncErr) {
+          console.error('[briefing] Failed to re-sync fitness:', syncErr);
+        }
+      }
+    }
 
     // Build prompt sections
     const calendarSection =
@@ -417,7 +442,28 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
       weight: !!(recentWeights && recentWeights.length > 0),
     };
 
-    // Upsert to briefing_cache (written + voiceover)
+    // Build baseline snapshot for delta briefing comparison
+    // Store item IDs so delta can identify what's new vs what was already briefed
+    const baselineSnapshot = {
+      calendar_count: events?.length ?? 0,
+      calendar_ids: events?.map(e => e.id) ?? [],
+      task_count: tasks?.length ?? 0,
+      task_ids: tasks?.map(t => t.id) ?? [],
+      email_count: emailData ? 1 : 0,
+      email_ids: emailData ? [today] : [],
+    };
+
+    // Preserve health_insights if already cached
+    const { data: existingCache } = await supabase
+      .from('briefing_cache')
+      .select('baseline_snapshot')
+      .eq('date', today)
+      .single();
+
+    const existingSnapshot = (existingCache?.baseline_snapshot as Record<string, unknown>) || {};
+    const mergedSnapshot = { ...existingSnapshot, ...baselineSnapshot };
+
+    // Upsert to briefing_cache (written + voiceover + baseline)
     const { error: dbError } = await supabase.from('briefing_cache').upsert(
       {
         date: today,
@@ -425,6 +471,7 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
         voiceover_text: voiceoverText,
         generated_at: new Date().toISOString(),
         data_sources_used: dataSources,
+        baseline_snapshot: mergedSnapshot,
       },
       { onConflict: 'date' }
     );

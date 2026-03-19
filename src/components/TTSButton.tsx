@@ -18,11 +18,13 @@ export default function TTSButton({ text }: TTSButtonProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       if (audioRef.current) audioRef.current.pause();
     };
@@ -32,6 +34,10 @@ export default function TTSButton({ text }: TTSButtonProps) {
     // Abort in-flight fetch
     abortRef.current?.abort();
     abortRef.current = null;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     try {
       if (audioRef.current) {
@@ -57,6 +63,37 @@ export default function TTSButton({ text }: TTSButtonProps) {
     utterance.onerror = () => setIsPlaying(false);
     window.speechSynthesis.speak(utterance);
     setIsPlaying(true);
+    setIsLoading(false);
+  };
+
+  const playAudioBlob = async (blob: Blob) => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    objectUrlRef.current = url;
+
+    const audio = new Audio();
+    audio.setAttribute('playsinline', 'true');
+    audio.preload = 'auto';
+    audioRef.current = audio;
+    audio.onended = () => setIsPlaying(false);
+    audio.onerror = () => {
+      setIsPlaying(false);
+      setIsLoading(false);
+    };
+
+    // Set source and wait for enough data before playing
+    audio.src = url;
+
+    await new Promise<void>((resolve, reject) => {
+      audio.oncanplaythrough = () => resolve();
+      audio.onerror = () => reject(new Error('Audio load failed'));
+      // If canplaythrough doesn't fire in 5s, try playing anyway
+      setTimeout(resolve, 5000);
+    });
+
+    await audio.play();
+    setIsPlaying(true);
+    setIsLoading(false);
   };
 
   // Streaming fetch: uses ElevenLabs streaming endpoint for faster server response,
@@ -84,17 +121,7 @@ export default function TTSButton({ text }: TTSButtonProps) {
     }
 
     const blob = new Blob(chunks, { type: 'audio/mpeg' });
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(blob);
-    objectUrlRef.current = url;
-
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => setIsPlaying(false);
-    await audio.play();
-    setIsPlaying(true);
-    setIsLoading(false);
+    await playAudioBlob(blob);
   };
 
   // Non-streaming playback: fetch full audio then play (iOS fallback)
@@ -110,17 +137,7 @@ export default function TTSButton({ text }: TTSButtonProps) {
     if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
 
     const blob = await res.blob();
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-
-    const url = URL.createObjectURL(blob);
-    objectUrlRef.current = url;
-
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => setIsPlaying(false);
-    await audio.play();
-    setIsPlaying(true);
+    await playAudioBlob(blob);
   };
 
   const handleToggle = async () => {
@@ -133,18 +150,31 @@ export default function TTSButton({ text }: TTSButtonProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Timeout: if audio hasn't started in 20s, fall back to Web Speech
+    timeoutRef.current = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[TTS] Timeout after 20s, falling back to Web Speech');
+        controller.abort();
+        fallbackToWebSpeech();
+      }
+    }, 20000);
+
     try {
-      // Use streaming on non-iOS for faster time-to-audio
-      if (!isIOS()) {
-        await playStreaming(controller);
-      } else {
+      // Use non-streaming on iOS for reliability
+      if (isIOS()) {
         await playBlob(controller);
+      } else {
+        await playStreaming(controller);
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      // Fallback to Web Speech API
+      console.warn('[TTS] ElevenLabs/OpenAI failed, falling back to Web Speech:', err);
       fallbackToWebSpeech();
     } finally {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       setIsLoading(false);
     }
   };
@@ -153,18 +183,21 @@ export default function TTSButton({ text }: TTSButtonProps) {
     <button
       onClick={handleToggle}
       className="p-2 rounded-lg border border-jarvis-border hover:border-jarvis-accent transition-colors"
-      aria-label={isPlaying || isLoading ? 'Stop reading' : 'Read briefing aloud'}
-      title={isPlaying || isLoading ? 'Stop reading' : 'Read briefing aloud'}
+      aria-label={isLoading ? 'Loading audio...' : isPlaying ? 'Stop reading' : 'Read briefing aloud'}
+      title={isLoading ? 'Loading audio...' : isPlaying ? 'Stop reading' : 'Read briefing aloud'}
     >
       {isLoading ? (
-        <svg
-          className="w-4 h-4 text-jarvis-accent animate-spin"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+        <div className="flex items-center gap-1.5">
+          <svg
+            className="w-4 h-4 text-jarvis-accent animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-[10px] text-jarvis-text-dim">Loading...</span>
+        </div>
       ) : isPlaying ? (
         <svg
           className="w-4 h-4 text-jarvis-accent"

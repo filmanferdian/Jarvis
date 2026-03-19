@@ -149,7 +149,9 @@ export default function UtilitiesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(usage.services).map(([svc, data]) => (
+                  {Object.entries(usage.services)
+                    .filter(([svc, data]) => svc !== 'elevenlabs' && data.calls > 0)
+                    .map(([svc, data]) => (
                     <tr key={svc} className="border-b border-jarvis-border/50">
                       <td className="py-1.5 text-jarvis-text-secondary">{SERVICE_LABELS[svc] || svc}</td>
                       <td className="py-1.5 text-right font-mono text-jarvis-text-primary">{data.calls.toLocaleString()}</td>
