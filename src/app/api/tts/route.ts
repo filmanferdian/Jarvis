@@ -32,10 +32,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     }
 
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-    const voiceParam = req.nextUrl.searchParams.get('voice'); // "1" or "2"
-    const voiceId = voiceParam === '2'
-      ? process.env.ELEVENLABS_VOICE_ID_2
-      : process.env.ELEVENLABS_VOICE_ID;
+    const voiceId = process.env.ELEVENLABS_VOICE_ID;
 
     // Check ElevenLabs monthly credit before attempting
     let elevenLabsExhausted = false;

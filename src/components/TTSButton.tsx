@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 
 interface TTSButtonProps {
   text: string;
-  voice?: '1' | '2';
 }
 
 function isIOS(): boolean {
@@ -13,7 +12,7 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
+export default function TTSButton({ text }: TTSButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -63,7 +62,7 @@ export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
   // Streaming fetch: uses ElevenLabs streaming endpoint for faster server response,
   // but collects all chunks before playing (partial blobs cause early cutoff)
   const playStreaming = async (controller: AbortController) => {
-    const res = await fetch(`/api/tts?stream=true&voice=${voice}`, {
+    const res = await fetch('/api/tts?stream=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -100,7 +99,7 @@ export default function TTSButton({ text, voice = '1' }: TTSButtonProps) {
 
   // Non-streaming playback: fetch full audio then play (iOS fallback)
   const playBlob = async (controller: AbortController) => {
-    const res = await fetch(`/api/tts?voice=${voice}`, {
+    const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

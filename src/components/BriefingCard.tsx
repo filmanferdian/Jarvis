@@ -73,7 +73,6 @@ export default function BriefingCard() {
     new Set()
   );
   const [regenerating, setRegenerating] = useState(false);
-  const [activeVoice, setActiveVoice] = useState<'1' | '2'>('1');
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -189,14 +188,7 @@ export default function BriefingCard() {
               />
             </svg>
           </button>
-          <button
-            onClick={() => setActiveVoice(activeVoice === '1' ? '2' : '1')}
-            className="px-2 py-1 rounded text-xs border border-jarvis-border hover:border-jarvis-accent text-jarvis-text-muted transition-colors"
-            title={`${activeVoice === '1' ? 'Paul' : 'Morgan'} — click to switch`}
-          >
-            {activeVoice === '1' ? 'Paul' : 'Morgan'}
-          </button>
-          <TTSButton text={data.voiceover || data.briefing} voice={activeVoice} />
+          <TTSButton text={data.voiceover || data.briefing} />
         </div>
       </div>
       <div className="space-y-3">
