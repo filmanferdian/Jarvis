@@ -1,8 +1,9 @@
+// Single source of truth: reads from package.json
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pkg = require('../../package.json');
+
 export const VERSION = {
-  major: 1,
-  sprint: 8,
-  iteration: 0,
   get string() {
-    return `${this.major}.${this.sprint}.${this.iteration}`;
+    return pkg.version as string;
   },
 };
