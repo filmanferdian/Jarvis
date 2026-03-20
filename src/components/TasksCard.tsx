@@ -252,7 +252,7 @@ function TaskRow({ task }: { task: NotionTask }) {
           className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor}`}
           title={task.status}
         />
-        <span className="absolute left-5 -top-1 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-1.5 py-0.5 whitespace-nowrap z-10">
+        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-1.5 py-0.5 whitespace-nowrap z-10">
           {task.status}
         </span>
       </div>
