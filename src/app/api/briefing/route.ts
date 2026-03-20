@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getAudioSignedUrl } from '@/lib/tts';
 
-// GET: Fetch today's cached briefing
+// GET: Fetch today's cached briefing + any delta updates
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
     // Use WIB timezone (UTC+7) for date
@@ -36,6 +36,22 @@ export const GET = withAuth(async (_req: NextRequest) => {
       audioUrl = await getAudioSignedUrl(today);
     }
 
+    // Fetch today's delta updates
+    const { data: deltas } = await supabase
+      .from('briefing_deltas')
+      .select('id, delta_text, audio_url, has_changes, generated_at')
+      .eq('date', today)
+      .order('generated_at', { ascending: true });
+
+    // Refresh signed URLs for delta audio
+    const deltasWithUrls = (deltas || []).map((d) => ({
+      id: d.id,
+      delta: d.delta_text,
+      audioUrl: d.audio_url || null, // Already signed when stored, valid 24h
+      hasChanges: d.has_changes,
+      timestamp: d.generated_at,
+    }));
+
     return NextResponse.json({
       date: today,
       briefing: data.briefing_text,
@@ -43,6 +59,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
       audioUrl,
       generatedAt: data.generated_at,
       dataSources: data.data_sources_used,
+      deltas: deltasWithUrls,
     });
   } catch {
     return NextResponse.json(

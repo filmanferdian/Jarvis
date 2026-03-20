@@ -5,6 +5,14 @@ import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import TTSButton from './TTSButton';
 
+interface DeltaItem {
+  id: string;
+  delta: string;
+  audioUrl: string | null;
+  hasChanges: boolean;
+  timestamp: string;
+}
+
 interface BriefingData {
   date: string;
   briefing: string | null;
@@ -12,14 +20,7 @@ interface BriefingData {
   audioUrl?: string | null;
   generatedAt?: string;
   message?: string;
-}
-
-interface DeltaData {
-  delta: string;
-  has_changes: boolean;
-  type: string;
-  since?: string;
-  timestamp?: string;
+  deltas?: DeltaItem[];
 }
 
 interface BriefingSection {
@@ -72,17 +73,24 @@ function parseBriefing(text: string): BriefingSection[] {
   return sections;
 }
 
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  });
+}
+
 export default function BriefingCard() {
   const { data, loading, refetch } = usePolling<BriefingData>(
     () => fetchAuth('/api/briefing'),
     5 * 60 * 1000
   );
 
-  const [expandedSections, setExpandedSections] = useState<Set<number>>(
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
   );
   const [regenerating, setRegenerating] = useState(false);
-  const [deltaData, setDeltaData] = useState<DeltaData | null>(null);
   const [deltaLoading, setDeltaLoading] = useState(false);
 
   const hasBriefing = !!data?.briefing;
@@ -112,8 +120,8 @@ export default function BriefingCard() {
         credentials: 'include',
       });
       if (res.ok) {
-        const result: DeltaData = await res.json();
-        setDeltaData(result);
+        // Refetch to get the newly stored delta from the API
+        await refetch();
       }
     } catch {
       // Silently fail
@@ -122,13 +130,13 @@ export default function BriefingCard() {
     }
   };
 
-  const toggleSection = (index: number) => {
+  const toggleSection = (key: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(index);
+        next.add(key);
       }
       return next;
     });
@@ -182,6 +190,8 @@ export default function BriefingCard() {
   }
 
   const sections = parseBriefing(data.briefing);
+  const deltas = data.deltas || [];
+  const briefingExpanded = expandedSections.has('briefing');
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
@@ -192,14 +202,9 @@ export default function BriefingCard() {
         <div className="flex items-center gap-2">
           {data.generatedAt && (
             <span className="text-sm text-jarvis-text-dim">
-              {new Date(data.generatedAt).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Asia/Jakarta',
-              })}
+              {formatTime(data.generatedAt)}
             </span>
           )}
-          {/* Update button (delta) when briefing exists, otherwise regenerate */}
           <button
             onClick={hasBriefing ? handleDelta : handleRegenerate}
             disabled={regenerating || deltaLoading}
@@ -223,79 +228,112 @@ export default function BriefingCard() {
           <TTSButton text={data.voiceover || data.briefing} audioUrl={data.audioUrl} />
         </div>
       </div>
-      <div className="space-y-3">
-        {sections.map((section, i) => {
-          const isExpanded = expandedSections.has(i);
-          return (
-            <div
-              key={i}
-              className={`border-l-2 pl-4 ${
-                section.isAlert
-                  ? 'border-jarvis-warn'
-                  : 'border-jarvis-accent'
-              }`}
-            >
+
+      {/* Morning briefing — collapsible */}
+      <div className="border-l-2 border-jarvis-accent pl-4">
+        <button
+          onClick={() => toggleSection('briefing')}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          <svg
+            className={`w-3 h-3 text-jarvis-text-muted transition-transform ${
+              briefingExpanded ? 'rotate-90' : ''
+            }`}
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <span className="text-base font-medium text-jarvis-text-primary">
+            Briefing
+          </span>
+        </button>
+        {briefingExpanded && (
+          <div className="mt-2 space-y-3">
+            {sections.map((section, i) => {
+              const sectionKey = `section-${i}`;
+              const sectionExpanded = expandedSections.has(sectionKey);
+              return (
+                <div key={i} className="ml-2">
+                  <button
+                    onClick={() => toggleSection(sectionKey)}
+                    className="flex items-center gap-2 w-full text-left"
+                  >
+                    <svg
+                      className={`w-2.5 h-2.5 text-jarvis-text-dim transition-transform ${
+                        sectionExpanded ? 'rotate-90' : ''
+                      }`}
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    <span
+                      className={`text-sm font-medium ${
+                        section.isAlert
+                          ? 'text-jarvis-warn'
+                          : 'text-jarvis-text-secondary'
+                      }`}
+                    >
+                      {section.title}
+                    </span>
+                  </button>
+                  {sectionExpanded && (
+                    <div
+                      className="mt-1 ml-5 text-sm text-jarvis-text-secondary whitespace-pre-line"
+                      dangerouslySetInnerHTML={{
+                        __html: section.content
+                          .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
+                          .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Delta updates — each as a collapsible section */}
+      {deltas.map((delta) => {
+        const deltaKey = `delta-${delta.id}`;
+        const deltaExpanded = expandedSections.has(deltaKey);
+        return (
+          <div key={delta.id} className="mt-3 border-l-2 border-jarvis-warn/60 pl-4">
+            <div className="flex items-center justify-between">
               <button
-                onClick={() => toggleSection(i)}
-                className="flex items-center gap-2 w-full text-left"
+                onClick={() => toggleSection(deltaKey)}
+                className="flex items-center gap-2 text-left flex-1"
               >
                 <svg
                   className={`w-3 h-3 text-jarvis-text-muted transition-transform ${
-                    isExpanded ? 'rotate-90' : ''
+                    deltaExpanded ? 'rotate-90' : ''
                   }`}
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path d="M8 5v14l11-7z" />
                 </svg>
-                <span
-                  className={`text-base font-medium ${
-                    section.isAlert
-                      ? 'text-jarvis-warn'
-                      : 'text-jarvis-text-primary'
-                  }`}
-                >
-                  {section.title}
+                <span className="text-base font-medium text-jarvis-text-primary">
+                  Update
+                </span>
+                <span className="text-xs text-jarvis-text-dim">
+                  · {formatTime(delta.timestamp)}
                 </span>
               </button>
-              {isExpanded && (
-                <div
-                  className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line"
-                  dangerouslySetInnerHTML={{
-                    __html: section.content
-                      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
-                      .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
-                  }}
-                >
-                </div>
+              {delta.audioUrl && (
+                <TTSButton text={delta.delta} audioUrl={delta.audioUrl} />
               )}
             </div>
-          );
-        })}
-      </div>
-
-      {/* Delta update section */}
-      {deltaData && (
-        <div className="mt-4 border-t border-jarvis-border pt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-medium text-jarvis-accent uppercase tracking-wider">
-              Update
-            </span>
-            {deltaData.timestamp && (
-              <span className="text-xs text-jarvis-text-dim">
-                · {new Date(deltaData.timestamp).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZone: 'Asia/Jakarta',
-                })}
-              </span>
+            {deltaExpanded && (
+              <p className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line">
+                {delta.delta}
+              </p>
             )}
           </div>
-          <p className="text-base text-jarvis-text-secondary whitespace-pre-line">
-            {deltaData.delta}
-          </p>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }

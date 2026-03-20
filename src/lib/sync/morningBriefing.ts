@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
-import { generateAndStoreAudio } from '@/lib/tts';
+import { generateAndStoreAudio, cleanupOldDeltas } from '@/lib/tts';
 
 export interface BriefingResult {
   date: string;
@@ -187,6 +187,9 @@ ${emailSection}`;
   } catch (audioErr) {
     console.error('[morning-briefing] Audio pre-generation failed (non-critical):', audioErr);
   }
+
+  // Clean up old delta recordings and records from previous days
+  await cleanupOldDeltas(today);
 
   return {
     date: today,

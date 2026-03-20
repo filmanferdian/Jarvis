@@ -181,6 +181,48 @@ async function cleanupPreviousDayAudio(currentDate: string): Promise<void> {
 }
 
 /**
+ * Clean up all delta audio files and DB records from previous days.
+ * Called when a new morning briefing is generated.
+ */
+export async function cleanupOldDeltas(currentDate: string): Promise<void> {
+  try {
+    // Find all delta records from before today
+    const { data: oldDeltas } = await supabase
+      .from('briefing_deltas')
+      .select('id, audio_url')
+      .lt('date', currentDate);
+
+    if (oldDeltas && oldDeltas.length > 0) {
+      // Collect audio file paths to delete from storage
+      const filesToDelete: string[] = [];
+      for (const delta of oldDeltas) {
+        if (delta.audio_url) {
+          // Extract filename from signed URL: .../briefing-audio/delta-2026-03-20-1234.mp3?token=...
+          const match = delta.audio_url.match(/briefing-audio\/([^?]+)/);
+          if (match) filesToDelete.push(match[1]);
+        }
+      }
+
+      // Delete audio files from storage
+      if (filesToDelete.length > 0) {
+        await supabase.storage.from(STORAGE_BUCKET).remove(filesToDelete);
+        console.log(`[TTS Storage] Cleaned up ${filesToDelete.length} delta audio files`);
+      }
+
+      // Delete delta records from DB
+      await supabase
+        .from('briefing_deltas')
+        .delete()
+        .lt('date', currentDate);
+
+      console.log(`[TTS Storage] Cleaned up ${oldDeltas.length} old delta records`);
+    }
+  } catch (err) {
+    console.error('[TTS Storage] Delta cleanup error:', err);
+  }
+}
+
+/**
  * Get a fresh signed URL for today's audio (if file exists in storage).
  * Called by GET /api/briefing to ensure the URL hasn't expired.
  */

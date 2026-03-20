@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
+import { generateAndStoreAudio } from '@/lib/tts';
 
 function getWibToday(): string {
   const now = new Date();
@@ -74,11 +75,20 @@ export const POST = withAuth(async (_req: NextRequest) => {
     const hasChanges = newCalendar.length > 0 || newTasks.length > 0 || newEmails.length > 0 || removedCalCount > 0 || removedTaskCount > 0;
 
     if (!hasChanges) {
+      const noChangeText = 'No changes since this morning\'s briefing, sir. Your day is proceeding as planned.';
+      // Store even "no changes" deltas so the timeline is complete
+      await supabase.from('briefing_deltas').insert({
+        date: today,
+        delta_text: noChangeText,
+        has_changes: false,
+        generated_at: new Date().toISOString(),
+      });
       return NextResponse.json({
-        delta: 'No changes since this morning\'s briefing, sir. Your day is proceeding as planned.',
+        delta: noChangeText,
         has_changes: false,
         type: 'delta',
         since: morningTime,
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -159,9 +169,34 @@ Write a concise update (under 150 words) that:
     });
 
     const delta = claudeData.content?.[0]?.text || `Since this morning: ${changeDetails.join('. ')}`;
+    const now = new Date().toISOString();
+
+    // Generate audio for the delta
+    let audioUrl: string | null = null;
+    try {
+      const audioPath = `delta-${today}-${Date.now()}`;
+      audioUrl = await generateAndStoreAudio(delta, audioPath);
+    } catch (audioErr) {
+      console.error('[delta] Audio generation failed (non-critical):', audioErr);
+    }
+
+    // Store delta in briefing_deltas table
+    const { data: stored } = await supabase
+      .from('briefing_deltas')
+      .insert({
+        date: today,
+        delta_text: delta,
+        audio_url: audioUrl,
+        has_changes: true,
+        generated_at: now,
+      })
+      .select('id')
+      .single();
 
     return NextResponse.json({
+      id: stored?.id,
       delta,
+      audioUrl,
       has_changes: true,
       type: 'delta',
       changes: changeDetails,
@@ -171,7 +206,7 @@ Write a concise update (under 150 words) that:
         emails: newEmails.length,
       },
       since: morningTime,
-      timestamp: new Date().toISOString(),
+      timestamp: now,
     });
   } catch (err) {
     console.error('Delta briefing error:', err);
