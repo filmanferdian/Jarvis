@@ -100,28 +100,34 @@ export async function syncNotionTasks(): Promise<SyncResult> {
 
   // Resolve project names from Notion (batch fetch page titles)
   const projectNames = new Map<string, string>();
+  console.log(`[notion-tasks] Resolving ${projectIdSet.size} project names`);
   for (const projectId of projectIdSet) {
     try {
-      const res = await fetch(`https://api.notion.com/v1/pages/${projectId}`, {
+      const pageRes = await fetch(`https://api.notion.com/v1/pages/${projectId}`, {
         headers: {
           Authorization: `Bearer ${notionApiKey}`,
           'Notion-Version': '2022-06-28',
         },
       });
-      if (res.ok) {
-        const pageData = await res.json();
-        // Try common title property names
-        const props = pageData.properties || {};
-        const titleProp = Object.values(props).find(
+      if (pageRes.ok) {
+        const pageData = await pageRes.json();
+        const pageProps = pageData.properties || {};
+        const titleProp = Object.values(pageProps).find(
           (p) => (p as { type?: string }).type === 'title'
         ) as { title?: { plain_text: string }[] } | undefined;
         const name = titleProp?.title?.[0]?.plain_text;
-        if (name) projectNames.set(projectId, name);
+        if (name) {
+          projectNames.set(projectId, name);
+          console.log(`[notion-tasks] Project ${projectId} → "${name}"`);
+        }
+      } else {
+        console.warn(`[notion-tasks] Failed to fetch project ${projectId}: ${pageRes.status}`);
       }
-    } catch {
-      // Non-critical — project name will be null
+    } catch (projErr) {
+      console.warn(`[notion-tasks] Error fetching project ${projectId}:`, projErr);
     }
   }
+  console.log(`[notion-tasks] Resolved ${projectNames.size}/${projectIdSet.size} project names`);
 
   const tasks = allPages
     .map((page) => {
@@ -147,7 +153,10 @@ export async function syncNotionTasks(): Promise<SyncResult> {
       .from('notion_tasks')
       .upsert(tasks, { onConflict: 'notion_page_id' });
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('[notion-tasks] Upsert error:', JSON.stringify(dbError));
+      throw new Error(`Supabase upsert failed: ${dbError.message || JSON.stringify(dbError)}`);
+    }
   }
 
   // Clean up: remove tasks from Supabase that no longer exist in Notion
