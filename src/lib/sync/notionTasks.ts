@@ -36,6 +36,11 @@ function extractMultiSelect(prop: unknown): string[] {
   return multiProp?.multi_select?.map((t) => t.name) || [];
 }
 
+function extractRelationIds(prop: unknown): string[] {
+  const relProp = prop as { relation?: { id: string }[] };
+  return relProp?.relation?.map((r) => r.id) || [];
+}
+
 export interface SyncResult {
   synced: number;
   deleted: number;
@@ -85,16 +90,52 @@ export async function syncNotionTasks(): Promise<SyncResult> {
   }
 
   const now = new Date().toISOString();
+
+  // Collect all unique project page IDs from relations to resolve names
+  const projectIdSet = new Set<string>();
+  for (const page of allPages) {
+    const ids = extractRelationIds(page.properties['Project']);
+    ids.forEach((id) => projectIdSet.add(id));
+  }
+
+  // Resolve project names from Notion (batch fetch page titles)
+  const projectNames = new Map<string, string>();
+  for (const projectId of projectIdSet) {
+    try {
+      const res = await fetch(`https://api.notion.com/v1/pages/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${notionApiKey}`,
+          'Notion-Version': '2022-06-28',
+        },
+      });
+      if (res.ok) {
+        const pageData = await res.json();
+        // Try common title property names
+        const props = pageData.properties || {};
+        const titleProp = Object.values(props).find(
+          (p) => (p as { type?: string }).type === 'title'
+        ) as { title?: { plain_text: string }[] } | undefined;
+        const name = titleProp?.title?.[0]?.plain_text;
+        if (name) projectNames.set(projectId, name);
+      }
+    } catch {
+      // Non-critical — project name will be null
+    }
+  }
+
   const tasks = allPages
     .map((page) => {
       const props = page.properties;
       const status = extractStatus(props['Status']);
+      const projectIds = extractRelationIds(props['Project']);
+      const projectName = projectIds.length > 0 ? projectNames.get(projectIds[0]) || null : null;
       return {
         notion_page_id: page.id,
         name: extractTitle(props['Task name']),
         due_date: extractDate(props['Due']),
         priority: extractSelect(props['Priority']),
         status,
+        project_name: projectName,
         tags: extractMultiSelect(props['Tags']),
         last_synced: now,
       };
