@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { getAudioSignedUrl } from '@/lib/tts';
 
 // GET: Fetch today's cached briefing
 export const GET = withAuth(async (_req: NextRequest) => {
@@ -29,10 +30,17 @@ export const GET = withAuth(async (_req: NextRequest) => {
       });
     }
 
+    // Get a fresh signed URL for stored audio (signed URLs expire after 24h)
+    let audioUrl: string | null = null;
+    if (data.audio_url) {
+      audioUrl = await getAudioSignedUrl(today);
+    }
+
     return NextResponse.json({
       date: today,
       briefing: data.briefing_text,
       voiceover: data.voiceover_text || data.briefing_text,
+      audioUrl,
       generatedAt: data.generated_at,
       dataSources: data.data_sources_used,
     });

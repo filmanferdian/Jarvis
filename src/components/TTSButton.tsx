@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 
 interface TTSButtonProps {
   text: string;
+  audioUrl?: string | null; // Pre-generated audio URL from Supabase Storage
 }
 
 function isIOS(): boolean {
@@ -12,7 +13,7 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-export default function TTSButton({ text }: TTSButtonProps) {
+export default function TTSButton({ text, audioUrl }: TTSButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -96,6 +97,21 @@ export default function TTSButton({ text }: TTSButtonProps) {
     setIsLoading(false);
   };
 
+  /**
+   * Play pre-generated audio from a URL (Supabase Storage signed URL).
+   * Much faster — no TTS generation needed, just fetch the stored file.
+   */
+  const playStoredAudio = async (url: string, controller: AbortController) => {
+    const res = await fetch(url, { signal: controller.signal });
+
+    if (!res.ok) {
+      throw new Error(`Stored audio fetch failed: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    await playAudioBlob(blob);
+  };
+
   // Streaming fetch: uses ElevenLabs streaming endpoint for faster server response,
   // but collects all chunks before playing (partial blobs cause early cutoff)
   const playStreaming = async (controller: AbortController) => {
@@ -160,7 +176,18 @@ export default function TTSButton({ text }: TTSButtonProps) {
     }, 20000);
 
     try {
-      // Use non-streaming on iOS for reliability
+      // Priority 1: Play pre-generated stored audio (instant, no TTS call)
+      if (audioUrl) {
+        try {
+          await playStoredAudio(audioUrl, controller);
+          return; // Success — skip fallback paths
+        } catch (storedErr) {
+          console.warn('[TTS] Stored audio failed, falling back to live TTS:', storedErr);
+          // Fall through to live TTS
+        }
+      }
+
+      // Priority 2: Live TTS generation (ElevenLabs/OpenAI)
       if (isIOS()) {
         await playBlob(controller);
       } else {

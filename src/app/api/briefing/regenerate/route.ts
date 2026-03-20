@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { detectRedFlags, RedFlag } from '@/lib/fitness/redflags';
 import { buildJarvisContext, allPages } from '@/lib/context';
+import { generateAndStoreAudio } from '@/lib/tts';
 
 // POST: Regenerate today's morning briefing using real calendar + tasks + fitness data
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -483,10 +484,27 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
 
     await incrementUsage();
 
+    // Pre-generate TTS audio and store in Supabase Storage
+    let audioUrl: string | null = null;
+    try {
+      audioUrl = await generateAndStoreAudio(voiceoverText, today);
+      if (audioUrl) {
+        // Update briefing_cache with audio URL
+        await supabase
+          .from('briefing_cache')
+          .update({ audio_url: audioUrl })
+          .eq('date', today);
+        console.log(`[briefing] Audio pre-generated and stored for ${today}`);
+      }
+    } catch (audioErr) {
+      console.error('[briefing] Audio pre-generation failed (non-critical):', audioErr);
+    }
+
     return NextResponse.json({
       date: today,
       briefing: writtenText,
       voiceover: voiceoverText,
+      audioUrl,
       generatedAt: new Date().toISOString(),
       dataSources,
     });

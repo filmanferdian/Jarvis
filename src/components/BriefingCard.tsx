@@ -9,6 +9,7 @@ interface BriefingData {
   date: string;
   briefing: string | null;
   voiceover?: string | null;
+  audioUrl?: string | null;
   generatedAt?: string;
   message?: string;
 }
@@ -188,7 +189,7 @@ export default function BriefingCard() {
               />
             </svg>
           </button>
-          <TTSButton text={data.voiceover || data.briefing} />
+          <TTSButton text={data.voiceover || data.briefing} audioUrl={data.audioUrl} />
         </div>
       </div>
       <div className="space-y-3">
