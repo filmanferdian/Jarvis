@@ -129,10 +129,21 @@ export async function syncNotionTasks(): Promise<SyncResult> {
   }
   console.log(`[notion-tasks] Resolved ${projectNames.size}/${projectIdSet.size} project names`);
 
+  // Valid statuses matching the DB check constraint
+  const VALID_STATUSES = ['Not Started', 'In Progress', 'Done', 'Archived'];
+  function normalizeStatus(raw: string): string {
+    if (VALID_STATUSES.includes(raw)) return raw;
+    // Map Notion custom statuses to closest match
+    if (raw.toLowerCase().includes('review')) return 'In Progress';
+    if (raw.toLowerCase().includes('blocked')) return 'In Progress';
+    return 'Not Started';
+  }
+
   const tasks = allPages
     .map((page) => {
       const props = page.properties;
-      const status = extractStatus(props['Status']);
+      const rawStatus = extractStatus(props['Status']);
+      const status = normalizeStatus(rawStatus);
       const projectIds = extractRelationIds(props['Project']);
       const projectName = projectIds.length > 0 ? projectNames.get(projectIds[0]) || null : null;
       return {
