@@ -261,7 +261,7 @@ function TaskRow({ task }: { task: NotionTask }) {
           {task.name}
         </span>
         {task.project_name && (
-          <span className="text-[11px] text-jarvis-text-dim truncate">{task.project_name}</span>
+          <span className="text-xs text-jarvis-text-muted truncate">{task.project_name}</span>
         )}
       </div>
       {priority && (
