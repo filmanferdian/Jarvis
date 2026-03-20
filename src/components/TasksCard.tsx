@@ -256,12 +256,14 @@ function TaskRow({ task }: { task: NotionTask }) {
           {task.status}
         </span>
       </div>
-      <span className={`text-base truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
-        {task.name}
+      <div className="flex flex-col flex-1 min-w-0">
+        <span className={`text-base truncate ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
+          {task.name}
+        </span>
         {task.project_name && (
-          <span className="text-[11px] text-jarvis-text-dim ml-1.5">{task.project_name}</span>
+          <span className="text-[11px] text-jarvis-text-dim truncate">{task.project_name}</span>
         )}
-      </span>
+      </div>
       {priority && (
         <span className={`text-sm font-mono ${priority.color}`}>
           {priority.label}

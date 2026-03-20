@@ -131,7 +131,7 @@ export async function syncNotionTasks(): Promise<SyncResult> {
       const projectName = projectIds.length > 0 ? projectNames.get(projectIds[0]) || null : null;
       return {
         notion_page_id: page.id,
-        name: extractTitle(props['Task name']),
+        name: extractTitle(props['Tasks'] || props['Task name']),
         due_date: extractDate(props['Due']),
         priority: extractSelect(props['Priority']),
         status,
