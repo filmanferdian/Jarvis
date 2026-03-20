@@ -14,6 +14,14 @@ interface BriefingData {
   message?: string;
 }
 
+interface DeltaData {
+  delta: string;
+  has_changes: boolean;
+  type: string;
+  since?: string;
+  timestamp?: string;
+}
+
 interface BriefingSection {
   title: string;
   content: string;
@@ -74,6 +82,10 @@ export default function BriefingCard() {
     new Set()
   );
   const [regenerating, setRegenerating] = useState(false);
+  const [deltaData, setDeltaData] = useState<DeltaData | null>(null);
+  const [deltaLoading, setDeltaLoading] = useState(false);
+
+  const hasBriefing = !!data?.briefing;
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -89,6 +101,24 @@ export default function BriefingCard() {
       // Silently fail — existing briefing stays
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleDelta = async () => {
+    setDeltaLoading(true);
+    try {
+      const res = await fetch('/api/briefing/delta', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const result: DeltaData = await res.json();
+        setDeltaData(result);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setDeltaLoading(false);
     }
   };
 
@@ -169,14 +199,15 @@ export default function BriefingCard() {
               })}
             </span>
           )}
+          {/* Update button (delta) when briefing exists, otherwise regenerate */}
           <button
-            onClick={handleRegenerate}
-            disabled={regenerating}
+            onClick={hasBriefing ? handleDelta : handleRegenerate}
+            disabled={regenerating || deltaLoading}
             className="p-1.5 rounded-lg hover:bg-jarvis-border/50 text-jarvis-text-muted hover:text-jarvis-accent transition-colors disabled:opacity-50"
-            title="Regenerate briefing"
+            title={hasBriefing ? 'Check for updates since morning' : 'Regenerate briefing'}
           >
             <svg
-              className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 ${regenerating || deltaLoading ? 'animate-spin' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -242,6 +273,29 @@ export default function BriefingCard() {
           );
         })}
       </div>
+
+      {/* Delta update section */}
+      {deltaData && (
+        <div className="mt-4 border-t border-jarvis-border pt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-jarvis-accent uppercase tracking-wider">
+              Update
+            </span>
+            {deltaData.timestamp && (
+              <span className="text-xs text-jarvis-text-dim">
+                · {new Date(deltaData.timestamp).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Jakarta',
+                })}
+              </span>
+            )}
+          </div>
+          <p className="text-base text-jarvis-text-secondary whitespace-pre-line">
+            {deltaData.delta}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
