@@ -34,7 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
   Archived: 'bg-jarvis-text-dim',
 };
 
-const STATUS_CYCLE = ['Not Started', 'In Progress', 'Done'];
+// Tasks are read-only — status managed in Notion
 
 function isOverdue(dateStr: string | null): boolean {
   if (!dateStr) return false;
@@ -95,20 +95,6 @@ export default function TasksCard() {
       // Silently fail
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleStatusToggle = async (task: NotionTask) => {
-    try {
-      await fetch('/api/tasks/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ notionPageId: task.notion_page_id }),
-      });
-      await refetch();
-    } catch {
-      // Silently fail
     }
   };
 
@@ -228,7 +214,7 @@ export default function TasksCard() {
               </p>
               <div className="space-y-1">
                 {overdueTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onStatusToggle={handleStatusToggle} />
+                  <TaskRow key={task.id} task={task} />
                 ))}
               </div>
             </div>
@@ -243,7 +229,7 @@ export default function TasksCard() {
               )}
               <div className="space-y-1">
                 {upcomingTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onStatusToggle={handleStatusToggle} />
+                  <TaskRow key={task.id} task={task} />
                 ))}
               </div>
             </div>
@@ -254,34 +240,28 @@ export default function TasksCard() {
   );
 }
 
-function TaskRow({ task, onStatusToggle }: { task: NotionTask; onStatusToggle: (task: NotionTask) => void }) {
+function TaskRow({ task }: { task: NotionTask }) {
   const priority = task.priority ? PRIORITY_STYLES[task.priority] : null;
   const statusColor = STATUS_COLORS[task.status] || 'bg-jarvis-text-dim';
   const overdue = isOverdue(task.due_date);
-  const nextStatus = STATUS_CYCLE[(STATUS_CYCLE.indexOf(task.status) + 1) % STATUS_CYCLE.length];
 
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-jarvis-bg-card group relative">
       <div className="relative">
-        <button
-          onClick={() => onStatusToggle(task)}
-          className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
-          title={`${task.status} → Click for ${nextStatus}`}
+        <div
+          className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor}`}
+          title={task.status}
         />
         <span className="absolute left-5 -top-1 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-1.5 py-0.5 whitespace-nowrap z-10">
           {task.status}
         </span>
       </div>
-      <div className="flex flex-col flex-1 min-w-0">
-        <span className={`text-base truncate ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
-          {task.name}
-        </span>
+      <span className={`text-base truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
+        {task.name}
         {task.project_name && (
-          <span className="text-[11px] text-jarvis-text-dim truncate">
-            {task.project_name}
-          </span>
+          <span className="text-[11px] text-jarvis-text-dim ml-1.5">{task.project_name}</span>
         )}
-      </div>
+      </span>
       {priority && (
         <span className={`text-sm font-mono ${priority.color}`}>
           {priority.label}
