@@ -48,12 +48,13 @@ interface WeightPoint {
 
 interface HealthData {
   date: string;
-  garmin: GarminDaily | null;
+  garmin: (GarminDaily & { last_synced?: string }) | null;
   latestActivity: Activity | null;
   weight: {
     current: WeightPoint | null;
     trend: WeightPoint[];
   };
+  timestamp: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -186,14 +187,25 @@ export default function HealthCard() {
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-      <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider mb-4">
-        Health & Fitness
-        {data?.date && (
-          <span className="text-jarvis-text-muted ml-2 text-sm normal-case">
-            · {new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
+          Health & Fitness
+          {data?.date && (
+            <span className="text-jarvis-text-muted ml-2 text-sm normal-case">
+              · {new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </h2>
+        {g?.last_synced && (
+          <span className="text-xs text-jarvis-text-dim">
+            Synced {new Date(g.last_synced).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Jakarta',
+            })}
           </span>
         )}
-      </h2>
+      </div>
 
       {/* Sleep + Recovery row */}
       {g && (g.sleep_score != null || g.body_battery != null || g.training_readiness != null) && (
@@ -308,9 +320,9 @@ export default function HealthCard() {
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-jarvis-text-dim uppercase tracking-wider">Weight</span>
             <div className="flex items-baseline gap-2">
-              {weightDelta && (
+              {weightDelta && weightDelta !== '+0.0 kg' && weightDelta !== '-0.0 kg' && (
                 <span className={`text-xs font-medium ${
-                  weightDelta.startsWith('-') ? 'text-emerald-400' : weightDelta.startsWith('+0.0') ? 'text-jarvis-text-dim' : 'text-jarvis-warn'
+                  weightDelta.startsWith('-') ? 'text-emerald-400' : 'text-jarvis-warn'
                 }`}>
                   {weightDelta}
                 </span>
