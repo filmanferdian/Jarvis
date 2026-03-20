@@ -261,12 +261,17 @@ function TaskRow({ task, onStatusToggle }: { task: NotionTask; onStatusToggle: (
   const nextStatus = STATUS_CYCLE[(STATUS_CYCLE.indexOf(task.status) + 1) % STATUS_CYCLE.length];
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-jarvis-bg-card group">
-      <button
-        onClick={() => onStatusToggle(task)}
-        className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
-        title={`Click to change to: ${nextStatus}`}
-      />
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-jarvis-bg-card group relative">
+      <div className="relative">
+        <button
+          onClick={() => onStatusToggle(task)}
+          className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
+          title={`${task.status} → Click for ${nextStatus}`}
+        />
+        <span className="absolute left-5 -top-1 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-1.5 py-0.5 whitespace-nowrap z-10">
+          {task.status}
+        </span>
+      </div>
       <div className="flex flex-col flex-1 min-w-0">
         <span className={`text-base truncate ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
           {task.name}
