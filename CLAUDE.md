@@ -15,6 +15,13 @@
 6. **Garmin raw_json** — Always store raw API responses
 7. **Cookie auth** — Browser uses httpOnly cookie, external callers use `x-cron-secret` header
 
+## Versioning Discipline
+- Version lives in `package.json` (single source of truth). `src/lib/version.ts` reads from it automatically.
+- **Every push to main that triggers a Railway deploy MUST bump the version in `package.json`.**
+- Use semver: `major.sprint.patch` (e.g., `1.8.3`). Bump patch for every deploy within a sprint.
+- Include the version bump in the same commit or as a separate `chore: bump version to vX.Y.Z` commit.
+- Never push to main without updating the version — the dashboard header shows it.
+
 ## Branch Discipline
 - Railway deploys from `main`. Never point it at a worktree branch.
 - Every Claude Code session MUST merge its worktree branch to `main` and push before ending.
