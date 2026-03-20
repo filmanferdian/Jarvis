@@ -5,6 +5,7 @@ export interface GarminSyncResult {
   date: string;
   metrics: Record<string, unknown>;
   activitiesSynced: number;
+  historicalSynced: number;
   timestamp: string;
 }
 
@@ -267,6 +268,102 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
     await trackServiceUsage('garmin');
   } catch { /* non-critical */ }
 
+  // --- Incremental historical backfill (up to 5 missing/partial days per run) ---
+  const MAX_HISTORICAL_PER_RUN = 5;
+  let historicalSynced = 0;
+
+  try {
+    // Build list of all dates in the 56-day window (oldest first, skip today)
+    const allDates: string[] = [];
+    for (let i = RETENTION_DAYS; i >= 2; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      allDates.push(formatDate(d));
+    }
+
+    // Fetch existing records to classify
+    const { data: existingRecords } = await supabase
+      .from('garmin_daily')
+      .select('date, raw_json')
+      .in('date', allDates);
+
+    const histMap = new Map<string, Record<string, unknown>>();
+    for (const row of existingRecords ?? []) {
+      histMap.set(row.date, row.raw_json as Record<string, unknown>);
+    }
+
+    // Find MISSING or PARTIAL dates (oldest first)
+    const datesToFill: { dateStr: string; existingRaw: Record<string, unknown> | null }[] = [];
+    for (const dateStr of allDates) {
+      if (datesToFill.length >= MAX_HISTORICAL_PER_RUN) break;
+      const raw = histMap.get(dateStr) ?? null;
+      if (!raw) {
+        datesToFill.push({ dateStr, existingRaw: null });
+      } else {
+        const keys = Object.keys(raw);
+        const isComplete = COMPLETE_RAW_KEYS.every((k) => keys.includes(k));
+        if (!isComplete) {
+          datesToFill.push({ dateStr, existingRaw: raw });
+        }
+      }
+    }
+
+    if (datesToFill.length > 0) {
+      console.log(`[garmin] Incremental backfill: ${datesToFill.length} historical days to fill`);
+    }
+
+    for (const { dateStr, existingRaw } of datesToFill) {
+      try {
+        const dateObj = new Date(`${dateStr}T00:00:00+07:00`);
+
+        if (existingRaw) {
+          // PARTIAL: merge missing keys from API
+          const rawData: RawData = {
+            summary: (existingRaw.summary as Record<string, unknown>) ?? {},
+            bodyBattery: (existingRaw.bodyBattery as unknown[]) ?? [],
+            stress: (existingRaw.stress as Record<string, unknown>) ?? {},
+            hrv: (existingRaw.hrv as Record<string, unknown>) ?? {},
+            trainingReadiness: (existingRaw.trainingReadiness as Record<string, unknown>[]) ?? [],
+            trainingStatus: (existingRaw.trainingStatus as Record<string, unknown>) ?? {},
+            heartRate: (existingRaw.heartRate as Record<string, unknown>) ?? {},
+            sleep: (existingRaw.sleep as Record<string, unknown>) ?? {},
+          };
+          const missingKeys = COMPLETE_RAW_KEYS.filter((k) => !Object.keys(existingRaw).includes(k));
+          if (missingKeys.length > 0) {
+            const freshData = await fetchAllEndpoints(client, dateStr, dateObj);
+            for (const key of missingKeys) {
+              (rawData as unknown as Record<string, unknown>)[key] = (freshData as unknown as Record<string, unknown>)[key];
+            }
+          }
+          const record = buildDailyRecord(dateStr, rawData);
+          await supabase.from('garmin_daily').delete().eq('date', dateStr);
+          const { error } = await supabase.from('garmin_daily').insert(record);
+          if (!error) historicalSynced++;
+        } else {
+          // MISSING: fetch all endpoints
+          const rawData = await fetchAllEndpoints(client, dateStr, dateObj);
+          const record = buildDailyRecord(dateStr, rawData);
+          await supabase.from('garmin_daily').delete().eq('date', dateStr);
+          const { error } = await supabase.from('garmin_daily').insert(record);
+          if (!error) historicalSynced++;
+        }
+
+        console.log(`[garmin] Historical: synced ${dateStr}`);
+        // Gentle 2-second delay between historical days
+        await new Promise((r) => setTimeout(r, 2000));
+      } catch (err) {
+        console.error(`[garmin] Historical sync failed for ${dateStr}:`, err);
+        // Don't abort — continue with remaining dates
+      }
+    }
+
+    if (historicalSynced > 0) {
+      console.log(`[garmin] Incremental backfill complete: ${historicalSynced} days synced`);
+    }
+  } catch (err) {
+    console.error('[garmin] Incremental backfill error:', err);
+  }
+
   return {
     date: today,
     metrics: {
@@ -279,6 +376,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
       vo2_max: dailyRecord.vo2_max,
     },
     activitiesSynced,
+    historicalSynced,
     timestamp: new Date().toISOString(),
   };
 }
