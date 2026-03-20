@@ -23,56 +23,6 @@ interface BriefingData {
   deltas?: DeltaItem[];
 }
 
-interface BriefingSection {
-  title: string;
-  content: string;
-  isAlert: boolean;
-}
-
-function parseBriefing(text: string): BriefingSection[] {
-  const sections: BriefingSection[] = [];
-  const lines = text.split('\n');
-  let currentTitle = '';
-  let currentContent: string[] = [];
-
-  for (const line of lines) {
-    const headerMatch = line.match(/^\d+\.\s+(.+?):\s*(.*)$/);
-    if (headerMatch) {
-      if (currentTitle) {
-        sections.push({
-          title: currentTitle,
-          content: currentContent.join('\n').trim(),
-          isAlert: currentTitle.toLowerCase().includes('alert'),
-        });
-      }
-      currentTitle = headerMatch[1];
-      currentContent = headerMatch[2] ? [headerMatch[2]] : [];
-    } else if (currentTitle) {
-      currentContent.push(line);
-    } else {
-      currentContent.push(line);
-    }
-  }
-
-  if (currentTitle) {
-    sections.push({
-      title: currentTitle,
-      content: currentContent.join('\n').trim(),
-      isAlert: currentTitle.toLowerCase().includes('alert'),
-    });
-  }
-
-  if (sections.length === 0 && text.trim()) {
-    sections.push({
-      title: 'Briefing',
-      content: text.trim(),
-      isAlert: false,
-    });
-  }
-
-  return sections;
-}
-
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -106,7 +56,7 @@ export default function BriefingCard() {
         await refetch();
       }
     } catch {
-      // Silently fail — existing briefing stays
+      // Silently fail
     } finally {
       setRegenerating(false);
     }
@@ -120,7 +70,6 @@ export default function BriefingCard() {
         credentials: 'include',
       });
       if (res.ok) {
-        // Refetch to get the newly stored delta from the API
         await refetch();
       }
     } catch {
@@ -133,11 +82,8 @@ export default function BriefingCard() {
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -172,12 +118,8 @@ export default function BriefingCard() {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             {regenerating ? 'Generating...' : 'Generate now'}
           </button>
@@ -189,22 +131,17 @@ export default function BriefingCard() {
     );
   }
 
-  const sections = parseBriefing(data.briefing);
   const deltas = data.deltas || [];
   const briefingExpanded = expandedSections.has('briefing');
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
+      {/* Header with update button */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
           Morning Briefing
         </h2>
         <div className="flex items-center gap-2">
-          {data.generatedAt && (
-            <span className="text-sm text-jarvis-text-dim">
-              {formatTime(data.generatedAt)}
-            </span>
-          )}
           <button
             onClick={hasBriefing ? handleDelta : handleRegenerate}
             disabled={regenerating || deltaLoading}
@@ -213,127 +150,80 @@ export default function BriefingCard() {
           >
             <svg
               className={`w-4 h-4 ${regenerating || deltaLoading ? 'animate-spin' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
-          <TTSButton text={data.voiceover || data.briefing} audioUrl={data.audioUrl} />
         </div>
       </div>
 
-      {/* Morning briefing — collapsible */}
-      <div className="border-l-2 border-jarvis-accent pl-4">
-        <button
-          onClick={() => toggleSection('briefing')}
-          className="flex items-center gap-2 w-full text-left"
-        >
-          <svg
-            className={`w-3 h-3 text-jarvis-text-muted transition-transform ${
-              briefingExpanded ? 'rotate-90' : ''
-            }`}
-            fill="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <span className="text-base font-medium text-jarvis-text-primary">
-            Briefing
-          </span>
-        </button>
-        {briefingExpanded && (
-          <div className="mt-2 space-y-3">
-            {sections.map((section, i) => {
-              const sectionKey = `section-${i}`;
-              const sectionExpanded = expandedSections.has(sectionKey);
-              return (
-                <div key={i} className="ml-2">
-                  <button
-                    onClick={() => toggleSection(sectionKey)}
-                    className="flex items-center gap-2 w-full text-left"
-                  >
-                    <svg
-                      className={`w-2.5 h-2.5 text-jarvis-text-dim transition-transform ${
-                        sectionExpanded ? 'rotate-90' : ''
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    <span
-                      className={`text-sm font-medium ${
-                        section.isAlert
-                          ? 'text-jarvis-warn'
-                          : 'text-jarvis-text-secondary'
-                      }`}
-                    >
-                      {section.title}
-                    </span>
-                  </button>
-                  {sectionExpanded && (
-                    <div
-                      className="mt-1 ml-5 text-sm text-jarvis-text-secondary whitespace-pre-line"
-                      dangerouslySetInnerHTML={{
-                        __html: section.content
-                          .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
-                          .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Delta updates — each as a collapsible section */}
-      {deltas.map((delta) => {
-        const deltaKey = `delta-${delta.id}`;
-        const deltaExpanded = expandedSections.has(deltaKey);
-        return (
-          <div key={delta.id} className="mt-3 border-l-2 border-jarvis-warn/60 pl-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => toggleSection(deltaKey)}
-                className="flex items-center gap-2 text-left flex-1"
+      {/* Collapsible sections — all at same level */}
+      <div className="space-y-2">
+        {/* Morning briefing section */}
+        <div className="border-l-2 border-jarvis-accent pl-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => toggleSection('briefing')}
+              className="flex items-center gap-2 text-left flex-1"
+            >
+              <svg
+                className={`w-3 h-3 text-jarvis-text-muted transition-transform ${briefingExpanded ? 'rotate-90' : ''}`}
+                fill="currentColor" viewBox="0 0 24 24"
               >
-                <svg
-                  className={`w-3 h-3 text-jarvis-text-muted transition-transform ${
-                    deltaExpanded ? 'rotate-90' : ''
-                  }`}
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span className="text-base font-medium text-jarvis-text-primary">Briefing</span>
+              {data.generatedAt && (
+                <span className="text-xs text-jarvis-text-dim">· {formatTime(data.generatedAt)}</span>
+              )}
+            </button>
+            <TTSButton text={data.voiceover || data.briefing} audioUrl={data.audioUrl} />
+          </div>
+          {briefingExpanded && (
+            <div
+              className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line"
+              dangerouslySetInnerHTML={{
+                __html: data.briefing
+                  .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
+                  .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
+              }}
+            />
+          )}
+        </div>
+
+        {/* Delta update sections — same level as briefing */}
+        {deltas.map((delta) => {
+          const deltaKey = `delta-${delta.id}`;
+          const deltaExpanded = expandedSections.has(deltaKey);
+          return (
+            <div key={delta.id} className="border-l-2 border-jarvis-warn/60 pl-4">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => toggleSection(deltaKey)}
+                  className="flex items-center gap-2 text-left flex-1"
                 >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                <span className="text-base font-medium text-jarvis-text-primary">
-                  Update
-                </span>
-                <span className="text-xs text-jarvis-text-dim">
-                  · {formatTime(delta.timestamp)}
-                </span>
-              </button>
-              {delta.audioUrl && (
+                  <svg
+                    className={`w-3 h-3 text-jarvis-text-muted transition-transform ${deltaExpanded ? 'rotate-90' : ''}`}
+                    fill="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <span className="text-base font-medium text-jarvis-text-primary">Update</span>
+                  <span className="text-xs text-jarvis-text-dim">· {formatTime(delta.timestamp)}</span>
+                </button>
                 <TTSButton text={delta.delta} audioUrl={delta.audioUrl} />
+              </div>
+              {deltaExpanded && (
+                <p className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line">
+                  {delta.delta}
+                </p>
               )}
             </div>
-            {deltaExpanded && (
-              <p className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line">
-                {delta.delta}
-              </p>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
