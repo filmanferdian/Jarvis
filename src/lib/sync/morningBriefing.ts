@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
+import { generateAndStoreAudio } from '@/lib/tts';
 
 export interface BriefingResult {
   date: string;
@@ -172,6 +173,20 @@ ${emailSection}`;
   if (dbError) throw dbError;
 
   await incrementUsage();
+
+  // Pre-generate TTS audio and store in Supabase Storage
+  try {
+    const audioUrl = await generateAndStoreAudio(briefingText, today);
+    if (audioUrl) {
+      await supabase
+        .from('briefing_cache')
+        .update({ audio_url: audioUrl })
+        .eq('date', today);
+      console.log(`[morning-briefing] Audio pre-generated for ${today}`);
+    }
+  } catch (audioErr) {
+    console.error('[morning-briefing] Audio pre-generation failed (non-critical):', audioErr);
+  }
 
   return {
     date: today,
