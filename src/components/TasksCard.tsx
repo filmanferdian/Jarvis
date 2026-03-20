@@ -267,14 +267,16 @@ function TaskRow({ task, onStatusToggle }: { task: NotionTask; onStatusToggle: (
         className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColor} hover:ring-2 hover:ring-jarvis-accent/50 transition-all cursor-pointer`}
         title={`Click to change to: ${nextStatus}`}
       />
-      <span className={`text-base truncate flex-1 ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
-        {task.name}
-      </span>
-      {task.project_name && (
-        <span className="text-sm text-jarvis-text-dim hidden group-hover:inline truncate max-w-[120px]">
-          {task.project_name}
+      <div className="flex flex-col flex-1 min-w-0">
+        <span className={`text-base truncate ${task.status === 'Done' ? 'line-through text-jarvis-text-dim' : 'text-jarvis-text-secondary'}`}>
+          {task.name}
         </span>
-      )}
+        {task.project_name && (
+          <span className="text-[11px] text-jarvis-text-dim truncate">
+            {task.project_name}
+          </span>
+        )}
+      </div>
       {priority && (
         <span className={`text-sm font-mono ${priority.color}`}>
           {priority.label}
