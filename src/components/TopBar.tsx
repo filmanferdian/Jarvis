@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { VERSION } from '@/lib/version';
+import ArcReactor from '@/components/ArcReactor';
 
 interface UsageData {
   callCount: number;
@@ -75,53 +76,66 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   const isWarning = usagePercent >= 80;
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b border-jarvis-border">
+    <header className="flex items-center justify-between px-5 md:px-6 h-14 border-b border-jarvis-border bg-jarvis-bg/80 backdrop-blur-md sticky top-0 z-30">
       <div className="flex items-center gap-3">
         {/* Mobile hamburger */}
         <button
           onClick={onToggleSidebar}
-          className="md:hidden p-1 rounded hover:bg-jarvis-bg-card transition-colors"
+          className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-jarvis-bg-hover transition-colors"
           aria-label="Toggle sidebar"
         >
           <svg className="w-5 h-5 text-jarvis-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="text-lg font-semibold tracking-wide text-jarvis-accent">
+
+        {/* Arc Reactor icon + JARVIS wordmark */}
+        <ArcReactor state="idle" size="sm" />
+        <span className="text-[15px] font-semibold text-jarvis-text-primary tracking-widest">
           JARVIS
-        </h1>
-        <span className="text-xs text-jarvis-text-muted hidden sm:inline">
-          Personal Command Center
         </span>
-        <span className="text-xs font-semibold font-mono bg-jarvis-accent/10 text-jarvis-accent px-2 py-0.5 rounded-full">
+        <span className="text-[10px] text-jarvis-text-dim font-mono">
           v{VERSION.string}
         </span>
       </div>
+
       <div className="flex items-center gap-4">
         {clock.time && (
-          <span className="text-xs font-mono text-jarvis-text-secondary">
-            <span className="hidden sm:inline">{clock.date} · </span>
-            {clock.time}
-            <span className="hidden sm:inline"> WIB</span>
-          </span>
+          <div className="flex items-center gap-1.5 text-xs text-jarvis-text-muted">
+            <span className="hidden sm:inline">{clock.date}</span>
+            <span className="hidden sm:inline text-jarvis-text-dim">·</span>
+            <span className="font-mono text-jarvis-text-secondary">{clock.time}</span>
+          </div>
         )}
+
         {usage && (
           <span
             className={`text-xs font-mono ${
-              isWarning ? 'text-jarvis-warn' : 'text-jarvis-text-secondary'
+              isWarning ? 'text-jarvis-warn' : 'text-jarvis-text-dim'
             }`}
           >
             {usage.callCount}/{usage.limit}
           </span>
         )}
-        <div className="w-2 h-2 rounded-full bg-jarvis-accent animate-pulse" />
+
+        {/* Neon green ONLINE status pill */}
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[rgba(57,255,20,0.25)] bg-[rgba(57,255,20,0.06)]">
+          <div className="relative">
+            <div className="w-1.5 h-1.5 rounded-full bg-jarvis-neon" />
+            <div className="absolute inset-0 w-1.5 h-1.5 rounded-full bg-jarvis-neon animate-ping-slow" />
+          </div>
+          <span className="text-[10px] font-medium text-jarvis-neon tracking-wide hidden sm:inline">
+            ONLINE
+          </span>
+        </div>
+
         <button
           onClick={handleLogout}
-          className="text-xs text-jarvis-text-dim hover:text-jarvis-text-secondary transition-colors"
+          className="p-1.5 rounded-lg text-jarvis-text-dim hover:text-jarvis-text-secondary hover:bg-jarvis-bg-hover transition-colors"
           title="Logout"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </button>
       </div>

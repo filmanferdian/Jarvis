@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
-import TopBar from '@/components/TopBar';
-import Sidebar from '@/components/Sidebar';
+import AppShell from '@/components/AppShell';
 import OkrCard from '@/components/health/OkrCard';
 import BloodWorkPanel from '@/components/health/BloodWorkPanel';
 import ManualEntryForm from '@/components/health/ManualEntryForm';
@@ -62,7 +61,6 @@ export default function HealthPage() {
       if (okr.status === 'fulfilled') setOkrData(okr.value);
       if (fitness.status === 'fulfilled') setFitnessCtx(fitness.value.context);
 
-      // Fetch blood work separately
       try {
         const res = await fetch('/api/health-fitness/blood-work', { credentials: 'include' });
         if (res.ok) {
@@ -70,7 +68,7 @@ export default function HealthPage() {
           setBloodWork(data.entries || []);
         }
       } catch {
-        // Blood work endpoint may not exist yet, that's ok
+        // Blood work endpoint may not exist yet
       }
     } catch {
       // Silent fail
@@ -83,7 +81,6 @@ export default function HealthPage() {
     loadData();
   }, [loadData]);
 
-  // Compute overall progress across all objectives
   const overallProgress = okrData
     ? (() => {
         const withData = okrData.objectives.filter((o) => o.overall_pct != null);
@@ -94,21 +91,9 @@ export default function HealthPage() {
 
   const lastBloodDate = bloodWork.length > 0 ? bloodWork[0].test_date : null;
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
-    <div className="flex flex-col h-screen">
-      <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex flex-1 overflow-hidden relative">
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 max-w-5xl mx-auto w-full">
+    <AppShell>
+      <div className="max-w-5xl mx-auto w-full space-y-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
           <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
@@ -117,15 +102,15 @@ export default function HealthPage() {
         </div>
 
         {/* OKR Overview Bar */}
-        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
+        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-base font-semibold text-jarvis-text-primary">OKR Progress</h2>
+            <h2 className="text-[15px] font-medium text-jarvis-text-primary">OKR Progress</h2>
             {overallProgress != null && (
               <span className="text-lg font-mono font-semibold text-jarvis-accent">{overallProgress}%</span>
             )}
           </div>
           {overallProgress != null && (
-            <div className="h-3 bg-jarvis-border rounded-full overflow-hidden mb-2">
+            <div className="h-2 bg-jarvis-border rounded-full overflow-hidden mb-3">
               <div
                 className="h-full bg-jarvis-accent rounded-full transition-all"
                 style={{ width: `${overallProgress}%` }}
@@ -156,7 +141,7 @@ export default function HealthPage() {
         {okrData && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {okrData.objectives
-              .filter((o) => o.objective !== 'O4') // O4 gets the blood work panel
+              .filter((o) => o.objective !== 'O4')
               .map((obj) => (
                 <OkrCard
                   key={obj.objective}
@@ -177,8 +162,7 @@ export default function HealthPage() {
 
         {/* Manual Entry */}
         <ManualEntryForm onSaved={loadData} />
-      </main>
       </div>
-    </div>
+    </AppShell>
   );
 }

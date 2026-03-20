@@ -1,8 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import TopBar from '@/components/TopBar';
-import Sidebar from '@/components/Sidebar';
+import { useEffect, useState, useMemo } from 'react';
+import AppShell from '@/components/AppShell';
+import ArcReactor from '@/components/ArcReactor';
+
+function useTimeGreeting() {
+  const [greeting, setGreeting] = useState('Good evening');
+
+  useEffect(() => {
+    function update() {
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const wib = new Date(Date.now() + wibOffset);
+      const hour = wib.getUTCHours();
+      if (hour < 12) setGreeting('Good morning');
+      else if (hour < 17) setGreeting('Good afternoon');
+      else setGreeting('Good evening');
+    }
+    update();
+    const interval = setInterval(update, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return greeting;
+}
 import BriefingCard from '@/components/BriefingCard';
 import ScheduleStrip from '@/components/ScheduleStrip';
 import TasksCard from '@/components/TasksCard';
@@ -11,10 +31,9 @@ import FitnessCard from '@/components/FitnessCard';
 import HealthCard from '@/components/HealthCard';
 import KpiRow from '@/components/KpiRow';
 import VoiceMic from '@/components/VoiceMic';
-import AuthGate from '@/components/AuthGate';
 
 export default function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const greeting = useTimeGreeting();
 
   // Auto-sync on dashboard load (fire-and-forget, debounced server-side)
   useEffect(() => {
@@ -27,35 +46,28 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <AuthGate>
-      <div className="flex flex-col h-screen">
-        <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-        <div className="flex flex-1 overflow-hidden relative">
-          {/* Mobile sidebar overlay */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <main className="flex-1 overflow-y-auto p-6 space-y-6">
-            <KpiRow />
-            <BriefingCard />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ScheduleStrip />
-              <TasksCard />
-            </div>
-            <EmailCard />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <FitnessCard />
-              <HealthCard />
-            </div>
-
-            <VoiceMic />
-          </main>
+    <AppShell>
+      {/* Jarvis Hero — visual identity */}
+      <div className="flex items-center gap-4 py-2">
+        <ArcReactor state="idle" size="md" />
+        <div>
+          <p className="text-[15px] font-medium text-jarvis-text-primary">{greeting}, Filman</p>
+          <p className="text-xs text-jarvis-text-muted">Standing by...</p>
         </div>
       </div>
-    </AuthGate>
+
+      <KpiRow />
+      <BriefingCard />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <ScheduleStrip />
+        <TasksCard />
+      </div>
+      <EmailCard />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <FitnessCard />
+        <HealthCard />
+      </div>
+      <VoiceMic />
+    </AppShell>
   );
 }

@@ -9,6 +9,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Dev preview bypass — skip auth when ?preview=1 is in the URL
+    if (process.env.NODE_ENV === 'development') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('preview') === '1') {
+        setAuthenticated(true);
+        setChecking(false);
+        return;
+      }
+    }
+
     // Check if we have a valid session cookie by making an authenticated request
     fetch('/api/calendar', { credentials: 'include' })
       .then((res) => {

@@ -48,7 +48,7 @@ export default function EmailCard() {
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
+        <h2 className="text-[15px] font-medium text-jarvis-text-primary">
           Email Digest
         </h2>
         <div className="flex items-center gap-3">

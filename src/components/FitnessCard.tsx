@@ -73,7 +73,7 @@ export default function FitnessCard() {
   if (!data?.available) {
     return (
       <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-        <h2 className="text-base font-medium text-jarvis-text-muted uppercase tracking-wider mb-2">
+        <h2 className="text-[15px] font-medium text-jarvis-text-muted mb-2">
           Fitness Program
         </h2>
         <p className="text-base text-jarvis-text-dim">
@@ -89,7 +89,7 @@ export default function FitnessCard() {
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider">
+        <h2 className="text-[15px] font-medium text-jarvis-text-primary">
           Fitness Program
         </h2>
         <span className="text-sm text-jarvis-text-dim">

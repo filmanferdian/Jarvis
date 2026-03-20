@@ -41,9 +41,9 @@ function getStatus(entry: BloodWorkEntry): 'normal' | 'borderline' | 'out_of_ran
 }
 
 const STATUS_CLASSES = {
-  normal: 'text-emerald-400',
+  normal: 'text-jarvis-success',
   borderline: 'text-jarvis-warn',
-  out_of_range: 'text-red-400',
+  out_of_range: 'text-jarvis-danger',
 };
 
 export default function BloodWorkPanel({ entries, lastTestDate }: BloodWorkPanelProps) {

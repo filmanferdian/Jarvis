@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
-import TopBar from '@/components/TopBar';
-import Sidebar from '@/components/Sidebar';
+import AppShell from '@/components/AppShell';
 
 interface Integration {
   sync_type: string;
@@ -38,9 +37,9 @@ interface UsageData {
 }
 
 const STATUS_DOT = {
-  ok: 'bg-emerald-400',
+  ok: 'bg-jarvis-success',
   warning: 'bg-jarvis-warn',
-  error: 'bg-red-400',
+  error: 'bg-jarvis-danger',
 };
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -82,31 +81,19 @@ export default function UtilitiesPage() {
     load();
   }, []);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
-    <div className="flex flex-col h-screen">
-      <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex flex-1 overflow-hidden relative">
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 max-w-5xl mx-auto w-full">
+    <AppShell>
+      <div className="max-w-5xl mx-auto w-full space-y-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs text-jarvis-text-muted">
+        <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
           <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
           <span>/</span>
           <span className="text-jarvis-text-primary">Utilities</span>
         </div>
 
         {/* Integration Health */}
-        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-          <h2 className="text-sm font-semibold text-jarvis-text-primary mb-3">Integration Health</h2>
+        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+          <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">Integration Health</h2>
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
@@ -122,13 +109,13 @@ export default function UtilitiesPage() {
                 >
                   <div className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[int.status]} shrink-0`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-jarvis-text-primary truncate">{int.label}</p>
-                    <p className="text-[10px] text-jarvis-text-dim">
+                    <p className="text-[13px] font-medium text-jarvis-text-primary truncate">{int.label}</p>
+                    <p className="text-[11px] text-jarvis-text-dim">
                       {int.last_synced_at ? formatElapsed(int.elapsed_minutes) : 'Never synced'}
                       {int.events_synced != null && int.events_synced > 0 && ` · ${int.events_synced} items`}
                     </p>
                     {int.last_error && int.status !== 'ok' && (
-                      <p className="text-[10px] text-red-400 truncate" title={int.last_error}>
+                      <p className="text-[11px] text-jarvis-danger truncate" title={int.last_error}>
                         {int.last_error.slice(0, 60)}
                       </p>
                     )}
@@ -141,9 +128,9 @@ export default function UtilitiesPage() {
 
         {/* API Usage */}
         {usage && (
-          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-jarvis-text-primary">API Usage</h2>
+          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[15px] font-medium text-jarvis-text-primary">API Usage</h2>
               <span className="text-xs text-jarvis-text-dim font-mono">{usage.billing_month}</span>
             </div>
 
@@ -151,12 +138,12 @@ export default function UtilitiesPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-jarvis-text-muted border-b border-jarvis-border">
-                    <th className="text-left py-1 font-normal">Service</th>
-                    <th className="text-right py-1 font-normal">Calls</th>
-                    <th className="text-right py-1 font-normal">Tokens In</th>
-                    <th className="text-right py-1 font-normal">Tokens Out</th>
-                    <th className="text-right py-1 font-normal">Chars</th>
-                    <th className="text-right py-1 font-normal">Cost</th>
+                    <th className="text-left py-1.5 font-normal">Service</th>
+                    <th className="text-right py-1.5 font-normal">Calls</th>
+                    <th className="text-right py-1.5 font-normal">Tokens In</th>
+                    <th className="text-right py-1.5 font-normal">Tokens Out</th>
+                    <th className="text-right py-1.5 font-normal">Chars</th>
+                    <th className="text-right py-1.5 font-normal">Cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -164,18 +151,18 @@ export default function UtilitiesPage() {
                     .filter(([svc, data]) => svc !== 'elevenlabs' && data.calls > 0)
                     .map(([svc, data]) => (
                     <tr key={svc} className="border-b border-jarvis-border/50">
-                      <td className="py-1.5 text-jarvis-text-secondary">{SERVICE_LABELS[svc] || svc}</td>
-                      <td className="py-1.5 text-right font-mono text-jarvis-text-primary">{data.calls.toLocaleString()}</td>
-                      <td className="py-1.5 text-right font-mono text-jarvis-text-dim">
+                      <td className="py-2 text-jarvis-text-secondary">{SERVICE_LABELS[svc] || svc}</td>
+                      <td className="py-2 text-right font-mono text-jarvis-text-primary">{data.calls.toLocaleString()}</td>
+                      <td className="py-2 text-right font-mono text-jarvis-text-dim">
                         {data.tokens_input > 0 ? data.tokens_input.toLocaleString() : '—'}
                       </td>
-                      <td className="py-1.5 text-right font-mono text-jarvis-text-dim">
+                      <td className="py-2 text-right font-mono text-jarvis-text-dim">
                         {data.tokens_output > 0 ? data.tokens_output.toLocaleString() : '—'}
                       </td>
-                      <td className="py-1.5 text-right font-mono text-jarvis-text-dim">
+                      <td className="py-2 text-right font-mono text-jarvis-text-dim">
                         {data.characters > 0 ? data.characters.toLocaleString() : '—'}
                       </td>
-                      <td className="py-1.5 text-right font-mono text-jarvis-text-primary">
+                      <td className="py-2 text-right font-mono text-jarvis-text-primary">
                         {data.estimated_cost_usd > 0 ? `$${data.estimated_cost_usd.toFixed(2)}` : '$0'}
                       </td>
                     </tr>
@@ -186,16 +173,16 @@ export default function UtilitiesPage() {
 
             {/* ElevenLabs quota bar */}
             <div className="mt-4 p-3 rounded-lg border border-jarvis-border/50">
-              <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="text-jarvis-text-secondary">ElevenLabs Characters</span>
-                <span className={`font-mono ${usage.elevenlabs_quota.pct_used > 90 ? 'text-red-400' : usage.elevenlabs_quota.pct_used > 70 ? 'text-jarvis-warn' : 'text-jarvis-text-dim'}`}>
+                <span className={`font-mono ${usage.elevenlabs_quota.pct_used > 90 ? 'text-jarvis-danger' : usage.elevenlabs_quota.pct_used > 70 ? 'text-jarvis-warn' : 'text-jarvis-text-dim'}`}>
                   {usage.elevenlabs_quota.used.toLocaleString()} / {usage.elevenlabs_quota.limit.toLocaleString()}
                 </span>
               </div>
-              <div className="h-2 bg-jarvis-border rounded-full overflow-hidden">
+              <div className="h-1.5 bg-jarvis-border rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    usage.elevenlabs_quota.pct_used > 90 ? 'bg-red-400' : usage.elevenlabs_quota.pct_used > 70 ? 'bg-jarvis-warn' : 'bg-jarvis-accent'
+                    usage.elevenlabs_quota.pct_used > 90 ? 'bg-jarvis-danger' : usage.elevenlabs_quota.pct_used > 70 ? 'bg-jarvis-warn' : 'bg-jarvis-accent'
                   }`}
                   style={{ width: `${Math.min(100, usage.elevenlabs_quota.pct_used)}%` }}
                 />
@@ -206,35 +193,34 @@ export default function UtilitiesPage() {
 
         {/* Cost Summary */}
         {usage && (
-          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-            <h2 className="text-sm font-semibold text-jarvis-text-primary mb-3">Monthly Cost Estimate</h2>
+          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+            <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">Monthly Cost Estimate</h2>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center">
                 <p className="text-lg font-mono font-semibold text-jarvis-text-primary">
                   ${usage.cost_summary.variable_usd.toFixed(2)}
                 </p>
-                <p className="text-[10px] text-jarvis-text-dim uppercase">Variable</p>
+                <p className="text-[11px] text-jarvis-text-dim uppercase">Variable</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-mono font-semibold text-jarvis-text-primary">
                   ${usage.cost_summary.fixed_usd.toFixed(2)}
                 </p>
-                <p className="text-[10px] text-jarvis-text-dim uppercase">Fixed</p>
+                <p className="text-[11px] text-jarvis-text-dim uppercase">Fixed</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-mono font-semibold text-jarvis-accent">
                   ${usage.cost_summary.total_estimated_usd.toFixed(2)}
                 </p>
-                <p className="text-[10px] text-jarvis-text-dim uppercase">Total</p>
+                <p className="text-[11px] text-jarvis-text-dim uppercase">Total</p>
               </div>
             </div>
-            <div className="mt-3 text-[10px] text-jarvis-text-dim">
+            <div className="mt-3 text-[11px] text-jarvis-text-dim">
               Fixed: Railway ${usage.cost_summary.fixed_breakdown.railway}/mo + ElevenLabs ${usage.cost_summary.fixed_breakdown.elevenlabs}/mo
             </div>
           </div>
         )}
-      </main>
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -18,11 +18,33 @@ interface KpisData {
   kpis: Kpi[];
 }
 
-const TREND_ICONS: Record<string, { symbol: string; color: string }> = {
-  up: { symbol: '\u2191', color: 'text-emerald-400' },
-  down: { symbol: '\u2193', color: 'text-red-400' },
-  flat: { symbol: '\u2192', color: 'text-jarvis-text-dim' },
+const TREND_ICONS: Record<string, { symbol: string; color: string; label: string }> = {
+  up: { symbol: '\u2191', color: 'text-emerald-400', label: 'Trending up' },
+  down: { symbol: '\u2193', color: 'text-red-400', label: 'Trending down' },
+  flat: { symbol: '\u2192', color: 'text-jarvis-text-dim', label: 'Holding steady' },
 };
+
+function deriveMeaning(kpi: Kpi): string {
+  if (kpi.progress !== null) {
+    if (kpi.progress >= 90) return 'On track';
+    if (kpi.progress >= 70) return 'Good progress';
+    if (kpi.progress >= 50) return 'Needs attention';
+    return 'Behind target';
+  }
+  if (kpi.trend) return TREND_ICONS[kpi.trend].label;
+  return '';
+}
+
+function meaningColor(kpi: Kpi): string {
+  if (kpi.progress !== null) {
+    if (kpi.progress >= 80) return 'text-jarvis-success';
+    if (kpi.progress >= 50) return 'text-jarvis-warn';
+    return 'text-jarvis-danger';
+  }
+  if (kpi.trend === 'up') return 'text-jarvis-success';
+  if (kpi.trend === 'down') return 'text-jarvis-danger';
+  return 'text-jarvis-text-dim';
+}
 
 export default function KpiRow() {
   const { data, loading } = usePolling<KpisData>(
@@ -63,46 +85,53 @@ export default function KpiRow() {
     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
       {kpis.map((kpi) => {
         const trend = kpi.trend ? TREND_ICONS[kpi.trend] : null;
+        const meaning = deriveMeaning(kpi);
         return (
           <div
             key={kpi.id}
             className="min-w-[180px] max-w-[220px] shrink-0 rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4"
           >
-            <p className="text-xs uppercase tracking-wider text-jarvis-text-muted mb-1 truncate">
+            <p className="text-[11px] uppercase tracking-wider text-jarvis-text-dim mb-0.5 truncate">
               {kpi.domainName}
             </p>
-            <p className="text-sm text-jarvis-text-secondary mb-2 truncate">
+            <p className="text-[13px] text-jarvis-text-secondary mb-2 truncate">
               {kpi.name}
             </p>
-            <div className="flex items-baseline gap-1.5 mb-2">
+            <div className="flex items-baseline gap-1.5 mb-1">
               <span className="text-2xl font-semibold text-jarvis-text-primary font-mono">
                 {kpi.value}
               </span>
               {kpi.unit && (
-                <span className="text-sm text-jarvis-text-dim">{kpi.unit}</span>
+                <span className="text-xs text-jarvis-text-dim">{kpi.unit}</span>
               )}
               {kpi.target !== null && (
-                <span className="text-sm text-jarvis-text-dim">
+                <span className="text-xs text-jarvis-text-dim">
                   / {kpi.target}
                 </span>
               )}
               {trend && (
-                <span className={`text-base ${trend.color}`}>
+                <span className={`text-sm ${trend.color}`}>
                   {trend.symbol}
                 </span>
               )}
             </div>
+            {/* Meaning — the "so what" for this KPI */}
+            {meaning && (
+              <p className={`text-[11px] font-medium mb-2 ${meaningColor(kpi)}`}>
+                {meaning}
+              </p>
+            )}
             {kpi.progress !== null && (
-              <div className="h-1.5 rounded-full bg-jarvis-border overflow-hidden">
+              <div className="h-1 rounded-full bg-jarvis-border overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
                     kpi.progress >= 80
-                      ? 'bg-emerald-400'
+                      ? 'bg-jarvis-success'
                       : kpi.progress >= 50
                         ? 'bg-jarvis-accent'
                         : 'bg-jarvis-warn'
                   }`}
-                  style={{ width: `${kpi.progress}%` }}
+                  style={{ width: `${Math.min(kpi.progress, 100)}%` }}
                 />
               </div>
             )}

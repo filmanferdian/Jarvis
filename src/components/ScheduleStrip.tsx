@@ -52,7 +52,7 @@ export default function ScheduleStrip() {
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-      <h2 className="text-base font-medium text-jarvis-accent uppercase tracking-wider mb-4">
+      <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">
         Today&apos;s Schedule
       </h2>
       {events.length === 0 ? (

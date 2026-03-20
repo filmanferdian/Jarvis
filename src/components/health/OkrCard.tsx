@@ -20,16 +20,16 @@ interface OkrCardProps {
 }
 
 const STATUS_COLORS = {
-  on_track: 'bg-emerald-400',
+  on_track: 'bg-jarvis-success',
   behind: 'bg-jarvis-warn',
-  off_track: 'bg-red-400',
+  off_track: 'bg-jarvis-danger',
   no_data: 'bg-jarvis-border',
 };
 
 const STATUS_TEXT_COLORS = {
-  on_track: 'text-emerald-400',
+  on_track: 'text-jarvis-success',
   behind: 'text-jarvis-warn',
-  off_track: 'text-red-400',
+  off_track: 'text-jarvis-danger',
   no_data: 'text-jarvis-text-dim',
 };
 

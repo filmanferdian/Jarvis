@@ -1,29 +1,58 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-jarvis-bg: #0a0e17;
-  --color-jarvis-bg-card: rgba(0, 180, 216, 0.03);
-  --color-jarvis-border: rgba(0, 180, 216, 0.1);
-  --color-jarvis-accent: #00b4d8;
-  --color-jarvis-warn: #ef9f27;
-  --color-jarvis-text-primary: #b8c4d4;
-  --color-jarvis-text-secondary: #8a9ab0;
-  --color-jarvis-text-muted: #5a6a7a;
-  --color-jarvis-text-dim: #3a4a5a;
+  /* ── Background layers (dark navy blue) ── */
+  --color-jarvis-bg: #0f1729;
+  --color-jarvis-bg-card: #162036;
+  --color-jarvis-bg-elevated: #1c2a44;
+  --color-jarvis-bg-hover: rgba(255, 255, 255, 0.04);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* ── Borders ── */
+  --color-jarvis-border: rgba(255, 255, 255, 0.08);
+  --color-jarvis-border-active: rgba(37, 99, 235, 0.3);
+
+  /* ── Accent (bold blue) ── */
+  --color-jarvis-accent: #2563eb;
+  --color-jarvis-accent-light: #3b82f6;
+  --color-jarvis-accent-muted: rgba(37, 99, 235, 0.12);
+
+  /* ── Neon green (heartbeat) ── */
+  --color-jarvis-neon: #39ff14;
+  --color-jarvis-neon-muted: rgba(57, 255, 20, 0.1);
+
+  /* ── Semantic ── */
+  --color-jarvis-warn: #f59e0b;
+  --color-jarvis-success: #34d399;
+  --color-jarvis-danger: #f87171;
+
+  /* ── Text hierarchy ── */
+  --color-jarvis-text-primary: #f8fafc;
+  --color-jarvis-text-secondary: #cbd5e1;
+  --color-jarvis-text-muted: #64748b;
+  --color-jarvis-text-dim: #475569;
+
+  /* ── Typography ── */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 body {
   background: var(--color-jarvis-bg);
   color: var(--color-jarvis-text-primary);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* ── Selection ── */
+::selection {
+  background: rgba(37, 99, 235, 0.25);
+  color: #f8fafc;
+}
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -31,10 +60,131 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-jarvis-border);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-jarvis-accent);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Card utility ── */
+.card {
+  background: var(--color-jarvis-bg-card);
+  border: 1px solid var(--color-jarvis-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+/* ── Animations ── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes neon-pulse {
+  0%, 100% { opacity: 0.6; box-shadow: 0 0 4px var(--color-jarvis-neon); }
+  50% { opacity: 1; box-shadow: 0 0 12px var(--color-jarvis-neon), 0 0 24px rgba(57, 255, 20, 0.3); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.04) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+/* ── Reactor Animations ── */
+@keyframes reactor-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes reactor-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-reactor-breathe { animation: reactor-breathe 4s ease-in-out infinite; }
+.animate-reactor-spin-slow { animation: reactor-ring-spin 20s linear infinite; }
+.animate-reactor-spin-med { animation: reactor-ring-spin 12s linear infinite; }
+.animate-reactor-spin-fast { animation: reactor-ring-spin 4s linear infinite; }
+
+/* ── Jarvis Orb Animations (legacy, still used by JarvisOrb) ── */
+@keyframes orb-breathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@keyframes orb-speak {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  25% { opacity: 0.7; transform: scale(1.15); }
+  75% { opacity: 0.5; transform: scale(1.05); }
+}
+
+@keyframes orb-listen {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.12); }
+}
+
+@keyframes orb-think {
+  0%, 100% { opacity: 0.4; transform: scale(1.02); }
+  50% { opacity: 0.6; transform: scale(1.06); }
+}
+
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes ping-slower {
+  0% { transform: scale(1); opacity: 0.3; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.animate-orb-breathe { animation: orb-breathe 4s ease-in-out infinite; }
+.animate-orb-speak { animation: orb-speak 1.5s ease-in-out infinite; }
+.animate-orb-listen { animation: orb-listen 2s ease-in-out infinite; }
+.animate-orb-think { animation: orb-think 2.5s ease-in-out infinite; }
+.animate-wave-bar { animation: wave-bar 0.8s ease-in-out infinite; }
+.animate-ping-slow { animation: ping-slow 2s ease-out infinite; }
+.animate-ping-slower { animation: ping-slower 2.5s ease-out infinite; }
+.animate-spin-slow { animation: reactor-ring-spin 2s linear infinite; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-shimmer,
+  .animate-neon-pulse,
+  .animate-reactor-breathe,
+  .animate-reactor-spin-slow,
+  .animate-reactor-spin-med,
+  .animate-reactor-spin-fast,
+  .animate-orb-breathe,
+  .animate-orb-speak,
+  .animate-orb-listen,
+  .animate-orb-think,
+  .animate-wave-bar,
+  .animate-ping-slow,
+  .animate-ping-slower,
+  .animate-spin-slow {
+    animation: none;
+  }
 }
