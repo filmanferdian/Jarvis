@@ -92,6 +92,26 @@ async function fetchNotionPage(pageId: string): Promise<string> {
     for (const block of data.results) {
       const text = extractBlockText(block);
       if (text) blocks.push(text);
+
+      // Recursively fetch table row children (Notion tables require a second fetch)
+      if (block.type === 'table' && block.has_children) {
+        const childRes = await fetch(
+          `https://api.notion.com/v1/blocks/${block.id}/children?page_size=100`,
+          {
+            headers: {
+              Authorization: `Bearer ${notionApiKey}`,
+              'Notion-Version': '2022-06-28',
+            },
+          }
+        );
+        if (childRes.ok) {
+          const childData = await childRes.json();
+          for (const childBlock of childData.results) {
+            const childText = extractBlockText(childBlock);
+            if (childText) blocks.push(childText);
+          }
+        }
+      }
     }
 
     hasMore = data.has_more;
@@ -105,6 +125,13 @@ function extractBlockText(block: Record<string, unknown>): string {
   const type = block.type as string;
   const content = block[type] as Record<string, unknown> | undefined;
   if (!content) return '';
+
+  // Handle table rows (cells array instead of rich_text)
+  if (type === 'table_row') {
+    const cells = content.cells as Array<Array<{ plain_text: string }>> | undefined;
+    if (!cells) return '';
+    return '| ' + cells.map(cell => cell.map(t => t.plain_text).join('')).join(' | ') + ' |';
+  }
 
   const richText = content.rich_text as Array<{ plain_text: string }> | undefined;
   if (richText) {
