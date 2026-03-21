@@ -99,15 +99,36 @@ export async function generateBriefing(): Promise<BriefingResult> {
 
   const prompt = `${ctx.systemPrompt}
 
-Generate a concise morning briefing for ${dateSummary}.
+Generate a morning briefing for ${dateSummary}.
 
-Use these numbered sections:
-1. Calendar overview: Summarize today's schedule
-2. Tasks & priorities: Highlight what needs attention this week
-3. Alerts: Flag anything overdue, conflicting, or urgent
-4. Recommended focus: Suggest top priority for today
+VOICE AND TONE:
+Warm but composed, like a trusted advisor briefing you at the start of the day. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
-Keep it concise and actionable. Under 300 words total. Warm but composed tone — like Alfred Pennyworth briefing Bruce Wayne.
+STRUCTURE:
+Use clear sections with plain text labels on their own line. Follow each label with flowing paragraphs.
+
+Calendar Overview
+Summarize today's schedule. Note any back-to-back meetings or gaps.
+
+Tasks and Priorities
+Highlight what needs attention this week. Call out anything overdue or due soon.
+
+Alerts
+Flag anything overdue, conflicting, or urgent. Skip this section entirely if there is nothing to flag.
+
+Recommended Focus
+Suggest the top priority for today based on deadlines, calendar, and urgency.
+
+STRICT RULES:
+- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
+- No bullet points, dashes, or numbered lists.
+- No emdashes. Use commas or periods instead.
+- Write in plain flowing paragraphs only.
+- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Under 500 words total for the written briefing.
+
+===VOICEOVER===
+After the written briefing, provide a 3-4 sentence spoken version. Warm, composed tone. Address "sir" naturally. Summarize the day's priorities concisely. Write it as natural speech, no written formatting.
 
 --- TODAY'S CALENDAR ---
 ${calendarSection}
@@ -130,7 +151,7 @@ ${emailSection}`;
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
+      max_tokens: 800,
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -142,7 +163,12 @@ ${emailSection}`;
   }
 
   const claudeData = await claudeRes.json();
-  const briefingText = claudeData.content?.[0]?.text || 'Unable to generate briefing';
+  const fullText = claudeData.content?.[0]?.text || 'Unable to generate briefing';
+
+  // Split written briefing from voiceover
+  const parts = fullText.split('===VOICEOVER===');
+  const briefingText = parts[0].trim();
+  const voiceoverText = parts[1]?.trim() || briefingText;
 
   // Track Claude API usage
   try {
@@ -176,7 +202,7 @@ ${emailSection}`;
 
   // Pre-generate TTS audio and store in Supabase Storage
   try {
-    const audioUrl = await generateAndStoreAudio(briefingText, today);
+    const audioUrl = await generateAndStoreAudio(voiceoverText, today);
     if (audioUrl) {
       await supabase
         .from('briefing_cache')
