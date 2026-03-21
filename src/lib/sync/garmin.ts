@@ -404,14 +404,18 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   const sleep = sleepData.status === 'fulfilled' ? sleepData.value as unknown as Record<string, unknown> : {};
   const stepsVal = steps.status === 'fulfilled' ? steps.value as number : null;
 
-  const fitnessAge = fitnessAgeData.status === 'fulfilled' ? fitnessAgeData.value as Record<string, unknown> : {};
+  const fitnessAge = fitnessAgeData.status === 'fulfilled' ? fitnessAgeData.value as Record<string, unknown> : null;
 
-  const rawData = { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep, fitnessAge };
+  const rawData = { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep };
   const dailyRecord = buildDailyRecord(today, rawData, stepsVal);
 
   // Override fitness_age from dedicated endpoint (more reliable than trainingStatus)
-  const fitnessAgeVal = (fitnessAge.chronologicalFitnessAge as number) ?? (fitnessAge.fitnessAge as number) ?? null;
-  if (fitnessAgeVal != null) dailyRecord.fitness_age = fitnessAgeVal;
+  if (fitnessAge) {
+    const fitnessAgeVal = (fitnessAge.chronologicalFitnessAge as number) ?? (fitnessAge.fitnessAge as number) ?? null;
+    if (fitnessAgeVal != null) dailyRecord.fitness_age = Math.round(fitnessAgeVal);
+    // Store fitness age response in raw_json for debugging
+    (dailyRecord.raw_json as unknown as Record<string, unknown>).fitnessAge = fitnessAge;
+  }
 
   // Upsert daily record (delete-then-insert for date-unique tables)
   await supabase.from('garmin_daily').delete().eq('date', today);
