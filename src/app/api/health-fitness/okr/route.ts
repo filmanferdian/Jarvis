@@ -56,13 +56,30 @@ export const GET = withAuth(async () => {
       return NextResponse.json({ objectives: [], message: 'No OKR targets configured' });
     }
 
-    // Fetch latest values from each source
-    const { data: latestGarmin } = await supabase
+    // Fetch last 7 days of Garmin data for averaging daily metrics
+    const { data: garminRows } = await supabase
       .from('garmin_daily')
       .select('*')
       .order('date', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(7);
+
+    const latestGarmin = garminRows?.[0] ?? null;
+
+    // Metrics that should use 7-day average (daily fluctuating values)
+    const AVERAGED_METRICS = ['resting_hr', 'steps', 'sleep_duration_seconds', 'stress_level', 'body_battery', 'hrv_7d_avg'];
+
+    // Compute 7-day averages for daily metrics
+    const garmin7dAvg: Record<string, number | null> = {};
+    if (garminRows && garminRows.length > 0) {
+      for (const col of AVERAGED_METRICS) {
+        const values = garminRows
+          .map((r) => r[col] as number | null)
+          .filter((v): v is number => v != null);
+        garmin7dAvg[col] = values.length > 0
+          ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
+          : null;
+      }
+    }
 
     const { data: latestWeight } = await supabase
       .from('weight_log')
@@ -110,7 +127,11 @@ export const GET = withAuth(async () => {
 
       // Garmin daily metrics
       if (t.source_table === 'garmin_daily' && latestGarmin && t.source_column) {
-        let val = latestGarmin[t.source_column] as number | null;
+        // Use 7-day average for daily fluctuating metrics, latest for stable ones (vo2_max, fitness_age)
+        const useAverage = AVERAGED_METRICS.includes(t.source_column);
+        let val = useAverage
+          ? (garmin7dAvg[t.source_column] ?? null)
+          : (latestGarmin[t.source_column] as number | null);
         // Convert sleep_duration_seconds to hours for sleep_hours KR
         if (t.key_result === 'sleep_hours' && val != null) {
           val = Math.round((val / 3600) * 10) / 10;
