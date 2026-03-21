@@ -1,12 +1,22 @@
 import { GarminConnect } from 'garmin-connect';
 import { supabase } from '@/lib/supabase';
 
+// --- Rate limiting constants ---
+const GARMIN_DAILY_CALL_BUDGET = 50;
+const GARMIN_COOLDOWN_DEFAULT_MS = 6 * 60 * 60 * 1000; // 6h default
+const GARMIN_MAX_BACKFILL_PER_RUN = 2;    // was 5
+const GARMIN_BACKFILL_DELAY_MS = 5000;    // was 2000
+const GARMIN_MAX_CONSECUTIVE_FAILURES = 3;
+const GARMIN_LOGIN_RETRIES = 1;           // was 3
+
 export interface GarminSyncResult {
   date: string;
   metrics: Record<string, unknown>;
   activitiesSynced: number;
   historicalSynced: number;
   timestamp: string;
+  skipped?: boolean;
+  skipReason?: string;
 }
 
 function formatDate(d: Date): string {
@@ -66,7 +76,148 @@ async function saveCachedTokens(client: GarminConnect): Promise<void> {
   }
 }
 
-async function createClient(retries = 3): Promise<GarminConnect> {
+// --- Circuit breaker ---
+// Stores block state in sync_status with sync_type = 'garmin-circuit-breaker'
+
+interface CircuitBreakerState {
+  blocked_until: string;
+  reason: string;
+  set_at: string;
+}
+
+export async function isGarminBlocked(): Promise<{ blocked: boolean; reason: string; blockedUntil: string | null }> {
+  const { data } = await supabase
+    .from('sync_status')
+    .select('last_result, last_error')
+    .eq('sync_type', 'garmin-circuit-breaker')
+    .single();
+
+  if (!data || data.last_result !== 'blocked') {
+    return { blocked: false, reason: '', blockedUntil: null };
+  }
+
+  try {
+    const state = JSON.parse(data.last_error) as CircuitBreakerState;
+    const blockedUntil = new Date(state.blocked_until);
+    if (blockedUntil > new Date()) {
+      return { blocked: true, reason: state.reason, blockedUntil: state.blocked_until };
+    }
+    // Expired — auto-clear
+    await clearGarminBlock();
+    return { blocked: false, reason: '', blockedUntil: null };
+  } catch {
+    return { blocked: false, reason: '', blockedUntil: null };
+  }
+}
+
+async function setGarminBlocked(reason: string, cooldownMs?: number): Promise<void> {
+  const effectiveCooldown = cooldownMs ?? GARMIN_COOLDOWN_DEFAULT_MS;
+  const blockedUntil = new Date(Date.now() + effectiveCooldown).toISOString();
+  const state: CircuitBreakerState = {
+    blocked_until: blockedUntil,
+    reason,
+    set_at: new Date().toISOString(),
+  };
+  await supabase.from('sync_status').upsert(
+    {
+      sync_type: 'garmin-circuit-breaker',
+      last_synced_at: new Date().toISOString(),
+      last_result: 'blocked',
+      last_error: JSON.stringify(state),
+    },
+    { onConflict: 'sync_type' },
+  );
+  console.log(`[garmin] Circuit breaker OPEN: blocked until ${blockedUntil} (reason: ${reason})`);
+}
+
+export async function clearGarminBlock(): Promise<void> {
+  await supabase.from('sync_status').upsert(
+    {
+      sync_type: 'garmin-circuit-breaker',
+      last_synced_at: new Date().toISOString(),
+      last_result: 'clear',
+      last_error: null,
+    },
+    { onConflict: 'sync_type' },
+  );
+  console.log('[garmin] Circuit breaker CLEARED');
+}
+
+// --- 429 / Cloudflare error detection ---
+
+function isRateLimitError(error: unknown): { isRateLimit: boolean; retryAfterMs: number | null } {
+  const msg = error instanceof Error ? error.message : String(error);
+  const patterns = [/429/i, /too many requests/i, /rate.?limit/i, /cloudflare/i, /blocked/i, /forbidden.*garmin/i];
+  const isRateLimit = patterns.some((p) => p.test(msg));
+
+  let retryAfterMs: number | null = null;
+  // Try to extract Retry-After from error if available
+  if (isRateLimit && error && typeof error === 'object' && 'response' in error) {
+    const resp = (error as { response?: { headers?: { get?: (k: string) => string | null } } }).response;
+    const retryAfter = resp?.headers?.get?.('retry-after');
+    if (retryAfter) {
+      const seconds = parseInt(retryAfter, 10);
+      if (!isNaN(seconds)) {
+        retryAfterMs = seconds * 1000;
+      } else {
+        const date = new Date(retryAfter);
+        if (!isNaN(date.getTime())) {
+          retryAfterMs = Math.max(0, date.getTime() - Date.now());
+        }
+      }
+    }
+  }
+
+  return { isRateLimit, retryAfterMs };
+}
+
+// --- Daily API call budget ---
+
+async function getGarminDailyCallCount(): Promise<number> {
+  const today = getWibToday();
+  const { data } = await supabase
+    .from('api_usage_v2')
+    .select('call_count')
+    .eq('date', today)
+    .eq('service', 'garmin')
+    .single();
+  return data?.call_count ?? 0;
+}
+
+async function trackGarminCalls(count: number): Promise<void> {
+  try {
+    const { trackServiceUsage } = await import('@/lib/rateLimit');
+    for (let i = 0; i < count; i++) {
+      await trackServiceUsage('garmin');
+    }
+  } catch { /* non-critical */ }
+}
+
+async function checkBudgetOrBlock(): Promise<void> {
+  const calls = await getGarminDailyCallCount();
+  if (calls >= GARMIN_DAILY_CALL_BUDGET) {
+    // Calculate ms until midnight WIB
+    const now = new Date();
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const wibNow = new Date(now.getTime() + wibOffset);
+    const wibMidnight = new Date(wibNow);
+    wibMidnight.setUTCHours(24, 0, 0, 0);
+    const msUntilMidnight = wibMidnight.getTime() - wibNow.getTime();
+    await setGarminBlocked('daily-budget-exceeded', Math.max(msUntilMidnight, 60000));
+    throw new Error(`Garmin daily API budget exceeded (${calls}/${GARMIN_DAILY_CALL_BUDGET} calls)`);
+  }
+}
+
+async function createClient(retries = GARMIN_LOGIN_RETRIES): Promise<GarminConnect> {
+  // Check circuit breaker before any API contact
+  const blockStatus = await isGarminBlocked();
+  if (blockStatus.blocked) {
+    throw new Error(`Garmin API blocked until ${blockStatus.blockedUntil} (${blockStatus.reason})`);
+  }
+
+  // Check daily budget
+  await checkBudgetOrBlock();
+
   const email = process.env.GARMIN_EMAIL;
   const password = process.env.GARMIN_PASSWORD;
   if (!email || !password) {
@@ -86,22 +237,35 @@ async function createClient(retries = 3): Promise<GarminConnect> {
       console.log('Garmin: restored session from cache');
       return client;
     } catch (err) {
+      // Check if the verification call was rate-limited
+      const { isRateLimit, retryAfterMs } = isRateLimitError(err);
+      if (isRateLimit) {
+        await setGarminBlocked('token-verify-blocked', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        throw new Error(`Garmin API rate-limited during token verify, blocked until cooldown`);
+      }
       console.log('Garmin: cached session expired, will re-login:', (err as Error).message);
     }
   }
 
-  // Fresh login with retries
+  // Fresh login with retries (reduced from 3 to 1)
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await client.login();
       console.log(`Garmin: fresh login succeeded${attempt > 1 ? ` on attempt ${attempt}` : ''}`);
-      // Cache the new session
       await saveCachedTokens(client);
       return client;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.error(`Garmin login attempt ${attempt}/${retries} failed:`, lastError.message);
+
+      // If rate-limited, trip circuit breaker immediately — do NOT retry
+      const { isRateLimit, retryAfterMs } = isRateLimitError(err);
+      if (isRateLimit) {
+        await setGarminBlocked('login-blocked', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        throw new Error(`Garmin login rate-limited, blocked until cooldown`);
+      }
+
       if (attempt < retries) {
         const delay = Math.pow(2, attempt) * 1000;
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -173,40 +337,38 @@ function buildDailyRecord(dateStr: string, raw: RawData, stepsOverride?: number 
 }
 
 export async function syncGarmin(): Promise<GarminSyncResult> {
-  const client = await createClient();
   const today = getWibToday();
+
+  // Circuit breaker check — createClient also checks, but we check here to avoid even that overhead
+  const blockStatus = await isGarminBlocked();
+  if (blockStatus.blocked) {
+    console.log(`[garmin] Sync skipped: ${blockStatus.reason}, blocked until ${blockStatus.blockedUntil}`);
+    return {
+      date: today, metrics: {}, activitiesSynced: 0, historicalSynced: 0,
+      timestamp: new Date().toISOString(), skipped: true,
+      skipReason: `Blocked until ${blockStatus.blockedUntil} (${blockStatus.reason})`,
+    };
+  }
+
+  const client = await createClient();
   const dateObj = new Date(`${today}T00:00:00+07:00`);
 
-  // Fetch data from multiple endpoints in parallel where possible
-  const [
-    steps,
-    sleepData,
-    heartRate,
-    activities,
-  ] = await Promise.allSettled([
-    client.getSteps(dateObj),
-    client.getSleepData(dateObj),
-    client.getHeartRate(dateObj),
-    client.getActivities(0, 5),
-  ]);
-
-  // Fetch additional metrics via generic API (these endpoints may vary)
+  // Fetch all 10 endpoints sequentially with 1s delay between each call
+  // This avoids burst requests that trigger Cloudflare rate limiting
   const apiBase = `https://connectapi.garmin.com`;
-  const [
-    dailySummary,
-    bodyBattery,
-    stressData,
-    hrvData,
-    trainingReadiness,
-    trainingStatus,
-  ] = await Promise.allSettled([
-    client.get(`${apiBase}/usersummary-service/usersummary/daily/${today}`),
-    client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${today}/${today}`),
-    client.get(`${apiBase}/wellness-service/wellness/dailyStress/${today}`),
-    client.get(`${apiBase}/hrv-service/hrv/${today}`),
-    client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${today}`),
-    client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${today}`),
+  const allResults = await fetchSequential([
+    () => client.getSteps(dateObj) as Promise<unknown>,
+    () => client.getSleepData(dateObj) as Promise<unknown>,
+    () => client.getHeartRate(dateObj) as Promise<unknown>,
+    () => client.getActivities(0, 5) as Promise<unknown>,
+    () => client.get(`${apiBase}/usersummary-service/usersummary/daily/${today}`),
+    () => client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${today}/${today}`),
+    () => client.get(`${apiBase}/wellness-service/wellness/dailyStress/${today}`),
+    () => client.get(`${apiBase}/hrv-service/hrv/${today}`),
+    () => client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${today}`),
+    () => client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${today}`),
   ]);
+  const [steps, sleepData, heartRate, activities, dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus] = allResults;
 
   // Extract values safely
   const summary = dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {};
@@ -262,106 +424,103 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   // Refresh cached tokens after successful sync
   await saveCachedTokens(client);
 
-  // Track Garmin API usage
-  try {
-    const { trackServiceUsage } = await import('@/lib/rateLimit');
-    await trackServiceUsage('garmin');
-  } catch { /* non-critical */ }
-
-  // --- Incremental historical backfill (up to 5 missing/partial days per run) ---
-  const MAX_HISTORICAL_PER_RUN = 5;
+  // --- Incremental historical backfill (reduced to 2 days per run) ---
   let historicalSynced = 0;
 
-  try {
-    // Build list of all dates in the 56-day window (oldest first, skip today)
-    const allDates: string[] = [];
-    for (let i = RETENTION_DAYS; i >= 2; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      allDates.push(formatDate(d));
-    }
-
-    // Fetch existing records to classify
-    const { data: existingRecords } = await supabase
-      .from('garmin_daily')
-      .select('date, raw_json')
-      .in('date', allDates);
-
-    const histMap = new Map<string, Record<string, unknown>>();
-    for (const row of existingRecords ?? []) {
-      histMap.set(row.date, row.raw_json as Record<string, unknown>);
-    }
-
-    // Find MISSING or PARTIAL dates (oldest first)
-    const datesToFill: { dateStr: string; existingRaw: Record<string, unknown> | null }[] = [];
-    for (const dateStr of allDates) {
-      if (datesToFill.length >= MAX_HISTORICAL_PER_RUN) break;
-      const raw = histMap.get(dateStr) ?? null;
-      if (!raw) {
-        datesToFill.push({ dateStr, existingRaw: null });
-      } else {
-        const keys = Object.keys(raw);
-        const isComplete = COMPLETE_RAW_KEYS.every((k) => keys.includes(k));
-        if (!isComplete) {
-          datesToFill.push({ dateStr, existingRaw: raw });
-        }
+  // Skip backfill if circuit breaker was tripped during today's sync
+  const postSyncBlock = await isGarminBlocked();
+  if (!postSyncBlock.blocked) {
+    try {
+      const allDates: string[] = [];
+      for (let i = RETENTION_DAYS; i >= 2; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        allDates.push(formatDate(d));
       }
-    }
 
-    if (datesToFill.length > 0) {
-      console.log(`[garmin] Incremental backfill: ${datesToFill.length} historical days to fill`);
-    }
+      const { data: existingRecords } = await supabase
+        .from('garmin_daily')
+        .select('date, raw_json')
+        .in('date', allDates);
 
-    for (const { dateStr, existingRaw } of datesToFill) {
-      try {
-        const dateObj = new Date(`${dateStr}T00:00:00+07:00`);
+      const histMap = new Map<string, Record<string, unknown>>();
+      for (const row of existingRecords ?? []) {
+        histMap.set(row.date, row.raw_json as Record<string, unknown>);
+      }
 
-        if (existingRaw) {
-          // PARTIAL: merge missing keys from API
-          const rawData: RawData = {
-            summary: (existingRaw.summary as Record<string, unknown>) ?? {},
-            bodyBattery: (existingRaw.bodyBattery as unknown[]) ?? [],
-            stress: (existingRaw.stress as Record<string, unknown>) ?? {},
-            hrv: (existingRaw.hrv as Record<string, unknown>) ?? {},
-            trainingReadiness: (existingRaw.trainingReadiness as Record<string, unknown>[]) ?? [],
-            trainingStatus: (existingRaw.trainingStatus as Record<string, unknown>) ?? {},
-            heartRate: (existingRaw.heartRate as Record<string, unknown>) ?? {},
-            sleep: (existingRaw.sleep as Record<string, unknown>) ?? {},
-          };
-          const missingKeys = COMPLETE_RAW_KEYS.filter((k) => !Object.keys(existingRaw).includes(k));
-          if (missingKeys.length > 0) {
-            const freshData = await fetchAllEndpoints(client, dateStr, dateObj);
-            for (const key of missingKeys) {
-              (rawData as unknown as Record<string, unknown>)[key] = (freshData as unknown as Record<string, unknown>)[key];
-            }
-          }
-          const record = buildDailyRecord(dateStr, rawData);
-          await supabase.from('garmin_daily').delete().eq('date', dateStr);
-          const { error } = await supabase.from('garmin_daily').insert(record);
-          if (!error) historicalSynced++;
+      const datesToFill: { dateStr: string; existingRaw: Record<string, unknown> | null }[] = [];
+      for (const dateStr of allDates) {
+        if (datesToFill.length >= GARMIN_MAX_BACKFILL_PER_RUN) break;
+        const raw = histMap.get(dateStr) ?? null;
+        if (!raw) {
+          datesToFill.push({ dateStr, existingRaw: null });
         } else {
-          // MISSING: fetch all endpoints
-          const rawData = await fetchAllEndpoints(client, dateStr, dateObj);
-          const record = buildDailyRecord(dateStr, rawData);
-          await supabase.from('garmin_daily').delete().eq('date', dateStr);
-          const { error } = await supabase.from('garmin_daily').insert(record);
-          if (!error) historicalSynced++;
+          const keys = Object.keys(raw);
+          const isComplete = COMPLETE_RAW_KEYS.every((k) => keys.includes(k));
+          if (!isComplete) {
+            datesToFill.push({ dateStr, existingRaw: raw });
+          }
+        }
+      }
+
+      if (datesToFill.length > 0) {
+        console.log(`[garmin] Incremental backfill: ${datesToFill.length} historical days to fill`);
+      }
+
+      for (const { dateStr, existingRaw } of datesToFill) {
+        // Re-check circuit breaker before each day
+        const midLoopBlock = await isGarminBlocked();
+        if (midLoopBlock.blocked) {
+          console.log(`[garmin] Backfill halted: circuit breaker tripped (${midLoopBlock.reason})`);
+          break;
         }
 
-        console.log(`[garmin] Historical: synced ${dateStr}`);
-        // Gentle 2-second delay between historical days
-        await new Promise((r) => setTimeout(r, 2000));
-      } catch (err) {
-        console.error(`[garmin] Historical sync failed for ${dateStr}:`, err);
-        // Don't abort — continue with remaining dates
-      }
-    }
+        try {
+          const histDateObj = new Date(`${dateStr}T00:00:00+07:00`);
 
-    if (historicalSynced > 0) {
-      console.log(`[garmin] Incremental backfill complete: ${historicalSynced} days synced`);
+          if (existingRaw) {
+            const rawData: RawData = {
+              summary: (existingRaw.summary as Record<string, unknown>) ?? {},
+              bodyBattery: (existingRaw.bodyBattery as unknown[]) ?? [],
+              stress: (existingRaw.stress as Record<string, unknown>) ?? {},
+              hrv: (existingRaw.hrv as Record<string, unknown>) ?? {},
+              trainingReadiness: (existingRaw.trainingReadiness as Record<string, unknown>[]) ?? [],
+              trainingStatus: (existingRaw.trainingStatus as Record<string, unknown>) ?? {},
+              heartRate: (existingRaw.heartRate as Record<string, unknown>) ?? {},
+              sleep: (existingRaw.sleep as Record<string, unknown>) ?? {},
+            };
+            const missingKeys = COMPLETE_RAW_KEYS.filter((k) => !Object.keys(existingRaw).includes(k));
+            if (missingKeys.length > 0) {
+              const freshData = await fetchAllEndpoints(client, dateStr, histDateObj);
+              for (const key of missingKeys) {
+                (rawData as unknown as Record<string, unknown>)[key] = (freshData as unknown as Record<string, unknown>)[key];
+              }
+            }
+            const record = buildDailyRecord(dateStr, rawData);
+            await supabase.from('garmin_daily').delete().eq('date', dateStr);
+            const { error } = await supabase.from('garmin_daily').insert(record);
+            if (!error) historicalSynced++;
+          } else {
+            const rawData = await fetchAllEndpoints(client, dateStr, histDateObj);
+            const record = buildDailyRecord(dateStr, rawData);
+            await supabase.from('garmin_daily').delete().eq('date', dateStr);
+            const { error } = await supabase.from('garmin_daily').insert(record);
+            if (!error) historicalSynced++;
+          }
+
+          console.log(`[garmin] Historical: synced ${dateStr}`);
+          await new Promise((r) => setTimeout(r, GARMIN_BACKFILL_DELAY_MS));
+        } catch (err) {
+          console.error(`[garmin] Historical sync failed for ${dateStr}:`, err);
+        }
+      }
+
+      if (historicalSynced > 0) {
+        console.log(`[garmin] Incremental backfill complete: ${historicalSynced} days synced`);
+      }
+    } catch (err) {
+      console.error('[garmin] Incremental backfill error:', err);
     }
-  } catch (err) {
-    console.error('[garmin] Incremental backfill error:', err);
   }
 
   return {
@@ -460,20 +619,53 @@ export interface BackfillResult {
   activities_synced: number;
 }
 
+// Sequential fetch with delay between each call to avoid Cloudflare bursts
+const GARMIN_INTER_CALL_DELAY_MS = 1000;
+
+async function fetchSequential<T>(calls: (() => Promise<T>)[]): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = [];
+  for (let i = 0; i < calls.length; i++) {
+    try {
+      const value = await calls[i]();
+      results.push({ status: 'fulfilled', value });
+    } catch (reason) {
+      results.push({ status: 'rejected', reason });
+
+      // If rate-limited, trip breaker and stop fetching — return partial results
+      const { isRateLimit, retryAfterMs } = isRateLimitError(reason);
+      if (isRateLimit) {
+        await setGarminBlocked('429-endpoint', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        // Fill remaining slots as rejected
+        for (let j = i + 1; j < calls.length; j++) {
+          results.push({ status: 'rejected', reason: new Error('skipped: circuit breaker tripped') });
+        }
+        break;
+      }
+    }
+    // Delay between calls (skip after last)
+    if (i < calls.length - 1) {
+      await new Promise((r) => setTimeout(r, GARMIN_INTER_CALL_DELAY_MS));
+    }
+  }
+  await trackGarminCalls(results.filter((r) => r.status !== 'rejected' || !(r.reason instanceof Error && r.reason.message.startsWith('skipped:'))).length);
+  return results;
+}
+
 async function fetchAllEndpoints(client: GarminConnect, dateStr: string, dateObj: Date): Promise<RawData> {
   const apiBase = 'https://connectapi.garmin.com';
 
-  const [dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus, heartRate, sleepData] =
-    await Promise.allSettled([
-      client.get(`${apiBase}/usersummary-service/usersummary/daily/${dateStr}`),
-      client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${dateStr}/${dateStr}`),
-      client.get(`${apiBase}/wellness-service/wellness/dailyStress/${dateStr}`),
-      client.get(`${apiBase}/hrv-service/hrv/${dateStr}`),
-      client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${dateStr}`),
-      client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${dateStr}`),
-      client.getHeartRate(dateObj),
-      client.getSleepData(dateObj),
-    ]);
+  const results = await fetchSequential([
+    () => client.get(`${apiBase}/usersummary-service/usersummary/daily/${dateStr}`),
+    () => client.get(`${apiBase}/wellness-service/wellness/bodyBattery/dates/${dateStr}/${dateStr}`),
+    () => client.get(`${apiBase}/wellness-service/wellness/dailyStress/${dateStr}`),
+    () => client.get(`${apiBase}/hrv-service/hrv/${dateStr}`),
+    () => client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${dateStr}`),
+    () => client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${dateStr}`),
+    () => client.getHeartRate(dateObj) as Promise<unknown>,
+    () => client.getSleepData(dateObj) as Promise<unknown>,
+  ]);
+
+  const [dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus, heartRate, sleepData] = results;
 
   return {
     summary: dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {},
@@ -488,12 +680,22 @@ async function fetchAllEndpoints(client: GarminConnect, dateStr: string, dateObj
 }
 
 function adaptiveDelay(baseMs: number, consecutiveFailures: number): Promise<void> {
-  const backoff = Math.min(baseMs * Math.pow(2, consecutiveFailures), 30000);
-  const jitter = Math.random() * 1500;
+  const backoff = Math.min(baseMs * Math.pow(2, consecutiveFailures), 60000);
+  const jitter = Math.random() * 2000;
   return new Promise((resolve) => setTimeout(resolve, backoff + jitter));
 }
 
-export async function backfillGarmin(force = false): Promise<BackfillResult> {
+export async function backfillGarmin(force = false): Promise<BackfillResult & { skipped?: boolean; skipReason?: string }> {
+  // Circuit breaker check
+  const blockStatus = await isGarminBlocked();
+  if (blockStatus.blocked) {
+    console.log(`[garmin] Backfill skipped: ${blockStatus.reason}, blocked until ${blockStatus.blockedUntil}`);
+    return {
+      days_synced: 0, days_enriched: 0, days_skipped: 0, days_failed: 0, activities_synced: 0,
+      skipped: true, skipReason: `Blocked until ${blockStatus.blockedUntil} (${blockStatus.reason})`,
+    };
+  }
+
   const client = await createClient();
   const result: BackfillResult = {
     days_synced: 0,
@@ -516,6 +718,20 @@ export async function backfillGarmin(force = false): Promise<BackfillResult> {
   }
 
   for (let i = RETENTION_DAYS; i >= 1; i--) {
+    // Re-check circuit breaker before each day
+    const midLoopBlock = await isGarminBlocked();
+    if (midLoopBlock.blocked) {
+      console.log(`[garmin] Backfill halted: circuit breaker tripped (${midLoopBlock.reason})`);
+      break;
+    }
+
+    // Hard stop after too many consecutive failures
+    if (consecutiveFailures >= GARMIN_MAX_CONSECUTIVE_FAILURES) {
+      console.log(`[garmin] Backfill halted: ${consecutiveFailures} consecutive failures, tripping circuit breaker`);
+      await setGarminBlocked('consecutive-failures', GARMIN_COOLDOWN_DEFAULT_MS);
+      break;
+    }
+
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = formatDate(date);
@@ -523,7 +739,6 @@ export async function backfillGarmin(force = false): Promise<BackfillResult> {
     const existingRaw = existingMap.get(dateStr);
 
     if (!force && existingRaw) {
-      // Check if record is COMPLETE (has all expected raw_json keys)
       const existingKeys = Object.keys(existingRaw);
       const isComplete = COMPLETE_RAW_KEYS.every((k) => existingKeys.includes(k));
 
@@ -545,15 +760,13 @@ export async function backfillGarmin(force = false): Promise<BackfillResult> {
           sleep: (existingRaw.sleep as Record<string, unknown>) ?? {},
         };
 
-        // Check which keys are missing and fetch only those
         const missingKeys = COMPLETE_RAW_KEYS.filter((k) => !existingKeys.includes(k));
         if (missingKeys.length > 0) {
-          // Fetch missing endpoints from API
           const freshData = await fetchAllEndpoints(client, dateStr, date);
           for (const key of missingKeys) {
             (rawData as unknown as Record<string, unknown>)[key] = (freshData as unknown as Record<string, unknown>)[key];
           }
-          await adaptiveDelay(3000, 0);
+          await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, 0);
         }
 
         const record = buildDailyRecord(dateStr, rawData);
@@ -565,7 +778,14 @@ export async function backfillGarmin(force = false): Promise<BackfillResult> {
         console.error(`Backfill enrich error for ${dateStr}:`, err);
         result.days_failed++;
         consecutiveFailures++;
-        await adaptiveDelay(3000, consecutiveFailures);
+
+        // Check if this was a rate limit error
+        if (isRateLimitError(err).isRateLimit) {
+          const { retryAfterMs } = isRateLimitError(err);
+          await setGarminBlocked('429-backfill', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+          break;
+        }
+        await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, consecutiveFailures);
       }
       continue;
     }
@@ -580,43 +800,54 @@ export async function backfillGarmin(force = false): Promise<BackfillResult> {
       if (!error) result.days_synced++;
       consecutiveFailures = 0;
 
-      await adaptiveDelay(3000, 0);
+      await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, 0);
     } catch (err) {
       console.error(`Backfill fetch error for ${dateStr}:`, err);
       result.days_failed++;
       consecutiveFailures++;
-      await adaptiveDelay(3000, consecutiveFailures);
+
+      // Check if this was a rate limit error
+      if (isRateLimitError(err).isRateLimit) {
+        const { retryAfterMs } = isRateLimitError(err);
+        await setGarminBlocked('429-backfill', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        break;
+      }
+      await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, consecutiveFailures);
     }
   }
 
-  // Backfill activities (fetch last 100)
-  try {
-    const allActivities = await client.getActivities(0, 100);
-    if (Array.isArray(allActivities)) {
-      const actRecords = (allActivities as unknown as Record<string, unknown>[]).map((act) => ({
-        activity_id: String(act.activityId),
-        activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
-        distance_meters: (act.distance as number) ?? null,
-        duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
-        avg_pace: (act.averageSpeed as number)
-          ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
-          : null,
-        avg_hr: (act.averageHR as number) ?? null,
-        calories: (act.calories as number) ?? null,
-        started_at: act.startTimeGMT ? new Date(act.startTimeGMT as string).toISOString() : null,
-        raw_json: act,
-        last_synced: new Date().toISOString(),
-      }));
+  // Backfill activities (fetch last 100) — only if not blocked
+  const postLoopBlock = await isGarminBlocked();
+  if (!postLoopBlock.blocked) {
+    try {
+      const allActivities = await client.getActivities(0, 100);
+      await trackGarminCalls(1);
+      if (Array.isArray(allActivities)) {
+        const actRecords = (allActivities as unknown as Record<string, unknown>[]).map((act) => ({
+          activity_id: String(act.activityId),
+          activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
+          distance_meters: (act.distance as number) ?? null,
+          duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
+          avg_pace: (act.averageSpeed as number)
+            ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
+            : null,
+          avg_hr: (act.averageHR as number) ?? null,
+          calories: (act.calories as number) ?? null,
+          started_at: act.startTimeGMT ? new Date(act.startTimeGMT as string).toISOString() : null,
+          raw_json: act,
+          last_synced: new Date().toISOString(),
+        }));
 
-      for (const rec of actRecords) {
-        const { error } = await supabase
-          .from('garmin_activities')
-          .upsert(rec, { onConflict: 'activity_id' });
-        if (!error) result.activities_synced++;
+        for (const rec of actRecords) {
+          const { error } = await supabase
+            .from('garmin_activities')
+            .upsert(rec, { onConflict: 'activity_id' });
+          if (!error) result.activities_synced++;
+        }
       }
+    } catch (err) {
+      console.error('Backfill activities error:', err);
     }
-  } catch (err) {
-    console.error('Backfill activities error:', err);
   }
 
   // Refresh tokens after successful backfill
