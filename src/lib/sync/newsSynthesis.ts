@@ -17,18 +17,11 @@ import { buildJarvisContext } from '@/lib/context';
 interface NewsSource {
   match: (from: string) => boolean;
   label: string;
-  tier: 'primary' | 'secondary' | 'contextual';
 }
 
 const NEWS_SOURCES: Record<string, NewsSource> = {
-  bloomberg: { match: (f) => /bloomberg/i.test(f), label: 'Bloomberg', tier: 'primary' },
-  nyt: { match: (f) => /nytimes\.com|nytdirect/i.test(f), label: 'NYT', tier: 'primary' },
-  econTimes: { match: (f) => /economictimes/i.test(f), label: 'Economic Times', tier: 'secondary' },
-  stockbit: { match: (f) => /stockbit/i.test(f), label: 'Stockbit', tier: 'secondary' },
-  crunchbase: { match: (f) => /crunchbase/i.test(f), label: 'Crunchbase', tier: 'contextual' },
-  mckinsey: { match: (f) => /mckinsey/i.test(f), label: 'McKinsey', tier: 'contextual' },
-  dealstreet: { match: (f) => /dealstreet/i.test(f), label: 'DealStreetAsia', tier: 'contextual' },
-  f6s: { match: (f) => /f6s\.com/i.test(f), label: 'F6S', tier: 'contextual' },
+  bloomberg: { match: (f) => /bloomberg/i.test(f), label: 'Bloomberg' },
+  nyt: { match: (f) => /nytimes\.com|nytdirect/i.test(f), label: 'NYT' },
 };
 
 // NYT subjects to skip (non-news)
@@ -198,37 +191,29 @@ export async function syncNews(): Promise<NewsSyncResult> {
 
 You are synthesizing current events from newsletter emails for the ${slotLabel} briefing on ${today}.
 
-These emails were received since ${sinceTimestamp}. Sources are tiered:
-- PRIMARY (bias heavily toward these): Bloomberg, NYT
-- SECONDARY (supplement): Economic Times, Stockbit
-- CONTEXTUAL (sprinkle in): Crunchbase, DealStreetAsia, McKinsey, F6S
+These emails were received since ${sinceTimestamp}. Sources: Bloomberg and NYT only.
 
 VOICE AND TONE:
 Warm but composed, like a trusted advisor delivering a news briefing. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
 STRUCTURE:
-Use two clear sections with plain text labels on their own line, followed by flowing paragraphs.
+Use markdown formatting. Section labels should be **bold** on their own line. Use bullet points (- ) for each story. Separate each section with one blank line.
 
-What's Happening Now
+**What's Happening Now**
 
-Cover the 5-7 most significant current events. Write each story as a short paragraph with a clear topic sentence. Attribute the source naturally in parentheses at the end, e.g. (Bloomberg). Prioritize geopolitics, markets, tech, macro-economy. Only promote CONTEXTUAL sources if corroborated by PRIMARY sources.
+Extract the 5-7 most significant current events across all the newsletter emails below. Do not summarize each email individually. Instead, identify the key stories and themes, then write each as a bullet point with a clear topic sentence. If a story appears in multiple sources, cite all of them, e.g. (Bloomberg, NYT). Prioritize geopolitics, markets, tech, macro-economy.
 
-Relevant to Your Priorities
+**Relevant to Your Priorities**
 
-Cover 3-5 stories relevant to the user's work, projects, and interests. These can come from any source tier. Write each as a paragraph explaining why it matters, with source in parentheses at the end.
+Extract 3-5 stories relevant to the user's work, projects, and interests. Write each as a bullet point explaining why it matters. Cite all sources that covered it in parentheses at the end.
 
-STRICT RULES:
-- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
-- No bullet points, dashes, or numbered lists.
+FORMATTING RULES:
+- Use markdown: **bold** for section labels, bullet points (- ) for each story.
 - No emdashes. Use commas or periods instead.
-- Write in plain flowing paragraphs only.
-- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Separate each section with one blank line for readability.
 - Under 500 words total.
 
 Do not fabricate stories. If insufficient news content, note that and provide what you can.
-
-===VOICEOVER===
-Provide a 3-4 sentence spoken summary in a warm, composed tone. Address "Mr. Ferdian" or "sir". Summarize the key developments concisely. Write it as natural speech, no written formatting.
 
 --- NEWSLETTERS (${newsEmails.length} emails from ${sourcesUsed.join(', ')}) ---
 
@@ -257,12 +242,7 @@ ${emailList}`;
   }
 
   const claudeData = await claudeRes.json();
-  const fullText = claudeData.content?.[0]?.text || 'Unable to generate synthesis';
-
-  // Split voiceover
-  const parts = fullText.split('===VOICEOVER===');
-  const synthesisText = parts[0].trim();
-  const voiceoverText = parts[1]?.trim() || synthesisText;
+  const synthesisText = (claudeData.content?.[0]?.text || 'Unable to generate synthesis').trim();
 
   // Use WIB date
   const now = new Date();
@@ -281,7 +261,6 @@ ${emailList}`;
     date: dateStr,
     time_slot: timeSlot,
     synthesis_text: synthesisText,
-    voiceover_text: voiceoverText,
     email_count: newsEmails.length,
     sources_used: sourcesUsed,
     since_timestamp: sinceTimestamp,

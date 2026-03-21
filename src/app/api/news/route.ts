@@ -35,7 +35,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
       latest: {
         timeSlot: latest.time_slot,
         synthesis: latest.synthesis_text,
-        voiceover: latest.voiceover_text || latest.synthesis_text,
+        voiceover: latest.synthesis_text,
         emailCount: latest.email_count,
         sourcesUsed: latest.sources_used,
         generatedAt: latest.generated_at,
