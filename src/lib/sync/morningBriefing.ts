@@ -193,22 +193,26 @@ ${emailSection}`;
 
   await incrementUsage();
 
-  // Pre-generate TTS audio and store in Supabase Storage
-  try {
-    const audioUrl = await generateAndStoreAudio(briefingText, today);
-    if (audioUrl) {
-      await supabase
-        .from('briefing_cache')
-        .update({ audio_url: audioUrl })
-        .eq('date', today);
-      console.log(`[morning-briefing] Audio pre-generated for ${today}`);
+  // Fire-and-forget: TTS audio generation + cleanup run in background
+  // so the cron response returns before the 30s timeout
+  const ttsPromise = (async () => {
+    try {
+      const audioUrl = await generateAndStoreAudio(briefingText, today);
+      if (audioUrl) {
+        await supabase
+          .from('briefing_cache')
+          .update({ audio_url: audioUrl })
+          .eq('date', today);
+        console.log(`[morning-briefing] Audio pre-generated for ${today}`);
+      }
+    } catch (audioErr) {
+      console.error('[morning-briefing] Audio pre-generation failed (non-critical):', audioErr);
     }
-  } catch (audioErr) {
-    console.error('[morning-briefing] Audio pre-generation failed (non-critical):', audioErr);
-  }
+    await cleanupOldDeltas(today);
+  })();
 
-  // Clean up old delta recordings and records from previous days
-  await cleanupOldDeltas(today);
+  // Prevent unhandled rejection if the background task fails
+  ttsPromise.catch(() => {});
 
   return {
     date: today,

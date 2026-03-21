@@ -484,27 +484,28 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
 
     await incrementUsage();
 
-    // Pre-generate TTS audio and store in Supabase Storage
-    let audioUrl: string | null = null;
-    try {
-      audioUrl = await generateAndStoreAudio(voiceoverText, today);
-      if (audioUrl) {
-        // Update briefing_cache with audio URL
-        await supabase
-          .from('briefing_cache')
-          .update({ audio_url: audioUrl })
-          .eq('date', today);
-        console.log(`[briefing] Audio pre-generated and stored for ${today}`);
+    // Fire-and-forget: TTS runs in background so response returns fast
+    const ttsPromise = (async () => {
+      try {
+        const audioUrl = await generateAndStoreAudio(voiceoverText, today);
+        if (audioUrl) {
+          await supabase
+            .from('briefing_cache')
+            .update({ audio_url: audioUrl })
+            .eq('date', today);
+          console.log(`[briefing] Audio pre-generated and stored for ${today}`);
+        }
+      } catch (audioErr) {
+        console.error('[briefing] Audio pre-generation failed (non-critical):', audioErr);
       }
-    } catch (audioErr) {
-      console.error('[briefing] Audio pre-generation failed (non-critical):', audioErr);
-    }
+    })();
+    ttsPromise.catch(() => {});
 
     return NextResponse.json({
       date: today,
       briefing: writtenText,
       voiceover: voiceoverText,
-      audioUrl,
+      audioUrl: null,
       generatedAt: new Date().toISOString(),
       dataSources,
     });
