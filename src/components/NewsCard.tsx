@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
+import { renderMarkdown } from '@/lib/renderMarkdown';
 
 interface SlotData {
   timeSlot: string;
@@ -99,21 +100,7 @@ export default function NewsCard() {
       {expanded && (
         <div
           className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
-          dangerouslySetInnerHTML={{
-            __html: latest.synthesis
-              .replace(
-                /\*\*(.+?)\*\*/g,
-                '<strong class="text-jarvis-text-primary">$1</strong>',
-              )
-              .replace(
-                /##\s?(.+)/g,
-                '<span class="text-jarvis-accent font-medium block mt-4 mb-2">$1</span>',
-              )
-              .replace(
-                /\(([A-Z][A-Za-z0-9\s]+?)\)\s*$/gm,
-                '<span class="text-jarvis-text-muted text-sm">($1)</span>',
-              ),
-          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(latest.synthesis) }}
         />
       )}
     </div>

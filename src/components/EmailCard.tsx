@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
+import { renderMarkdown } from '@/lib/renderMarkdown';
 
 interface EmailData {
   date: string;
@@ -84,9 +85,10 @@ export default function EmailCard() {
       </button>
 
       {expanded && (
-        <div className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line">
-          {data.synthesis}
-        </div>
+        <div
+          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(data.synthesis) }}
+        />
       )}
     </div>
   );

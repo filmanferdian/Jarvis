@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import TTSButton from './TTSButton';
+import { renderMarkdown } from '@/lib/renderMarkdown';
 
 interface DeltaItem {
   id: string;
@@ -184,11 +185,7 @@ export default function BriefingCard() {
           {briefingExpanded && (
             <div
               className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line"
-              dangerouslySetInnerHTML={{
-                __html: data.briefing
-                  .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
-                  .replace(/##\s?(.+)/g, '<span class="text-jarvis-accent font-medium">$1</span>'),
-              }}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(data.briefing) }}
             />
           )}
         </div>
@@ -216,9 +213,10 @@ export default function BriefingCard() {
                 <TTSButton text={delta.delta} audioUrl={delta.audioUrl} />
               </div>
               {deltaExpanded && (
-                <p className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line">
-                  {delta.delta}
-                </p>
+                <div
+                  className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(delta.delta) }}
+                />
               )}
             </div>
           );
