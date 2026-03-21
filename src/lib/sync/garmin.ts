@@ -424,7 +424,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
         : null,
       avg_hr: (act.averageHR as number) ?? null,
       calories: (act.calories as number) ?? null,
-      started_at: act.startTimeGMT ? new Date(act.startTimeGMT as string).toISOString() : null,
+      started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
       raw_json: act,
       last_synced: new Date().toISOString(),
     }));
@@ -856,7 +856,7 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
             : null,
           avg_hr: (act.averageHR as number) ?? null,
           calories: (act.calories as number) ?? null,
-          started_at: act.startTimeGMT ? new Date(act.startTimeGMT as string).toISOString() : null,
+          started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
           raw_json: act,
           last_synced: new Date().toISOString(),
         }));
