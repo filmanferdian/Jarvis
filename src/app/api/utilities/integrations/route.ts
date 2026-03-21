@@ -3,14 +3,15 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 // Expected sync intervals in milliseconds (based on cron-job.org config)
+// Intervals match cron-job.org schedule (updated 2026-03-21)
 const EXPECTED_INTERVALS: Record<string, { label: string; interval_ms: number }> = {
-  'google-calendar': { label: 'Google Calendar', interval_ms: 1 * 60 * 60 * 1000 },
-  'outlook-calendar': { label: 'Outlook Calendar', interval_ms: 1 * 60 * 60 * 1000 },
-  'garmin': { label: 'Garmin Connect', interval_ms: 3 * 60 * 60 * 1000 },
-  'notion-tasks': { label: 'Notion Tasks', interval_ms: 3 * 60 * 60 * 1000 },
-  'email-synthesis': { label: 'Email Synthesis', interval_ms: 6 * 60 * 60 * 1000 },
-  'fitness': { label: 'Fitness Context', interval_ms: 7 * 24 * 60 * 60 * 1000 },
-  'morning-briefing': { label: 'Morning Briefing', interval_ms: 24 * 60 * 60 * 1000 },
+  'google-calendar': { label: 'Google Calendar', interval_ms: 3 * 60 * 60 * 1000 },    // 7am–7pm every 3h
+  'outlook-calendar': { label: 'Outlook Calendar', interval_ms: 3 * 60 * 60 * 1000 },  // 7am–7pm every 3h
+  'garmin': { label: 'Garmin Connect', interval_ms: 6 * 60 * 60 * 1000 },               // 7am, 1pm, 7pm
+  'notion-tasks': { label: 'Notion Tasks', interval_ms: 3 * 60 * 60 * 1000 },           // 7am–7pm every 3h
+  'email-synthesis': { label: 'Email Synthesis', interval_ms: 6 * 60 * 60 * 1000 },     // 7am, 1pm, 7pm
+  'fitness': { label: 'Fitness Context', interval_ms: 7 * 24 * 60 * 60 * 1000 },        // weekly
+  'morning-briefing': { label: 'Morning Briefing', interval_ms: 24 * 60 * 60 * 1000 },  // daily
 };
 
 export const GET = withAuth(async () => {
@@ -20,8 +21,12 @@ export const GET = withAuth(async () => {
       .select('*')
       .order('sync_type');
 
+    // Filter out internal-only sync types (not real integrations)
+    const INTERNAL_SYNC_TYPES = ['garmin-tokens', 'garmin-circuit-breaker'];
+    const visibleRows = (syncRows || []).filter((row) => !INTERNAL_SYNC_TYPES.includes(row.sync_type));
+
     const now = Date.now();
-    const integrations = (syncRows || []).map((row) => {
+    const integrations = visibleRows.map((row) => {
       const config = EXPECTED_INTERVALS[row.sync_type] || {
         label: row.sync_type,
         interval_ms: 24 * 60 * 60 * 1000,
