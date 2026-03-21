@@ -238,7 +238,7 @@ async function extractWithClaude(programContent: string, subpageContents: string
   if (!apiKey) throw new Error('Anthropic API key not configured');
 
   const subpageText = subpageContents.length > 0
-    ? `\n\n--- ACTIVE SUB-PAGES (overrides) ---\n${subpageContents.join('\n\n---\n\n')}`
+    ? `\n\n--- REFERENCE SUB-PAGES ---\n${subpageContents.join('\n\n---\n\n')}`
     : '';
 
   // Compute today's date in WIB for accurate week calculation
@@ -256,7 +256,8 @@ async function extractWithClaude(programContent: string, subpageContents: string
 IMPORTANT RULES:
 1. Today's date is ${todayWib} (WIB timezone).
 2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
-3. Look at the program edit log at the bottom for the latest changes. Sub-pages may override sections of the main program.
+3. Look at the program edit log at the bottom for the latest changes.
+4. Sub-pages are provided as reference context. Only apply Ramadan-specific adjustments (eating window, schedule, macro changes) if Ramadan is currently active based on today's date. Outside of Ramadan, use the standard schedule and eating window from the main program content.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -361,8 +362,25 @@ export interface FitnessSyncResult {
 export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   const timestamp = new Date().toISOString();
 
-  // Check last edit time
+  // Check last edit time (main page + child pages)
   const lastEdited = await fetchPageLastEdited(PROGRAM_PAGE_ID);
+  const childPages = await fetchChildPages();
+  const relevantSubpages = childPages.filter((p) =>
+    p.title.includes('Cardio Adjustments') ||
+    p.title.includes('Ramadan') ||
+    p.title.includes('VO2 Max') ||
+    p.title.includes('Phase')
+  );
+
+  // Build composite edit fingerprint from main page + subpages
+  const subpageEditTimes: string[] = [];
+  for (const sp of relevantSubpages) {
+    try {
+      const edited = await fetchPageLastEdited(sp.id);
+      subpageEditTimes.push(edited);
+    } catch { /* skip */ }
+  }
+  const compositeFingerprintValue = [lastEdited, ...subpageEditTimes.sort()].join('|');
 
   if (!force) {
     const { data: existing } = await supabase
@@ -372,7 +390,7 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
       .limit(1)
       .single();
 
-    if (existing?.notion_last_edited === lastEdited) {
+    if (existing?.notion_last_edited === compositeFingerprintValue) {
       return {
         synced: false,
         skipped: true,
@@ -386,20 +404,12 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   // Fetch program content
   const programContent = await fetchNotionPage(PROGRAM_PAGE_ID);
 
-  // Fetch child pages to detect active sub-pages
-  const childPages = await fetchChildPages();
+  // Build active subpage list for metadata
   const activeSubpages = childPages
     .filter((p) => p.title !== 'Transformation program' && p.title !== 'Checkpoint')
     .map((p) => p.title);
 
-  // Fetch content of active sub-pages (limit to most relevant ones)
-  const relevantSubpages = childPages.filter((p) =>
-    p.title.includes('Cardio Adjustments') ||
-    p.title.includes('Ramadan') ||
-    p.title.includes('VO2 Max') ||
-    p.title.includes('Phase')
-  );
-
+  // Fetch content of relevant sub-pages (limit to most relevant ones)
   const subpageContents: string[] = [];
   for (const sp of relevantSubpages.slice(0, 3)) {
     try {
@@ -432,7 +442,7 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     special_notes: context.special_notes,
     active_subpages: activeSubpages,
     notion_page_id: PROGRAM_PAGE_ID,
-    notion_last_edited: lastEdited,
+    notion_last_edited: compositeFingerprintValue,
     synced_at: timestamp,
   });
 
