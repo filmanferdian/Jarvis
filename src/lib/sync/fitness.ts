@@ -363,11 +363,15 @@ ${subpageText}`;
     });
   } catch { /* non-critical */ }
 
+  // Log raw Claude response for debugging cardio extraction
+  console.log('[fitness] Claude raw cardio excerpt:', rawText.substring(rawText.indexOf('"cardio_schedule"'), rawText.indexOf('"cardio_schedule"') + 500));
+
   // Extract JSON from response
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Failed to extract JSON from Claude response');
 
   const parsed = JSON.parse(jsonMatch[0]) as FitnessContext;
+  console.log('[fitness] Extracted cardio_schedule:', JSON.stringify(parsed.cardio_schedule));
 
   // Sanity check: if extracted week is unreasonably far from today, clamp it
   // Programs are 52 weeks max; current_week shouldn't exceed a reasonable upper bound
@@ -449,6 +453,7 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   for (const sp of relevantSubpages.slice(0, 3)) {
     try {
       const content = await fetchNotionPage(sp.id);
+      console.log(`[fitness] Subpage "${sp.title}" content (first 2000 chars):`, content.substring(0, 2000));
       subpageContents.push(`## ${sp.title}\n${content}`);
     } catch {
       // Skip sub-pages that fail to fetch
