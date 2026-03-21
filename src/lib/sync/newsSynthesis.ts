@@ -203,26 +203,32 @@ These emails were received since ${sinceTimestamp}. Sources are tiered:
 - SECONDARY (supplement): Economic Times, Stockbit
 - CONTEXTUAL (sprinkle in): Crunchbase, DealStreetAsia, McKinsey, F6S
 
-Provide TWO sections:
+VOICE AND TONE:
+Warm but composed, like a trusted advisor delivering a news briefing. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
-## What's Happening Now
-List the 5-7 most significant current events/news stories. For each:
-- **Headline** (one line)
-- Summary (2-3 sentences)
-- Source attribution
+STRUCTURE:
+Use two clear sections with plain text labels on their own line, followed by flowing paragraphs.
 
-Rules: Only promote CONTEXTUAL sources to this section if the story is corroborated by PRIMARY sources. Prioritize geopolitics, markets, tech, macro-economy.
+What's Happening Now
 
-## Relevant to Your Priorities
-List 3-5 stories most relevant to the user's work, projects, and interests. These CAN come from any source tier including DealStreetAsia, Crunchbase, Stockbit. For each:
-- **Headline** (one line)
-- Why it matters to you specifically
-- Source attribution
+Cover the 5-7 most significant current events. Write each story as a short paragraph with a clear topic sentence. Attribute the source naturally in parentheses at the end, e.g. (Bloomberg). Prioritize geopolitics, markets, tech, macro-economy. Only promote CONTEXTUAL sources if corroborated by PRIMARY sources.
 
-Keep total output under 600 words. If insufficient news content, note that and provide what you can. Do not fabricate stories.
+Relevant to Your Priorities
+
+Cover 3-5 stories relevant to the user's work, projects, and interests. These can come from any source tier. Write each as a paragraph explaining why it matters, with source in parentheses at the end.
+
+STRICT RULES:
+- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
+- No bullet points, dashes, or numbered lists.
+- No emdashes. Use commas or periods instead.
+- Write in plain flowing paragraphs only.
+- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Under 500 words total.
+
+Do not fabricate stories. If insufficient news content, note that and provide what you can.
 
 ===VOICEOVER===
-Provide a 3-4 sentence spoken summary in Jarvis's refined British butler tone. Address "Mr. Ferdian" or "sir". Summarize the key developments concisely.
+Provide a 3-4 sentence spoken summary in a warm, composed tone. Address "Mr. Ferdian" or "sir". Summarize the key developments concisely. Write it as natural speech, no written formatting.
 
 --- NEWSLETTERS (${newsEmails.length} emails from ${sourcesUsed.join(', ')}) ---
 

@@ -98,7 +98,7 @@ export default function NewsCard() {
 
       {expanded && (
         <div
-          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line border-l-2 border-jarvis-accent pl-4"
+          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
           dangerouslySetInnerHTML={{
             __html: latest.synthesis
               .replace(
@@ -107,7 +107,11 @@ export default function NewsCard() {
               )
               .replace(
                 /##\s?(.+)/g,
-                '<span class="text-jarvis-accent font-medium">$1</span>',
+                '<span class="text-jarvis-accent font-medium block mt-4 mb-2">$1</span>',
+              )
+              .replace(
+                /\(([A-Z][A-Za-z0-9\s]+?)\)\s*$/gm,
+                '<span class="text-jarvis-text-muted text-sm">($1)</span>',
               ),
           }}
         />

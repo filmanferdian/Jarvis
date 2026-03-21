@@ -52,13 +52,15 @@ Synthesize the following emails received recently for ${today}.
 Generate TWO versions separated by the exact marker ===VOICEOVER=== on its own line.
 
 === VERSION 1: WRITTEN SUMMARY ===
-Direct, scannable. No fluff. Include:
-1. Brief summary (2-3 sentences) of overall email activity
-2. IMPORTANT items needing attention (actions, decisions)
-3. DEADLINES mentioned
-4. Urgent flags
+Write in Filman's natural voice — direct, conversational, personal. Short sentences. Not corporate, not AI-sounding. Think of how a sharp friend would brief you over coffee.
 
-Keep it under 200 words. No markdown.
+Open with 2-3 sentences on overall email activity. Then flow naturally into anything important that needs attention — actions, decisions, deadlines, urgent flags. Group related items together in short paragraphs.
+
+STRICT FORMATTING RULES — violating these is a failure:
+- Do NOT use bullet points, dashes (-), or numbered lists (1. 2. 3.)
+- Do NOT use markdown: no ## headers, no **bold**, no *italic*, no formatting symbols at all
+- Write ONLY in plain flowing paragraphs with line breaks between them
+- Keep it under 200 words
 
 ===VOICEOVER===
 

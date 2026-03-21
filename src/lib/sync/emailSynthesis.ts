@@ -88,13 +88,21 @@ The emails come from multiple inboxes:
 - outlook: Main work email (filman@infinid.id)
 - gmail: Google workspace and personal accounts
 
-Provide:
-1. A brief summary (2-3 sentences) of the overall email activity across all inboxes
-2. List any IMPORTANT items that need attention (action required, decisions needed)
-3. List any DEADLINES mentioned in the emails
-4. Flag anything that looks urgent
+VOICE AND TONE:
+Warm but composed, like a trusted advisor briefing you at the start of the day. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
-Keep it concise and actionable. Under 300 words total.
+STRUCTURE:
+Use clear sections with plain text labels on their own line (e.g. "Overview" or "Needs Attention"). Follow each label with flowing paragraphs. Group related items naturally.
+
+Start with a brief overview of email activity across inboxes. Then cover anything that needs attention: actions, decisions, deadlines, urgent flags.
+
+STRICT RULES:
+- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
+- No bullet points, dashes, or numbered lists.
+- No emdashes. Use commas or periods instead.
+- Write in plain flowing paragraphs only.
+- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Under 500 words total.
 
 --- EMAILS (${allEmails.length} total from ${new Set(allEmails.map(e => e.source)).size} accounts) ---
 
