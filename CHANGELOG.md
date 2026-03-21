@@ -4,6 +4,21 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [2.1.4] — 2026-03-21 (Sprint 12)
+
+### Changed
+- Synthesis writing style: all prompts (briefing, email, news) now use markdown with **bold** section labels, bullet points, and numbered lists
+- News synthesis: stories cross-referenced across all emails with multi-source attribution (e.g. Bloomberg, NYT)
+- News synthesis: narrowed sources to Bloomberg and NYT only, removed tier system
+- News synthesis: removed voiceover section
+
+### Added
+- Shared `renderMarkdown` helper (`src/lib/renderMarkdown.ts`) for consistent markdown-to-HTML across all synthesis cards
+
+### Fixed
+- Markdown not rendering in EmailCard (was plain text), BriefingCard and NewsCard (partial regex only)
+- Morning briefing cron timeout: TTS audio generation now runs in background (fire-and-forget) so response returns within 30s
+
 ## [1.7.0] — 2026-03-19 (Sprint 7)
 
 ### Added

@@ -5,8 +5,10 @@
 Sprint 11 added current events synthesis from newsletter emails and unified all synthesis prompts to natural prose style. Also included Garmin API rate limiting and integration health fixes carried from Sprint 10.
 
 ### Current State
-- **Version:** 2.1.2 deployed on Railway
-- **Synthesis style:** all prompts (email, news, briefing) produce plain text prose — no markdown, no bullets
+- **Version:** 2.1.4 deployed on Railway
+- **Synthesis style:** all prompts use markdown — **bold** section labels, bullet points, numbered lists, rendered via shared `renderMarkdown` helper
+- **News sources:** Bloomberg and NYT only (tier system removed), cross-referenced stories with multi-source attribution
+- **TTS:** audio generation is non-blocking (fire-and-forget) to prevent cron timeouts
 - **Current events:** newsletters automatically distilled into morning briefing
 - **Garmin:** circuit breaker + daily budget to prevent rate limiting
 - **Integration health:** all crons call markSynced, internal types filtered from dashboard
@@ -56,7 +58,7 @@ Sprint 11 added current events synthesis from newsletter emails and unified all 
 
 ## Gotchas
 
-1. **Synthesis prompts are strict about formatting** — any changes to email/news/briefing prompts must maintain the "no markdown, no bullets" rule or TTS will sound robotic reading markup
+1. **Synthesis prompts use markdown** — all three prompts (briefing, email, news) produce markdown. The `renderMarkdown` helper in `src/lib/renderMarkdown.ts` converts to HTML for display. TTS reads from the raw text which may include `**` markers
 2. **Garmin circuit breaker state is in-memory** — resets on Railway redeploy. This is fine since it's a safety mechanism, not persistent state
 3. **Current events synthesis depends on newsletter emails existing** — if no newsletters arrive, the current events section will be empty in the briefing
 4. **`prefers-reduced-motion`** is checked at render time, not reactively — user must reload after toggling OS setting
