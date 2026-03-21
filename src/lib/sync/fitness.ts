@@ -372,7 +372,7 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     p.title.includes('Phase')
   );
 
-  // Build composite edit fingerprint from main page + subpages
+  // Check subpage edit times to detect changes in child pages
   const subpageEditTimes: string[] = [];
   for (const sp of relevantSubpages) {
     try {
@@ -380,24 +380,31 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
       subpageEditTimes.push(edited);
     } catch { /* skip */ }
   }
-  const compositeFingerprintValue = [lastEdited, ...subpageEditTimes.sort()].join('|');
 
   if (!force) {
     const { data: existing } = await supabase
       .from('fitness_context')
-      .select('notion_last_edited')
+      .select('notion_last_edited, synced_at')
       .order('synced_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (existing?.notion_last_edited === compositeFingerprintValue) {
-      return {
-        synced: false,
-        skipped: true,
-        current_week: 0,
-        current_phase: '',
-        timestamp,
-      };
+    if (existing?.notion_last_edited === lastEdited) {
+      // Main page unchanged — also check if any subpage was edited after last sync
+      const lastSynced = existing.synced_at ? new Date(existing.synced_at).getTime() : 0;
+      const subpageChanged = subpageEditTimes.some(
+        (t) => new Date(t).getTime() > lastSynced
+      );
+      if (!subpageChanged) {
+        return {
+          synced: false,
+          skipped: true,
+          current_week: 0,
+          current_phase: '',
+          timestamp,
+        };
+      }
+      console.log('[fitness] Subpage edit detected after last sync, re-syncing');
     }
   }
 
@@ -442,7 +449,7 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     special_notes: context.special_notes,
     active_subpages: activeSubpages,
     notion_page_id: PROGRAM_PAGE_ID,
-    notion_last_edited: compositeFingerprintValue,
+    notion_last_edited: lastEdited,
     synced_at: timestamp,
   });
 
