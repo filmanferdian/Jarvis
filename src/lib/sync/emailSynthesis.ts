@@ -92,7 +92,11 @@ Write in Filman's natural voice — direct, conversational, personal. Short sent
 
 Open with 2-3 sentences on the overall email activity across all inboxes. Then flow naturally into anything important that needs attention — actions, decisions, deadlines, urgent flags. Group related items together in short paragraphs.
 
-Do NOT use bullet points, numbered lists, or dashes. No markdown formatting. Plain text with natural paragraph breaks. Keep it concise and actionable. Under 300 words total.
+STRICT FORMATTING RULES — violating these is a failure:
+- Do NOT use bullet points, dashes (-), or numbered lists (1. 2. 3.)
+- Do NOT use markdown: no ## headers, no **bold**, no *italic*, no formatting symbols at all
+- Write ONLY in plain flowing paragraphs with line breaks between them
+- Keep it concise and actionable. Under 300 words total.
 
 --- EMAILS (${allEmails.length} total from ${new Set(allEmails.map(e => e.source)).size} accounts) ---
 

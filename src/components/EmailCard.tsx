@@ -84,13 +84,9 @@ export default function EmailCard() {
       </button>
 
       {expanded && (
-        <div
-          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
-          dangerouslySetInnerHTML={{
-            __html: data.synthesis
-              .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>'),
-          }}
-        />
+        <div className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line">
+          {data.synthesis}
+        </div>
       )}
     </div>
   );
