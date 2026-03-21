@@ -56,23 +56,28 @@ export const GET = withAuth(async () => {
       return NextResponse.json({ objectives: [], message: 'No OKR targets configured' });
     }
 
-    // Fetch last 7 days of Garmin data for averaging daily metrics
+    // Fetch last 8 days of Garmin data (we exclude today for averages, keep it for latest)
     const { data: garminRows } = await supabase
       .from('garmin_daily')
       .select('*')
       .order('date', { ascending: false })
-      .limit(7);
+      .limit(8);
 
     const latestGarmin = garminRows?.[0] ?? null;
+
+    // Exclude today from averaging — today's data is incomplete (day still in progress)
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const todayWib = new Date(Date.now() + wibOffset).toISOString().split('T')[0];
+    const completedDays = (garminRows ?? []).filter((r) => r.date !== todayWib).slice(0, 7);
 
     // Metrics that should use 7-day average (daily fluctuating values)
     const AVERAGED_METRICS = ['resting_hr', 'steps', 'sleep_duration_seconds', 'stress_level', 'body_battery', 'hrv_7d_avg'];
 
-    // Compute 7-day averages for daily metrics
+    // Compute 7-day averages for daily metrics (excluding today)
     const garmin7dAvg: Record<string, number | null> = {};
-    if (garminRows && garminRows.length > 0) {
+    if (completedDays.length > 0) {
       for (const col of AVERAGED_METRICS) {
-        const values = garminRows
+        const values = completedDays
           .map((r) => r[col] as number | null)
           .filter((v): v is number => v != null);
         garmin7dAvg[col] = values.length > 0
