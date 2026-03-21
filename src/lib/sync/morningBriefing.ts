@@ -127,9 +127,6 @@ STRICT RULES:
 - Section labels should be a single plain text line, followed by a blank line, then paragraphs.
 - Under 500 words total for the written briefing.
 
-===VOICEOVER===
-After the written briefing, provide a 3-4 sentence spoken version. Warm, composed tone. Address "sir" naturally. Summarize the day's priorities concisely. Write it as natural speech, no written formatting.
-
 --- TODAY'S CALENDAR ---
 ${calendarSection}
 
@@ -165,10 +162,7 @@ ${emailSection}`;
   const claudeData = await claudeRes.json();
   const fullText = claudeData.content?.[0]?.text || 'Unable to generate briefing';
 
-  // Split written briefing from voiceover
-  const parts = fullText.split('===VOICEOVER===');
-  const briefingText = parts[0].trim();
-  const voiceoverText = parts[1]?.trim() || briefingText;
+  const briefingText = fullText;
 
   // Track Claude API usage
   try {
@@ -202,7 +196,7 @@ ${emailSection}`;
 
   // Pre-generate TTS audio and store in Supabase Storage
   try {
-    const audioUrl = await generateAndStoreAudio(voiceoverText, today);
+    const audioUrl = await generateAndStoreAudio(briefingText, today);
     if (audioUrl) {
       await supabase
         .from('briefing_cache')
