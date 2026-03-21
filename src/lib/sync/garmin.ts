@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 // --- Rate limiting constants ---
 const GARMIN_DAILY_CALL_BUDGET = 50;
 const GARMIN_COOLDOWN_DEFAULT_MS = 6 * 60 * 60 * 1000; // 6h default
-const GARMIN_MAX_BACKFILL_PER_RUN = 2;    // was 5
+const GARMIN_MAX_BACKFILL_PER_RUN = 0;    // disabled — building data forward from Mar 16
 const GARMIN_BACKFILL_DELAY_MS = 5000;    // was 2000
 const GARMIN_MAX_CONSECUTIVE_FAILURES = 3;
 const GARMIN_LOGIN_RETRIES = 1;           // was 3
