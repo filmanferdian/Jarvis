@@ -285,7 +285,7 @@ IMPORTANT RULES:
 2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
 3. Look at the program edit log at the bottom for the latest changes.
 4. Sub-pages are provided as reference context. Only apply Ramadan-specific adjustments (eating window, schedule, macro changes) if Ramadan is currently active based on today's date. Outside of Ramadan, use the standard schedule and eating window from the main program content.
-5. The cardio schedule varies by week. Look for a weekly cardio table (e.g. "WEEKS 1-12 CARDIO SCHEDULE") and extract the cardio values specifically from Week ${currentWeek}'s row. Map the columns to days accordingly (e.g. "Mon-Fri Walk" → monday-friday, "Wed Run" → wednesday, "Sat Run" → saturday, "Sun Walk" → sunday).
+5. The cardio schedule varies by week. Look for the "WEEKS 1-12 CARDIO SCHEDULE" table — it has columns for each day (Mon, Tue, Wed, Thu, Fri, Sat, Sun). Extract cardio values from Week ${currentWeek}'s row and map each column to the corresponding day in cardio_schedule.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -363,15 +363,11 @@ ${subpageText}`;
     });
   } catch { /* non-critical */ }
 
-  // Log raw Claude response for debugging cardio extraction
-  console.log('[fitness] Claude raw cardio excerpt:', rawText.substring(rawText.indexOf('"cardio_schedule"'), rawText.indexOf('"cardio_schedule"') + 500));
-
   // Extract JSON from response
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Failed to extract JSON from Claude response');
 
   const parsed = JSON.parse(jsonMatch[0]) as FitnessContext;
-  console.log('[fitness] Extracted cardio_schedule:', JSON.stringify(parsed.cardio_schedule));
 
   // Sanity check: if extracted week is unreasonably far from today, clamp it
   // Programs are 52 weeks max; current_week shouldn't exceed a reasonable upper bound
@@ -398,7 +394,6 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   const lastEdited = await fetchPageLastEdited(PROGRAM_PAGE_ID);
   const childPages = await fetchChildPages();
   const relevantSubpages = childPages.filter((p) =>
-    p.title.includes('Cardio Adjustments') ||
     p.title.includes('Ramadan') ||
     p.title.includes('VO2 Max') ||
     p.title.includes('Phase')
@@ -453,7 +448,6 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   for (const sp of relevantSubpages.slice(0, 3)) {
     try {
       const content = await fetchNotionPage(sp.id);
-      console.log(`[fitness] Subpage "${sp.title}" content (first 2000 chars):`, content.substring(0, 2000));
       subpageContents.push(`## ${sp.title}\n${content}`);
     } catch {
       // Skip sub-pages that fail to fetch
