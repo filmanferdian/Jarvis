@@ -203,21 +203,25 @@ These emails were received since ${sinceTimestamp}. Sources are tiered:
 - SECONDARY (supplement): Economic Times, Stockbit
 - CONTEXTUAL (sprinkle in): Crunchbase, DealStreetAsia, McKinsey, F6S
 
-Provide TWO sections:
+Provide TWO sections. Direct, scannable. No fluff.
 
 ## What's Happening Now
-List the 5-7 most significant current events/news stories. For each:
-- **Headline** (one line)
-- Summary (2-3 sentences)
-- Source attribution
+Cover the 5-7 most significant current events. Write each story as:
 
-Rules: Only promote CONTEXTUAL sources to this section if the story is corroborated by PRIMARY sources. Prioritize geopolitics, markets, tech, macro-economy.
+**Headline on one line**
+A 2-3 sentence summary paragraph. Attribute the source naturally at the end in parentheses, e.g. (Bloomberg).
+
+Do NOT use bullet points, dashes, or lists. No bold or italic on source names. Keep it direct and scannable.
+
+Rules: Only promote CONTEXTUAL sources if corroborated by PRIMARY sources. Prioritize geopolitics, markets, tech, macro-economy.
 
 ## Relevant to Your Priorities
-List 3-5 stories most relevant to the user's work, projects, and interests. These CAN come from any source tier including DealStreetAsia, Crunchbase, Stockbit. For each:
-- **Headline** (one line)
-- Why it matters to you specifically
-- Source attribution
+Cover 3-5 stories relevant to the user's work, projects, and interests. These CAN come from any source tier including DealStreetAsia, Crunchbase, Stockbit. Write each story as:
+
+**Headline on one line**
+A paragraph explaining why it matters, with source in parentheses at the end. (Source)
+
+Do NOT use bullet points, dashes, or lists. No bold or italic on source names.
 
 Keep total output under 600 words. If insufficient news content, note that and provide what you can. Do not fabricate stories.
 
