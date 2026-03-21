@@ -258,6 +258,7 @@ IMPORTANT RULES:
 2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
 3. Look at the program edit log at the bottom for the latest changes.
 4. Sub-pages are provided as reference context. Only apply Ramadan-specific adjustments (eating window, schedule, macro changes) if Ramadan is currently active based on today's date. Outside of Ramadan, use the standard schedule and eating window from the main program content.
+5. The cardio schedule varies by week. Look for a weekly cardio table (e.g. "WEEKS 1-12 CARDIO SCHEDULE") and extract the cardio values specifically from Week ${currentWeek}'s row. Map the columns to days accordingly (e.g. "Mon-Fri Walk" → monday-friday, "Wed Run" → wednesday, "Sat Run" → saturday, "Sun Walk" → sunday).
 
 Return ONLY valid JSON matching this exact structure:
 {
