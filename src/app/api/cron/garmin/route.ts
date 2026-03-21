@@ -18,11 +18,11 @@ export const GET = withCronAuth(async (_req: NextRequest) => {
   } catch (err) {
     const errorMsg = err instanceof Error
       ? `${err.message}${err.stack ? '\n' + err.stack.split('\n').slice(1, 3).join('\n') : ''}`
-      : String(err);
+      : typeof err === 'object' ? JSON.stringify(err) : String(err);
     console.error('Cron: Garmin sync error:', errorMsg);
 
     // If blocked, return 200 to prevent cron-job.org from retrying
-    const errStr = String(err);
+    const errStr = err instanceof Error ? err.message : typeof err === 'object' ? JSON.stringify(err) : String(err);
     if (errStr.includes('blocked') || errStr.includes('budget exceeded')) {
       await markSynced('garmin', 'success', 0, `skipped: ${errStr.slice(0, 500)}`);
       return NextResponse.json({ skipped: true, reason: errStr.slice(0, 500) });
