@@ -92,16 +92,15 @@ VOICE AND TONE:
 Warm but composed, like a trusted advisor briefing you at the start of the day. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
 STRUCTURE:
-Use clear sections with plain text labels on their own line (e.g. "Overview" or "Needs Attention"). Follow each label with flowing paragraphs. Group related items naturally.
+Use markdown formatting. Section labels should be **bold** on their own line. Use bullet points (- ) for listing items that need attention. Separate each section with one blank line.
 
-Start with a brief overview of email activity across inboxes. Then cover anything that needs attention: actions, decisions, deadlines, urgent flags.
+Start with a brief **Overview** of email activity across inboxes. Then cover anything under **Needs Attention**: actions, decisions, deadlines, urgent flags. Use bullet points to list individual items clearly.
 
-STRICT RULES:
-- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
-- No bullet points, dashes, or numbered lists.
+FORMATTING RULES:
+- Use markdown: **bold** for section labels, bullet points for actionable items.
 - No emdashes. Use commas or periods instead.
-- Write in plain flowing paragraphs only.
-- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Separate each section with one blank line for readability.
+- Mix flowing paragraphs with bullet lists as appropriate.
 - Under 500 words total.
 
 --- EMAILS (${allEmails.length} total from ${new Set(allEmails.map(e => e.source)).size} accounts) ---
