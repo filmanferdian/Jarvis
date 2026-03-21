@@ -203,30 +203,32 @@ These emails were received since ${sinceTimestamp}. Sources are tiered:
 - SECONDARY (supplement): Economic Times, Stockbit
 - CONTEXTUAL (sprinkle in): Crunchbase, DealStreetAsia, McKinsey, F6S
 
-Provide TWO sections. Direct, scannable. No fluff.
+VOICE AND TONE:
+Warm but composed, like a trusted advisor delivering a news briefing. Direct, personal, conversational. Short sentences. No corporate speak, no AI-sounding language.
 
-## What's Happening Now
-Cover the 5-7 most significant current events. Write each story as:
+STRUCTURE:
+Use two clear sections with plain text labels on their own line, followed by flowing paragraphs.
 
-**Headline on one line**
-A 2-3 sentence summary paragraph. Attribute the source naturally at the end in parentheses, e.g. (Bloomberg).
+What's Happening Now
 
-Do NOT use bullet points, dashes, or lists. No bold or italic on source names. Keep it direct and scannable.
+Cover the 5-7 most significant current events. Write each story as a short paragraph with a clear topic sentence. Attribute the source naturally in parentheses at the end, e.g. (Bloomberg). Prioritize geopolitics, markets, tech, macro-economy. Only promote CONTEXTUAL sources if corroborated by PRIMARY sources.
 
-Rules: Only promote CONTEXTUAL sources if corroborated by PRIMARY sources. Prioritize geopolitics, markets, tech, macro-economy.
+Relevant to Your Priorities
 
-## Relevant to Your Priorities
-Cover 3-5 stories relevant to the user's work, projects, and interests. These CAN come from any source tier including DealStreetAsia, Crunchbase, Stockbit. Write each story as:
+Cover 3-5 stories relevant to the user's work, projects, and interests. These can come from any source tier. Write each as a paragraph explaining why it matters, with source in parentheses at the end.
 
-**Headline on one line**
-A paragraph explaining why it matters, with source in parentheses at the end. (Source)
+STRICT RULES:
+- No markdown whatsoever. No ## headers, no **bold**, no *italic*, no formatting symbols.
+- No bullet points, dashes, or numbered lists.
+- No emdashes. Use commas or periods instead.
+- Write in plain flowing paragraphs only.
+- Section labels should be a single plain text line, followed by a blank line, then paragraphs.
+- Under 500 words total.
 
-Do NOT use bullet points, dashes, or lists. No bold or italic on source names.
-
-Keep total output under 600 words. If insufficient news content, note that and provide what you can. Do not fabricate stories.
+Do not fabricate stories. If insufficient news content, note that and provide what you can.
 
 ===VOICEOVER===
-Provide a 3-4 sentence spoken summary in Jarvis's refined British butler tone. Address "Mr. Ferdian" or "sir". Summarize the key developments concisely.
+Provide a 3-4 sentence spoken summary in a warm, composed tone. Address "Mr. Ferdian" or "sir". Summarize the key developments concisely. Write it as natural speech, no written formatting.
 
 --- NEWSLETTERS (${newsEmails.length} emails from ${sourcesUsed.join(', ')}) ---
 
