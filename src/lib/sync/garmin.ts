@@ -83,9 +83,10 @@ interface CircuitBreakerState {
   blocked_until: string;
   reason: string;
   set_at: string;
+  failure_count: number;
 }
 
-export async function isGarminBlocked(): Promise<{ blocked: boolean; reason: string; blockedUntil: string | null }> {
+export async function isGarminBlocked(): Promise<{ blocked: boolean; reason: string; blockedUntil: string | null; failureCount: number }> {
   const { data } = await supabase
     .from('sync_status')
     .select('last_result, last_error')
@@ -93,30 +94,51 @@ export async function isGarminBlocked(): Promise<{ blocked: boolean; reason: str
     .single();
 
   if (!data || data.last_result !== 'blocked') {
-    return { blocked: false, reason: '', blockedUntil: null };
+    return { blocked: false, reason: '', blockedUntil: null, failureCount: 0 };
   }
 
   try {
     const state = JSON.parse(data.last_error) as CircuitBreakerState;
     const blockedUntil = new Date(state.blocked_until);
     if (blockedUntil > new Date()) {
-      return { blocked: true, reason: state.reason, blockedUntil: state.blocked_until };
+      return { blocked: true, reason: state.reason, blockedUntil: state.blocked_until, failureCount: state.failure_count ?? 1 };
     }
-    // Expired — auto-clear
-    await clearGarminBlock();
-    return { blocked: false, reason: '', blockedUntil: null };
+    // Expired — don't clear failure count yet, only clear on successful sync
+    await supabase.from('sync_status').upsert(
+      { sync_type: 'garmin-circuit-breaker', last_synced_at: new Date().toISOString(), last_result: 'clear', last_error: JSON.stringify({ failure_count: state.failure_count ?? 0 }) },
+      { onConflict: 'sync_type' },
+    );
+    return { blocked: false, reason: '', blockedUntil: null, failureCount: state.failure_count ?? 0 };
   } catch {
-    return { blocked: false, reason: '', blockedUntil: null };
+    return { blocked: false, reason: '', blockedUntil: null, failureCount: 0 };
   }
 }
 
 async function setGarminBlocked(reason: string, cooldownMs?: number): Promise<void> {
-  const effectiveCooldown = cooldownMs ?? GARMIN_COOLDOWN_DEFAULT_MS;
-  const blockedUntil = new Date(Date.now() + effectiveCooldown).toISOString();
+  // Read previous failure count for exponential backoff
+  let previousFailures = 0;
+  try {
+    const { data: existing } = await supabase
+      .from('sync_status')
+      .select('last_error')
+      .eq('sync_type', 'garmin-circuit-breaker')
+      .single();
+    if (existing?.last_error) {
+      const prev = JSON.parse(existing.last_error) as CircuitBreakerState;
+      previousFailures = prev.failure_count ?? 0;
+    }
+  } catch { /* first time — no previous state */ }
+
+  const failureCount = previousFailures + 1;
+  // Exponential backoff: 6h, 12h, 24h, 48h (capped)
+  const baseCooldown = cooldownMs ?? GARMIN_COOLDOWN_DEFAULT_MS;
+  const escalatedCooldown = Math.min(baseCooldown * Math.pow(2, previousFailures), 48 * 60 * 60 * 1000);
+  const blockedUntil = new Date(Date.now() + escalatedCooldown).toISOString();
   const state: CircuitBreakerState = {
     blocked_until: blockedUntil,
     reason,
     set_at: new Date().toISOString(),
+    failure_count: failureCount,
   };
   await supabase.from('sync_status').upsert(
     {
@@ -127,7 +149,7 @@ async function setGarminBlocked(reason: string, cooldownMs?: number): Promise<vo
     },
     { onConflict: 'sync_type' },
   );
-  console.log(`[garmin] Circuit breaker OPEN: blocked until ${blockedUntil} (reason: ${reason})`);
+  console.log(`[garmin] Circuit breaker OPEN: blocked until ${blockedUntil} (reason: ${reason}, failure #${failureCount}, cooldown: ${Math.round(escalatedCooldown / 3600000)}h)`);
 }
 
 export async function clearGarminBlock(): Promise<void> {
@@ -421,8 +443,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   // Prune records older than 56 days
   await pruneOldRecords();
 
-  // Refresh cached tokens after successful sync
+  // Refresh cached tokens and reset circuit breaker failure count after successful sync
   await saveCachedTokens(client);
+  await clearGarminBlock();
 
   // --- Incremental historical backfill (reduced to 2 days per run) ---
   let historicalSynced = 0;
