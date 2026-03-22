@@ -5,11 +5,12 @@ import { supabase } from '@/lib/supabase';
 // GET: Today's fitness context for dashboard + briefing
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
-    // WIB today
+    // WIB today — use native timezone for day-of-week, manual offset for date string
     const now = new Date();
     const wibOffset = 7 * 60 * 60 * 1000;
     const wibDate = new Date(now.getTime() + wibOffset);
-    const dayOfWeek = wibDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();
+    // Use raw Date (not manually offset) with timezone parameter to avoid double offset
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();
 
     // Fetch fitness context (single row)
     const { data: ctx } = await supabase
