@@ -31,8 +31,8 @@ export const GET = withAuth(async (_req: NextRequest) => {
 
     // Latest slot with meaningful content (skip empty slots)
     const latest = data.find((d) => d.synthesis_text && d.synthesis_text.length > 100) ?? data[0];
-    // Previous meaningful slot (different from latest)
-    const previous = data.find((d) => d.generated_at !== latest.generated_at && d.synthesis_text && d.synthesis_text.length > 100) ?? null;
+    // Previous: first meaningful slot from a DIFFERENT date than today
+    const previous = data.find((d) => d.date !== today && d.synthesis_text && d.synthesis_text.length > 100) ?? null;
 
     return NextResponse.json({
       date: today,

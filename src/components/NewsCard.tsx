@@ -68,6 +68,10 @@ export default function NewsCard() {
 
   const { latest } = data;
   const slotLabel = SLOT_LABELS[latest.timeSlot] || latest.timeSlot;
+  // Filter today's non-empty slots (skip the latest which is shown expanded)
+  const olderSlots = data.slots.filter(
+    (s) => s.generatedAt !== latest.generatedAt && s.synthesis.length > 100
+  );
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
@@ -111,17 +115,20 @@ export default function NewsCard() {
             className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(latest.synthesis) }}
           />
-          {data.previous?.synthesis && (
-            <details className="mt-4 border-t border-jarvis-border pt-3">
+
+          {/* Older today's slots */}
+          {olderSlots.map((slot) => (
+            <details key={slot.timeSlot} className="mt-4 border-t border-jarvis-border pt-3">
               <summary className="text-sm text-jarvis-text-muted cursor-pointer hover:text-jarvis-text-secondary transition-colors">
-                Previous · {SLOT_LABELS[data.previous.timeSlot] || data.previous.timeSlot} · {new Date(data.previous.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {SLOT_LABELS[slot.timeSlot] || slot.timeSlot}
               </summary>
               <div
                 className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line opacity-80"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(data.previous.synthesis) }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(slot.synthesis) }}
               />
             </details>
-          )}
+          ))}
+
         </>
       )}
     </div>

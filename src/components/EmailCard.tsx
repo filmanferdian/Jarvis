@@ -5,8 +5,18 @@ import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import { renderMarkdown } from '@/lib/renderMarkdown';
 
+interface SlotData {
+  timeSlot: string;
+  label: string;
+  synthesis: string;
+  importantCount?: number;
+  deadlineCount?: number;
+  createdAt?: string;
+}
+
 interface PreviousSynthesis {
   date: string;
+  timeSlot: string;
   synthesis: string;
   importantCount?: number;
   createdAt?: string;
@@ -15,12 +25,20 @@ interface PreviousSynthesis {
 interface EmailData {
   date: string;
   synthesis: string | null;
+  timeSlot?: string;
   importantCount?: number;
   deadlineCount?: number;
   createdAt?: string;
+  slots?: SlotData[];
   previous?: PreviousSynthesis | null;
   message?: string;
 }
+
+const SLOT_LABELS: Record<string, string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+};
 
 export default function EmailCard() {
   const { data, loading } = usePolling<EmailData>(
@@ -54,6 +72,11 @@ export default function EmailCard() {
     );
   }
 
+  const slots = data.slots ?? [];
+  // The latest slot is shown expanded by default; older slots are collapsible
+  const latestSlot = slots.length > 0 ? slots[0] : null;
+  const olderSlots = slots.slice(1);
+
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
@@ -61,6 +84,11 @@ export default function EmailCard() {
           Email Digest
         </h2>
         <div className="flex items-center gap-3">
+          {latestSlot && (
+            <span className="text-sm font-mono text-jarvis-accent">
+              {latestSlot.label}
+            </span>
+          )}
           {(data.importantCount ?? 0) > 0 && (
             <span className="text-sm font-mono text-jarvis-warn">
               {data.importantCount} important
@@ -94,21 +122,25 @@ export default function EmailCard() {
 
       {expanded && (
         <>
+          {/* Latest slot */}
           <div
             className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(data.synthesis) }}
           />
-          {data.previous?.synthesis && (
-            <details className="mt-4 border-t border-jarvis-border pt-3">
+
+          {/* Older today's slots */}
+          {olderSlots.map((slot) => (
+            <details key={slot.timeSlot} className="mt-4 border-t border-jarvis-border pt-3">
               <summary className="text-sm text-jarvis-text-muted cursor-pointer hover:text-jarvis-text-secondary transition-colors">
-                Previous · {new Date(data.previous.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {slot.label}
               </summary>
               <div
                 className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line opacity-80"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(data.previous.synthesis) }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(slot.synthesis) }}
               />
             </details>
-          )}
+          ))}
+
         </>
       )}
     </div>

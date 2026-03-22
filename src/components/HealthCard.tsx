@@ -328,7 +328,7 @@ export default function HealthCard() {
                 </span>
               )}
               <span className="text-base font-semibold text-jarvis-text-primary">
-                {weight.current.weight_kg} kg
+                {(Math.round(weight.current.weight_kg * 10) / 10).toFixed(1)} kg
               </span>
             </div>
           </div>

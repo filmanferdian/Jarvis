@@ -139,20 +139,23 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
     /deadline|due|by (monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|end of)/gi,
   );
 
-  // Use WIB date
+  // Use WIB date and time slot
   const now = new Date();
   const wibOffset = 7 * 60 * 60 * 1000;
   const wibDate = new Date(now.getTime() + wibOffset);
   const dateStr = wibDate.toISOString().split('T')[0];
-
-  // Delete existing entry for today, then insert fresh
-  await supabase.from('email_synthesis').delete().eq('date', dateStr);
+  const wibHour = wibDate.getUTCHours();
+  const timeSlot = wibHour >= 5 && wibHour < 11 ? 'morning' : wibHour >= 11 && wibHour < 17 ? 'afternoon' : 'evening';
 
   const importantCount = importantMatch ? Math.min(importantMatch.length, 10) : 0;
   const deadlineCount = deadlineMatch ? Math.min(deadlineMatch.length, 10) : 0;
 
+  // Upsert by date + time_slot (keeps all 3 daily pulls)
+  await supabase.from('email_synthesis').delete().eq('date', dateStr).eq('time_slot', timeSlot);
+
   const { error: dbError } = await supabase.from('email_synthesis').insert({
     date: dateStr,
+    time_slot: timeSlot,
     synthesis_text: synthesisText,
     important_count: importantCount,
     deadline_count: deadlineCount,
