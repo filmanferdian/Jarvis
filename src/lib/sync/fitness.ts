@@ -284,7 +284,7 @@ IMPORTANT RULES:
 1. Today's date is ${todayWib} (WIB timezone).
 2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
 3. Look at the program edit log at the bottom for the latest changes.
-4. Sub-pages are provided as reference context. Only apply Ramadan-specific adjustments (eating window, schedule, macro changes) if Ramadan is currently active based on today's date. Outside of Ramadan, use the standard schedule and eating window from the main program content.
+4. The default eating window is 12:00 to 20:00 (12pm to 8pm). Always use this unless the program content explicitly states a different window for the current date.
 5. The cardio schedule varies by week. Look for the "WEEKS 1-12 CARDIO SCHEDULE" table — it has columns for each day (Mon, Tue, Wed, Thu, Fri, Sat, Sun). Extract cardio values from Week ${currentWeek}'s row and map each column to the corresponding day in cardio_schedule.
 
 Return ONLY valid JSON matching this exact structure:
@@ -394,7 +394,6 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   const lastEdited = await fetchPageLastEdited(PROGRAM_PAGE_ID);
   const childPages = await fetchChildPages();
   const relevantSubpages = childPages.filter((p) =>
-    p.title.includes('Ramadan') ||
     p.title.includes('VO2 Max') ||
     p.title.includes('Phase')
   );
