@@ -40,8 +40,11 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const weeksToDeload = ctx.next_deload_week ? ctx.next_deload_week - ctx.current_week : null;
     const isDeloadWeek = ctx.current_week === ctx.next_deload_week;
 
+    const today = wibDate.toISOString().split('T')[0];
+
     return NextResponse.json({
       available: true,
+      date: today,
       day: dayOfWeek,
       current_week: ctx.current_week,
       current_phase: ctx.current_phase,
@@ -57,6 +60,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
       next_deload_week: ctx.next_deload_week,
       weeks_to_deload: weeksToDeload,
       daily_habits: ctx.daily_habits,
+      steps_target: ctx.steps_target || 10000,
       special_notes: ctx.special_notes,
       synced_at: ctx.synced_at,
     });
