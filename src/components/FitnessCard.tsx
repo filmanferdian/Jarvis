@@ -101,11 +101,6 @@ export default function FitnessCard() {
                 Deload
               </span>
             )}
-            {next_deload_week && weeks_to_deload != null && weeks_to_deload > 0 && !is_deload_week && (
-              <span className="text-xs text-jarvis-text-dim">
-                Deload W{next_deload_week}
-              </span>
-            )}
             <span className="text-sm text-jarvis-text-dim">
               Week {current_week} · {current_phase}
             </span>
