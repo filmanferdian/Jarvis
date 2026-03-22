@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
-// GET: Fetch Notion tasks (due today or this week, ordered by priority)
+// GET: Fetch Notion tasks (due within 3 days: today, tomorrow, day after)
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
     // Use WIB timezone (UTC+7)
@@ -11,16 +11,15 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const wibDate = new Date(now.getTime() + wibOffset);
     const today = wibDate.toISOString().split('T')[0];
 
-    // End of this week (Sunday)
-    const dayOfWeek = wibDate.getDay();
-    const endOfWeek = new Date(wibDate);
-    endOfWeek.setDate(wibDate.getDate() + (7 - dayOfWeek));
-    const weekEnd = endOfWeek.toISOString().split('T')[0];
+    // 3-day window: today + 2 days
+    const horizon = new Date(wibDate);
+    horizon.setDate(wibDate.getDate() + 2);
+    const horizonEnd = horizon.toISOString().split('T')[0];
 
     const { data, error } = await supabase
       .from('notion_tasks')
       .select('*')
-      .lte('due_date', weekEnd)
+      .lte('due_date', horizonEnd)
       .not('status', 'in', '("Done","Archived")')
       .order('due_date', { ascending: true });
 

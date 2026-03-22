@@ -136,7 +136,7 @@ export default function TasksCard() {
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[15px] font-medium text-jarvis-text-primary">
-          Tasks This Week
+          Tasks
         </h2>
         <div className="flex items-center gap-2">
           <span className="text-sm text-jarvis-text-dim font-mono">
@@ -204,7 +204,7 @@ export default function TasksCard() {
       )}
 
       {tasks.length === 0 ? (
-        <p className="text-base text-jarvis-text-dim">No tasks due this week.</p>
+        <p className="text-base text-jarvis-text-dim">No tasks due in the next 3 days.</p>
       ) : (
         <div className="space-y-4">
           {overdueTasks.length > 0 && (
