@@ -11,11 +11,12 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const wibDate = new Date(now.getTime() + wibOffset);
     const today = wibDate.toISOString().split('T')[0];
 
+    // Fetch recent news syntheses across dates (not just today)
     const { data, error } = await supabase
       .from('news_synthesis')
       .select('*')
-      .eq('date', today)
-      .order('generated_at', { ascending: false });
+      .order('generated_at', { ascending: false })
+      .limit(10);
 
     if (error) throw error;
 
@@ -28,7 +29,10 @@ export const GET = withAuth(async (_req: NextRequest) => {
       });
     }
 
-    const latest = data[0];
+    // Latest slot with meaningful content (skip empty slots)
+    const latest = data.find((d) => d.synthesis_text && d.synthesis_text.length > 100) ?? data[0];
+    // Previous meaningful slot (different from latest)
+    const previous = data.find((d) => d.generated_at !== latest.generated_at && d.synthesis_text && d.synthesis_text.length > 100) ?? null;
 
     return NextResponse.json({
       date: today,
@@ -40,7 +44,13 @@ export const GET = withAuth(async (_req: NextRequest) => {
         sourcesUsed: latest.sources_used,
         generatedAt: latest.generated_at,
       },
-      slots: data.map((d) => ({
+      previous: previous ? {
+        date: previous.date,
+        timeSlot: previous.time_slot,
+        synthesis: previous.synthesis_text,
+        generatedAt: previous.generated_at,
+      } : null,
+      slots: data.filter((d) => d.date === today).map((d) => ({
         timeSlot: d.time_slot,
         synthesis: d.synthesis_text,
         emailCount: d.email_count,

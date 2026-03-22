@@ -5,12 +5,20 @@ import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import { renderMarkdown } from '@/lib/renderMarkdown';
 
+interface PreviousSynthesis {
+  date: string;
+  synthesis: string;
+  importantCount?: number;
+  createdAt?: string;
+}
+
 interface EmailData {
   date: string;
   synthesis: string | null;
   importantCount?: number;
   deadlineCount?: number;
   createdAt?: string;
+  previous?: PreviousSynthesis | null;
   message?: string;
 }
 
@@ -85,10 +93,23 @@ export default function EmailCard() {
       </button>
 
       {expanded && (
-        <div
-          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(data.synthesis) }}
-        />
+        <>
+          <div
+            className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(data.synthesis) }}
+          />
+          {data.previous?.synthesis && (
+            <details className="mt-4 border-t border-jarvis-border pt-3">
+              <summary className="text-sm text-jarvis-text-muted cursor-pointer hover:text-jarvis-text-secondary transition-colors">
+                Previous · {new Date(data.previous.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </summary>
+              <div
+                className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line opacity-80"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(data.previous.synthesis) }}
+              />
+            </details>
+          )}
+        </>
       )}
     </div>
   );

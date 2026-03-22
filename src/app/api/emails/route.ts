@@ -11,17 +11,16 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const wibDate = new Date(now.getTime() + wibOffset);
     const today = wibDate.toISOString().split('T')[0];
 
+    // Fetch 2 most recent syntheses (current + previous period)
     const { data, error } = await supabase
       .from('email_synthesis')
       .select('*')
-      .eq('date', today)
-      .single();
+      .order('date', { ascending: false })
+      .limit(2);
 
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    if (error) throw error;
 
-    if (!data) {
+    if (!data || data.length === 0) {
       return NextResponse.json({
         date: today,
         synthesis: null,
@@ -29,13 +28,22 @@ export const GET = withAuth(async (_req: NextRequest) => {
       });
     }
 
+    const latest = data[0];
+    const previous = data.length > 1 ? data[1] : null;
+
     return NextResponse.json({
       date: today,
-      synthesis: data.synthesis_text,
-      voiceover: data.voiceover_text || data.synthesis_text,
-      importantCount: data.important_count,
-      deadlineCount: data.deadline_count,
-      createdAt: data.created_at,
+      synthesis: latest.synthesis_text,
+      voiceover: latest.voiceover_text || latest.synthesis_text,
+      importantCount: latest.important_count,
+      deadlineCount: latest.deadline_count,
+      createdAt: latest.created_at,
+      previous: previous ? {
+        date: previous.date,
+        synthesis: previous.synthesis_text,
+        importantCount: previous.important_count,
+        createdAt: previous.created_at,
+      } : null,
     });
   } catch {
     return NextResponse.json(

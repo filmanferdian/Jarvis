@@ -13,9 +13,17 @@ interface SlotData {
   generatedAt: string;
 }
 
+interface PreviousSlot {
+  date: string;
+  timeSlot: string;
+  synthesis: string;
+  generatedAt: string;
+}
+
 interface NewsData {
   date: string;
   latest: SlotData | null;
+  previous?: PreviousSlot | null;
   slots: SlotData[];
   message?: string;
 }
@@ -98,10 +106,23 @@ export default function NewsCard() {
       </button>
 
       {expanded && (
-        <div
-          className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(latest.synthesis) }}
-        />
+        <>
+          <div
+            className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(latest.synthesis) }}
+          />
+          {data.previous?.synthesis && (
+            <details className="mt-4 border-t border-jarvis-border pt-3">
+              <summary className="text-sm text-jarvis-text-muted cursor-pointer hover:text-jarvis-text-secondary transition-colors">
+                Previous · {SLOT_LABELS[data.previous.timeSlot] || data.previous.timeSlot} · {new Date(data.previous.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </summary>
+              <div
+                className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line opacity-80"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(data.previous.synthesis) }}
+              />
+            </details>
+          )}
+        </>
       )}
     </div>
   );
