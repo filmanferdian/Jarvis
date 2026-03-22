@@ -86,7 +86,19 @@ export default function KpiRow() {
     5 * 60 * 1000
   );
 
-  const kpis = data?.kpis ?? [];
+  // Display order — only these KPIs are shown, in this exact sequence
+  const DISPLAY_ORDER = [
+    'Training Readiness',
+    'Sleep Score',
+    'Resting Heart Rate',
+    'HRV 7d Average',
+    'Daily Steps',
+    'Weight',
+  ];
+  const allKpis = data?.kpis ?? [];
+  const kpis = DISPLAY_ORDER
+    .map((name) => allKpis.find((k) => k.name === name))
+    .filter((k): k is Kpi => k !== undefined);
 
   if (loading) {
     return (

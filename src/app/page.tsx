@@ -29,7 +29,6 @@ import TasksCard from '@/components/TasksCard';
 import EmailCard from '@/components/EmailCard';
 import NewsCard from '@/components/NewsCard';
 import FitnessCard from '@/components/FitnessCard';
-import HealthCard from '@/components/HealthCard';
 import KpiRow from '@/components/KpiRow';
 import VoiceMic from '@/components/VoiceMic';
 
@@ -65,10 +64,7 @@ export default function Dashboard() {
       </div>
       <EmailCard />
       <NewsCard />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <FitnessCard />
-        <HealthCard />
-      </div>
+      <FitnessCard />
       <VoiceMic />
     </AppShell>
   );
