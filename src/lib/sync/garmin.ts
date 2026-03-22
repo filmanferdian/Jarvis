@@ -587,20 +587,55 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
   const fitnessDomain = domains.find((d) => d.name === 'Fitness');
   const now = new Date().toISOString();
 
-  const kpis: { domain_id: string; kpi_name: string; kpi_value: number | null; kpi_unit: string; last_updated: string }[] = [];
+  interface KpiEntry { domain_id: string; kpi_name: string; kpi_value: number | null; kpi_unit: string; last_updated: string; qualifier?: string | null }
+  const kpis: KpiEntry[] = [];
+
+  // Extract Garmin qualifiers from raw_json
+  const raw = daily.raw_json as Record<string, unknown> | null;
+  const sleepQualifier = raw
+    ? ((((raw.sleep as Record<string, unknown>)?.dailySleepDTO as Record<string, unknown>)
+        ?.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>)
+        ?.qualifierKey as string | undefined
+    : undefined;
+  const trArray = raw?.trainingReadiness as Record<string, unknown>[] | null;
+  const trQualifier = Array.isArray(trArray) && trArray.length > 0
+    ? (trArray[0].level as string | undefined) ?? null
+    : null;
+  // Stress: Garmin official ranges (0-25 Rest, 26-50 Low, 51-75 Medium, 76-100 High)
+  const stressLevel = daily.stress_level as number | null;
+  const stressQualifier = stressLevel != null
+    ? stressLevel <= 25 ? 'REST' : stressLevel <= 50 ? 'LOW' : stressLevel <= 75 ? 'MEDIUM' : 'HIGH'
+    : null;
 
   if (healthDomain) {
     if (daily.resting_hr != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Resting Heart Rate', kpi_value: daily.resting_hr as number, kpi_unit: 'bpm', last_updated: now });
-    if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now });
-    if (daily.stress_level != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Stress Level', kpi_value: daily.stress_level as number, kpi_unit: '/100', last_updated: now });
+    if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now, qualifier: sleepQualifier ?? null });
+    if (daily.stress_level != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Stress Level', kpi_value: daily.stress_level as number, kpi_unit: '/100', last_updated: now, qualifier: stressQualifier });
     if (daily.hrv_7d_avg != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'HRV 7d Average', kpi_value: daily.hrv_7d_avg as number, kpi_unit: 'ms', last_updated: now });
   }
 
   if (fitnessDomain) {
-    if (daily.vo2_max != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'VO2 Max', kpi_value: daily.vo2_max as number, kpi_unit: 'ml/kg/min', last_updated: now });
-    if (daily.training_readiness != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Training Readiness', kpi_value: daily.training_readiness as number, kpi_unit: '/100', last_updated: now });
-    if (daily.steps != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: daily.steps as number, kpi_unit: 'steps', last_updated: now });
+    if (daily.vo2_max != null) {
+      // VO2 Max qualifier: Cooper Institute ranges for males 30-39
+      const vo2 = daily.vo2_max as number;
+      const vo2Qualifier = vo2 >= 54 ? 'SUPERIOR' : vo2 >= 48.3 ? 'EXCELLENT' : vo2 >= 44 ? 'GOOD' : vo2 >= 40.5 ? 'FAIR' : 'POOR';
+      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'VO2 Max', kpi_value: vo2, kpi_unit: 'ml/kg/min', last_updated: now, qualifier: vo2Qualifier });
+    }
+    if (daily.training_readiness != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Training Readiness', kpi_value: daily.training_readiness as number, kpi_unit: '/100', last_updated: now, qualifier: trQualifier });
     if (daily.endurance_score != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Endurance Score', kpi_value: daily.endurance_score as number, kpi_unit: 'score', last_updated: now });
+
+    // Steps: use yesterday's completed data (today's is still accumulating)
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const wibNow = new Date(Date.now() + wibOffset);
+    const yesterday = new Date(wibNow.getTime() - 86400000).toISOString().split('T')[0];
+    const { data: yesterdayDaily } = await supabase
+      .from('garmin_daily')
+      .select('steps')
+      .eq('date', yesterday)
+      .single();
+    if (yesterdayDaily?.steps != null) {
+      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: yesterdayDaily.steps as number, kpi_unit: 'steps', last_updated: now });
+    }
   }
 
   // Upsert KPIs — match on domain_id + kpi_name
@@ -616,7 +651,7 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
     if (existing) {
       await supabase
         .from('domain_kpis')
-        .update({ kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated })
+        .update({ kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated, qualifier: kpi.qualifier ?? null })
         .eq('id', existing.id);
     } else {
       await supabase.from('domain_kpis').insert({
@@ -625,6 +660,7 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
         kpi_value: String(kpi.kpi_value),
         kpi_unit: kpi.kpi_unit,
         last_updated: kpi.last_updated,
+        qualifier: kpi.qualifier ?? null,
       });
     }
   }

@@ -20,17 +20,20 @@ export const GET = withAuth(async (_req: NextRequest) => {
           ? Math.min(100, Math.round((Number(kpi.kpi_value) / Number(kpi.kpi_target)) * 100))
           : null;
 
+      const value = Number(kpi.kpi_value);
+
       return {
         id: kpi.id,
         domainId: kpi.domain_id,
         domainName: domain?.name ?? 'Unknown',
         displayOrder: domain?.display_order ?? 99,
         name: kpi.kpi_name,
-        value: Number(kpi.kpi_value),
+        value,
         target: kpi.kpi_target ? Number(kpi.kpi_target) : null,
         unit: kpi.kpi_unit,
         trend: kpi.trend,
         progress,
+        qualifier: (kpi.qualifier as string) ?? null,
         lastUpdated: kpi.last_updated,
       };
     });

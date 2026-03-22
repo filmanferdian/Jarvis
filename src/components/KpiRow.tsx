@@ -12,6 +12,8 @@ interface Kpi {
   unit: string | null;
   trend: 'up' | 'down' | 'flat' | null;
   progress: number | null;
+  qualifier: string | null;
+  lastUpdated: string | null;
 }
 
 interface KpisData {
@@ -33,6 +35,38 @@ function deriveMeaning(kpi: Kpi): string {
   }
   if (kpi.trend) return TREND_ICONS[kpi.trend].label;
   return '';
+}
+
+function qualifierColor(q: string): string {
+  const upper = q.toUpperCase();
+  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST', 'LOW'];
+  const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL', 'MEDIUM'];
+  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
+  if (green.includes(upper)) return 'text-emerald-400';
+  if (orange.includes(upper)) return 'text-jarvis-warn';
+  if (red.includes(upper)) return 'text-red-400';
+  return 'text-jarvis-text-dim';
+}
+
+function toSentenceCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Jakarta' });
+}
+
+function formatValue(kpi: Kpi): string {
+  // Steps: comma-separated whole number
+  if (kpi.unit === 'steps') return Math.round(kpi.value).toLocaleString();
+  // Weight (kg): always 1 decimal place
+  if (kpi.unit === 'kg') {
+    const rounded = Math.round(kpi.value * 10) / 10;
+    return rounded.toFixed(1);
+  }
+  // All other metrics (Garmin integers): no decimals
+  return String(Math.round(kpi.value));
 }
 
 function meaningColor(kpi: Kpi): string {
@@ -99,7 +133,7 @@ export default function KpiRow() {
             </p>
             <div className="flex items-baseline gap-1.5 mb-1">
               <span className="text-2xl font-semibold text-jarvis-text-primary font-mono">
-                {kpi.value}
+                {formatValue(kpi)}
               </span>
               {kpi.unit && (
                 <span className="text-xs text-jarvis-text-dim">{kpi.unit}</span>
@@ -115,8 +149,14 @@ export default function KpiRow() {
                 </span>
               )}
             </div>
+            {/* Qualifier — contextual label for scored metrics */}
+            {kpi.qualifier && (
+              <p className={`text-[11px] font-medium mb-1 ${qualifierColor(kpi.qualifier)}`}>
+                {toSentenceCase(kpi.qualifier)}
+              </p>
+            )}
             {/* Meaning — the "so what" for this KPI */}
-            {meaning && (
+            {meaning && !kpi.qualifier && (
               <p className={`text-[11px] font-medium mb-2 ${meaningColor(kpi)}`}>
                 {meaning}
               </p>
@@ -134,6 +174,11 @@ export default function KpiRow() {
                   style={{ width: `${Math.min(kpi.progress, 100)}%` }}
                 />
               </div>
+            )}
+            {kpi.lastUpdated && (
+              <p className="text-[10px] text-jarvis-text-dim mt-2">
+                {formatDate(kpi.lastUpdated)}
+              </p>
             )}
           </div>
         );

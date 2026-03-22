@@ -56,11 +56,10 @@ export const GET = withAuth(async (_req: NextRequest) => {
           ?.sleepScores as Record<string, unknown>)?.overall as Record<string, unknown>)
           ?.qualifierKey as string | undefined;
 
-      // Stress qualifier: derive from stress_level value
-      // Use "RELAXED" instead of "LOW" to avoid collision with HRV "LOW" (which is negative)
+      // Stress qualifier: Garmin official ranges (0-25 Rest, 26-50 Low, 51-75 Medium, 76-100 High)
       const stressLevel = garminDaily.stress_level as number | null;
       const stressQualifier = stressLevel != null
-        ? stressLevel < 26 ? 'RELAXED' : stressLevel <= 50 ? 'MODERATE' : 'HIGH'
+        ? stressLevel <= 25 ? 'REST' : stressLevel <= 50 ? 'LOW' : stressLevel <= 75 ? 'MEDIUM' : 'HIGH'
         : null;
 
       // Body battery qualifier: last entry in bodyBatteryValuesArray, index 1 is status string

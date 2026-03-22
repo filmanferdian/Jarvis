@@ -95,9 +95,9 @@ function hasDistance(act: Activity): boolean {
 
 function qualifierColor(q: string): string {
   const upper = q.toUpperCase();
-  const green = ['EXCELLENT', 'GOOD', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED'];
-  const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL'];
-  const red = ['POOR', 'LOW', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
+  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST', 'LOW'];
+  const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL', 'MEDIUM'];
+  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
   if (green.includes(upper)) return 'text-emerald-400';
   if (orange.includes(upper)) return 'text-jarvis-warn';
   if (red.includes(upper)) return 'text-red-400';
