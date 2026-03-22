@@ -67,6 +67,14 @@ function formatValue(kr: KrProgress): string {
     const sec = Math.round(v % 60);
     return `${min}:${String(sec).padStart(2, '0')}`;
   }
+  // Steps: round to whole number with comma separator
+  if (kr.key_result === 'daily_steps') {
+    return Math.round(v).toLocaleString();
+  }
+  // Percentage metrics: whole number + %
+  if (kr.key_result === 'training_completion') {
+    return `${Math.round(v)}%`;
+  }
   // Round to 1 decimal, drop .0 for whole numbers
   const rounded = Math.round(v * 10) / 10;
   return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);

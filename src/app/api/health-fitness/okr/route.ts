@@ -123,8 +123,24 @@ export const GET = withAuth(async () => {
       }
     }
 
+    // Training completion: count strength_training activities in last 7 days vs 4 expected
+    const sevenDaysAgo = new Date(Date.now() + wibOffset - 7 * 86400000).toISOString();
+    const { data: recentActivities } = await supabase
+      .from('garmin_activities')
+      .select('activity_type')
+      .eq('activity_type', 'strength_training')
+      .gte('started_at', sevenDaysAgo);
+    const trainingCompletion = recentActivities
+      ? Math.min(100, Math.round((recentActivities.length / 4) * 100))
+      : null;
+
     // Resolve current values for each target
     function resolveCurrentValue(t: OkrTarget): { value: number | null; date: string | null } {
+      // Training completion — computed from Garmin activities
+      if (t.key_result === 'training_completion') {
+        return { value: trainingCompletion, date: todayWib };
+      }
+
       // Weight special case
       if (t.key_result === 'weight' && latestWeight) {
         return { value: Number(latestWeight.weight_kg), date: latestWeight.date };
