@@ -144,9 +144,17 @@ export const GET = withAuth(async () => {
         return { value: val ?? null, date: latestGarmin.date };
       }
 
-      // Health measurements
+      // Health measurements — map key_result to actual measurement_type
       if (t.source_table === 'health_measurements') {
-        const m = latestMeasurement[t.key_result];
+        const typeMap: Record<string, string> = {
+          dead_hang_seconds: 'dead_hang',
+          overhead_squat_compensations: 'ohs_major_compensations',
+          waist_cm: 'waist_circumference',
+          bp_systolic: 'blood_pressure_systolic',
+          bp_diastolic: 'blood_pressure_diastolic',
+        };
+        const measurementKey = typeMap[t.key_result] || t.key_result;
+        const m = latestMeasurement[measurementKey];
         return m ? { value: m.value, date: m.date } : { value: null, date: null };
       }
 

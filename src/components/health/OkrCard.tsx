@@ -67,8 +67,9 @@ function formatValue(kr: KrProgress): string {
     const sec = Math.round(v % 60);
     return `${min}:${String(sec).padStart(2, '0')}`;
   }
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
+  // Round to 1 decimal, drop .0 for whole numbers
+  const rounded = Math.round(v * 10) / 10;
+  return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
 }
 
 export default function OkrCard({ objective, label, keyResults, overallPct }: OkrCardProps) {
