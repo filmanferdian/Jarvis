@@ -250,10 +250,10 @@ export const GET = withAuth(async () => {
         const pct = ((current - baseline) / (target - baseline)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
       }
-      // range: check if within target_min-target_max
+      // range: check if within or above target_min-target_max
       if (targetMin != null && targetMax != null) {
-        if (current >= targetMin && current <= targetMax) return 100;
-        if (current < targetMin && baseline !== targetMin) {
+        if (current >= targetMin) return 100;
+        if (baseline !== targetMin) {
           const pct = ((current - baseline) / (targetMin - baseline)) * 100;
           return Math.max(0, Math.min(100, Math.round(pct)));
         }

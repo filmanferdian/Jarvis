@@ -82,9 +82,14 @@ function formatMetricValue(keyResult: string, value: number | null, unit: string
     return Math.round(value).toLocaleString();
   }
 
-  // Percentage-like metrics: integer with unit
-  if (keyResult === 'training_completion' || keyResult === 'body_fat' || keyResult === 'hrv_decline_pct') {
+  // Percentage-like metrics
+  if (keyResult === 'training_completion' || keyResult === 'hrv_decline_pct') {
     return `${Math.round(value)}`;
+  }
+
+  // Body fat: 1 decimal
+  if (keyResult === 'body_fat') {
+    return value.toFixed(1);
   }
 
   // HbA1c: 1 decimal (special — small number)
@@ -97,12 +102,17 @@ function formatMetricValue(keyResult: string, value: number | null, unit: string
     return value % 1 === 0 ? String(value) : value.toFixed(1);
   }
 
-  // Sleep hours: 1 decimal
+  // Sleep hours: always 1 decimal
   if (keyResult === 'sleep_hours') {
-    return value % 1 === 0 ? String(value) : value.toFixed(1);
+    return value.toFixed(1);
   }
 
-  // Integer metrics (HR, HRV, stress, body battery, glucose, etc.)
+  // Integer metrics (HR, HRV, stress, body battery, glucose, BP, fitness age, etc.)
+  if (['resting_hr', 'stress_avg', 'body_battery_wake', 'fitness_age', 'fasting_glucose', 'triglycerides', 'hdl', 'bp_systolic', 'bp_diastolic', 'testosterone', 'overhead_squat_compensations'].includes(keyResult)) {
+    return String(Math.round(value));
+  }
+
+  // Default: 1 decimal, drop .0
   const rounded = Math.round(value * 10) / 10;
   return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
 }
