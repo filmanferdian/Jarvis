@@ -7,6 +7,7 @@ interface ScannedContact {
   email: string;
   name: string | null;
   company: string | null;
+  phone: string | null;
   first_seen_date: string;
   last_seen_date: string;
   event_count: number;
@@ -48,7 +49,7 @@ export default function ContactsPage() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editingCell, setEditingCell] = useState<{ email: string; field: 'name' | 'company' } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ email: string; field: 'name' | 'company' | 'phone' } | null>(null);
   const [editValue, setEditValue] = useState('');
 
   const fetchContacts = useCallback(async () => {
@@ -122,7 +123,7 @@ export default function ContactsPage() {
     }
   };
 
-  const startEdit = (email: string, field: 'name' | 'company', currentValue: string | null) => {
+  const startEdit = (email: string, field: 'name' | 'company' | 'phone', currentValue: string | null) => {
     setEditingCell({ email, field });
     setEditValue(currentValue || '');
   };
@@ -270,6 +271,7 @@ export default function ContactsPage() {
                     <th className="pb-2 pr-3 text-left">Name</th>
                     <th className="pb-2 pr-3 text-left">Email</th>
                     <th className="pb-2 pr-3 text-left">Company</th>
+                    <th className="pb-2 pr-3 text-left">Phone</th>
                     <th className="pb-2 pr-3 text-left">Last Seen</th>
                     <th className="pb-2 text-right">Meetings</th>
                   </tr>
@@ -328,6 +330,27 @@ export default function ContactsPage() {
                             title="Click to edit"
                           >
                             {contact.company || <span className="italic text-jarvis-text-dim">Unknown</span>}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {editingCell?.email === contact.email && editingCell.field === 'phone' ? (
+                          <input
+                            autoFocus
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onBlur={saveEdit}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                            className="bg-jarvis-bg-elevated border border-jarvis-accent/50 rounded px-1.5 py-0.5 text-xs text-jarvis-text-primary w-full"
+                            placeholder="+62..."
+                          />
+                        ) : (
+                          <span
+                            onClick={() => startEdit(contact.email, 'phone', contact.phone || null)}
+                            className="cursor-pointer text-jarvis-text-secondary hover:text-jarvis-accent transition-colors"
+                            title="Click to edit"
+                          >
+                            {contact.phone || <span className="italic text-jarvis-text-dim">-</span>}
                           </span>
                         )}
                       </td>

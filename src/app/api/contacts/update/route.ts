@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 export const PATCH = withAuth(async (req: NextRequest) => {
   try {
-    const { email, name, company } = await req.json();
+    const { email, name, company, phone } = await req.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 });
@@ -13,6 +13,7 @@ export const PATCH = withAuth(async (req: NextRequest) => {
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (company !== undefined) updates.company = company;
+    if (phone !== undefined) updates.phone = phone;
 
     const { error } = await supabase
       .from('scanned_contacts')
