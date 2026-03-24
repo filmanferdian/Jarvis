@@ -1,7 +1,7 @@
-# Sprint 12 Retrospective (partial)
+# Sprint 12 Retrospective
 
-**Version:** v2.2.8
-**Date:** 2026-03-22
+**Version:** v2.2.8 → v2.2.13+
+**Date:** 2026-03-22 to 2026-03-24
 **Theme:** v2.2 Polishing — Incremental bug fixes and data reliability
 
 ## Delivery Summary
@@ -18,6 +18,8 @@
 - **Fitness API:** Fixed double timezone offset in day-of-week calculation
 - **Eating window:** Hardcoded 12:00-20:00 default, removed Ramadan detection
 - **Bullet point gaps:** Fixed in briefing and synthesis rendering
+- **Cron error visibility:** Added `logCronRun` to email synthesis cron for persistent error history
+- **Investigation:** Email missing slots on Mar 24 caused by Anthropic credit exhaustion, not code bug (Mar 23 had all 3 slots working)
 
 ## Key Decisions
 
@@ -38,9 +40,15 @@
 - Sprint 12 is spread across multiple sessions — context handoff between sessions needs improvement
 - Deload schedule was wrong (only phase boundaries) and took user feedback to correct
 
+## What Could Also Improve
+
+- Cron failures were invisible until cron_run_log was added — should add logging to all cron routes
+- Anthropic credit monitoring should be proactive (alert before exhaustion)
+
 ## Metrics
 
-- Version: 2.2.1 → 2.2.8 (7 patch deployments)
+- Version: 2.2.1 → 2.2.13+ (12+ patch deployments across 3 days)
 - Notion database rows created: 363 (of 364 target)
 - KPI cards: 9 → 6 (removed 3 redundant)
 - Dashboard cards: removed 1 (HealthCard)
+- Cron routes with logging: email-synthesis (others still missing)
