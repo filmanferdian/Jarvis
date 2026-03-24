@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 const MICROSOFT_AUTH_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
 const MICROSOFT_TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
-const SCOPES = 'openid profile email offline_access Calendars.Read Mail.Read User.Read';
+const SCOPES = 'openid profile email offline_access Calendars.Read Mail.Read Mail.ReadWrite User.Read';
 
 // --- Types ---
 
@@ -274,6 +274,122 @@ export async function fetchSentEmailsWithBody(
       body: body.slice(0, 3000),
     };
   });
+}
+
+// --- Full Email Fetch (for triage) ---
+
+export interface FullEmail {
+  messageId: string;
+  conversationId: string;
+  internetMessageId: string;
+  from: string;
+  fromName: string;
+  subject: string;
+  date: string;
+  body: string;
+  snippet: string;
+  source: 'outlook';
+}
+
+export async function fetchRecentEmailsFull(
+  accessToken: string,
+  sinceHours: number = 24,
+  limit: number = 30,
+): Promise<FullEmail[]> {
+  const since = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
+  const url =
+    `${GRAPH_BASE_URL}/me/messages?$filter=receivedDateTime ge ${since}&$top=${limit}&$orderby=receivedDateTime desc&$select=id,from,subject,bodyPreview,receivedDateTime,body,conversationId,internetMessageId`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Graph Mail Full API error: ${response.status} ${errText}`);
+  }
+
+  const data = await response.json();
+  return (data.value || []).map((msg: {
+    id?: string;
+    from?: { emailAddress?: { address?: string; name?: string } };
+    subject?: string;
+    bodyPreview?: string;
+    receivedDateTime?: string;
+    body?: { contentType?: string; content?: string };
+    conversationId?: string;
+    internetMessageId?: string;
+  }) => {
+    let body = msg.body?.content || '';
+    if (msg.body?.contentType === 'html') {
+      body = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return {
+      messageId: msg.id || '',
+      conversationId: msg.conversationId || '',
+      internetMessageId: msg.internetMessageId || '',
+      from: msg.from?.emailAddress?.address || 'unknown',
+      fromName: msg.from?.emailAddress?.name || '',
+      subject: msg.subject || '(No subject)',
+      date: msg.receivedDateTime || '',
+      body: body.slice(0, 5000),
+      snippet: (msg.bodyPreview || '').slice(0, 500),
+      source: 'outlook' as const,
+    };
+  });
+}
+
+// --- Draft Creation ---
+
+export async function createOutlookDraft(
+  accessToken: string,
+  params: { messageId: string; body: string },
+): Promise<{ draftId: string }> {
+  // Step 1: Create a reply draft (auto-threads the conversation)
+  const replyRes = await fetch(
+    `${GRAPH_BASE_URL}/me/messages/${params.messageId}/createReply`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    },
+  );
+
+  if (!replyRes.ok) {
+    const errText = await replyRes.text();
+    throw new Error(`Graph createReply error: ${replyRes.status} ${errText}`);
+  }
+
+  const replyData = await replyRes.json();
+  const draftId = replyData.id;
+
+  // Step 2: Update the draft body with our generated text
+  const patchRes = await fetch(
+    `${GRAPH_BASE_URL}/me/messages/${draftId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        body: {
+          contentType: 'Text',
+          content: params.body,
+        },
+      }),
+    },
+  );
+
+  if (!patchRes.ok) {
+    const errText = await patchRes.text();
+    throw new Error(`Graph PATCH draft error: ${patchRes.status} ${errText}`);
+  }
+
+  return { draftId };
 }
 
 // --- Calendar Transform ---

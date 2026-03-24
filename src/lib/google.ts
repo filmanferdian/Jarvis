@@ -6,7 +6,7 @@ const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_BASE_URL = 'https://gmail.googleapis.com/gmail/v1';
 const CALENDAR_BASE_URL = 'https://www.googleapis.com/calendar/v3';
-const SCOPES = 'openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly';
+const SCOPES = 'openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/calendar.readonly';
 
 // --- Types ---
 
@@ -293,6 +293,135 @@ export async function fetchSentEmailsWithBody(
       to,
       date: new Date(Number(msg.internalDate)).toISOString(),
       body,
+    });
+  }
+
+  return results;
+}
+
+// --- Draft Creation ---
+
+export async function createGmailDraft(
+  accessToken: string,
+  params: {
+    to: string;
+    subject: string;
+    body: string;
+    threadId: string;
+    inReplyTo?: string;
+  },
+): Promise<{ draftId: string }> {
+  // Build RFC 2822 message
+  const headers = [
+    `To: ${params.to}`,
+    `Subject: Re: ${params.subject.replace(/^Re:\s*/i, '')}`,
+    'Content-Type: text/plain; charset=utf-8',
+  ];
+  if (params.inReplyTo) {
+    headers.push(`In-Reply-To: ${params.inReplyTo}`);
+    headers.push(`References: ${params.inReplyTo}`);
+  }
+
+  const rawMessage = `${headers.join('\r\n')}\r\n\r\n${params.body}`;
+  const encoded = Buffer.from(rawMessage)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const res = await fetch(`${GMAIL_BASE_URL}/users/me/drafts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        raw: encoded,
+        threadId: params.threadId,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gmail draft creation error: ${res.status} ${errText}`);
+  }
+
+  const data = await res.json();
+  return { draftId: data.id };
+}
+
+// --- Full Email Fetch (for triage) ---
+
+export interface FullEmail {
+  messageId: string;
+  threadId: string;
+  from: string;
+  fromName: string;
+  subject: string;
+  date: string;
+  body: string;
+  snippet: string;
+  source: string;
+}
+
+export async function fetchRecentEmailsFull(
+  accessToken: string,
+  email: string,
+  sinceHours: number = 24,
+  limit: number = 30,
+): Promise<FullEmail[]> {
+  const sinceDate = new Date(Date.now() - sinceHours * 60 * 60 * 1000);
+  const afterTimestamp = Math.floor(sinceDate.getTime() / 1000);
+  const query = `after:${afterTimestamp}`;
+
+  const listUrl =
+    `${GMAIL_BASE_URL}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`;
+
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!listRes.ok) {
+    const errText = await listRes.text();
+    throw new Error(`Gmail list error: ${listRes.status} ${errText}`);
+  }
+
+  const listData = await listRes.json();
+  const messageIds: string[] = (listData.messages || []).map((m: { id: string }) => m.id);
+  if (messageIds.length === 0) return [];
+
+  const results: FullEmail[] = [];
+  for (const msgId of messageIds.slice(0, limit)) {
+    const msgRes = await fetch(
+      `${GMAIL_BASE_URL}/users/me/messages/${msgId}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!msgRes.ok) continue;
+
+    const msg = await msgRes.json();
+    const headers: { name: string; value: string }[] = msg.payload?.headers || [];
+    const fromHeader = headers.find((h: { name: string }) => h.name === 'From')?.value || 'unknown';
+    const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || '(No subject)';
+
+    // Parse "Name <email>" format
+    const fromMatch = fromHeader.match(/^(.+?)\s*<(.+?)>$/);
+    const fromName = fromMatch ? fromMatch[1].replace(/"/g, '').trim() : '';
+    const fromAddress = fromMatch ? fromMatch[2] : fromHeader;
+
+    const body = extractTextBody(msg.payload).slice(0, 5000);
+
+    results.push({
+      messageId: msgId,
+      threadId: msg.threadId || '',
+      from: fromAddress,
+      fromName,
+      subject,
+      date: new Date(Number(msg.internalDate)).toISOString(),
+      body,
+      snippet: (msg.snippet || '').slice(0, 500),
+      source: `gmail:${email}`,
     });
   }
 
