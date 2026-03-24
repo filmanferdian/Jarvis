@@ -371,11 +371,23 @@ export const GET = withAuth(async () => {
       objectiveMap.set(t.objective, existing);
     }
 
+    // Scoring: each objective = 20 points (5 × 20 = 100 total)
+    // Within each objective, KRs contribute equally, each capped at its max share
+    const POINTS_PER_OBJECTIVE = 20;
     const objectives: ObjectiveProgress[] = [];
     for (const [obj, krs] of objectiveMap) {
+      const totalKrs = krs.length;
+      const krWeight = totalKrs > 0 ? 100 / totalKrs : 0; // each KR's max contribution as % of objective
+
       const withProgress = krs.filter((kr) => kr.progress_pct != null);
       const overall = withProgress.length > 0
-        ? Math.round(withProgress.reduce((sum, kr) => sum + (kr.progress_pct ?? 0), 0) / withProgress.length)
+        ? Math.round(
+            krs.reduce((sum, kr) => {
+              // Each KR contributes proportionally, capped at its max share
+              const krPct = Math.min(kr.progress_pct ?? 0, 100); // cap at 100% — no overscoring
+              return sum + (krPct * krWeight / 100);
+            }, 0)
+          )
         : null;
 
       objectives.push({
@@ -386,8 +398,15 @@ export const GET = withAuth(async () => {
       });
     }
 
+    // Overall score: each objective contributes up to 20 points
+    const objectivesWithData = objectives.filter((o) => o.overall_pct != null);
+    const totalScore = objectivesWithData.length > 0
+      ? Math.round(objectivesWithData.reduce((sum, o) => sum + ((o.overall_pct ?? 0) * POINTS_PER_OBJECTIVE / 100), 0))
+      : null;
+
     return NextResponse.json({
       objectives,
+      totalScore,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

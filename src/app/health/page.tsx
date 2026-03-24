@@ -30,6 +30,7 @@ interface ObjectiveProgress {
 
 interface OkrResponse {
   objectives: ObjectiveProgress[];
+  totalScore: number | null;
 }
 
 interface BloodWorkEntry {
@@ -82,13 +83,7 @@ export default function HealthPage() {
     loadData();
   }, [loadData]);
 
-  const overallProgress = okrData
-    ? (() => {
-        const withData = okrData.objectives.filter((o) => o.overall_pct != null);
-        if (withData.length === 0) return null;
-        return Math.round(withData.reduce((sum, o) => sum + (o.overall_pct ?? 0), 0) / withData.length);
-      })()
-    : null;
+  const overallProgress = okrData?.totalScore ?? null;
 
   const lastBloodDate = bloodWork.length > 0 ? bloodWork[0].test_date : null;
 
