@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import { renderMarkdown } from '@/lib/renderMarkdown';
+import Link from 'next/link';
 
 interface SlotData {
   timeSlot: string;
@@ -34,15 +35,40 @@ interface EmailData {
   message?: string;
 }
 
+interface TriageSummary {
+  total: number;
+  need_response: number;
+  drafts_created: number;
+}
+
+interface TriageData {
+  date: string;
+  summary: TriageSummary;
+}
+
 const SLOT_LABELS: Record<string, string> = {
   morning: 'Morning',
   afternoon: 'Afternoon',
   evening: 'Evening',
 };
 
+function getWibTimeSlotLabel(): string {
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const wib = new Date(Date.now() + wibOffset);
+  const hour = wib.getUTCHours();
+  if (hour >= 5 && hour < 11) return 'Morning';
+  if (hour >= 11 && hour < 17) return 'Afternoon';
+  return 'Evening';
+}
+
 export default function EmailCard() {
   const { data, loading } = usePolling<EmailData>(
     () => fetchAuth('/api/emails'),
+    5 * 60 * 1000
+  );
+
+  const { data: triageData } = usePolling<TriageData>(
+    () => fetchAuth('/api/emails/triage'),
     5 * 60 * 1000
   );
 
@@ -101,6 +127,40 @@ export default function EmailCard() {
           )}
         </div>
       </div>
+
+      {/* Triage summary strip */}
+      {triageData && triageData.summary.total > 0 && (
+        <Link
+          href="/emails"
+          className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-jarvis-bg border border-jarvis-border/50 hover:border-jarvis-accent/30 transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-jarvis-accent" />
+            <span className="text-xs font-mono text-jarvis-accent font-medium">
+              {triageData.summary.need_response}
+            </span>
+            <span className="text-[11px] text-jarvis-text-muted">need response</span>
+          </div>
+          <span className="text-jarvis-border">|</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-jarvis-success" />
+            <span className="text-xs font-mono text-jarvis-success font-medium">
+              {triageData.summary.drafts_created}
+            </span>
+            <span className="text-[11px] text-jarvis-text-muted">drafted</span>
+          </div>
+          <span className="text-jarvis-border">|</span>
+          <span className="text-[11px] text-jarvis-text-dim">
+            {triageData.summary.total} total
+          </span>
+          <span className="ml-auto text-[10px] font-mono text-jarvis-text-dim">
+            {triageData.date} {getWibTimeSlotLabel()}
+          </span>
+          <svg className="w-3 h-3 text-jarvis-text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      )}
 
       <button
         onClick={() => setExpanded(!expanded)}
