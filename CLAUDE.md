@@ -43,3 +43,15 @@ Before closing any sprint, ALL of the following must be complete:
 - Retrospective log: `322c674aecec81de9e85f5dceca130ae`
 - Project Jarvis: `322c674aecec81c2986cef59e388c8f4`
 - Delivery: `322c674aecec81b793d4d69e163b0a23`
+
+## Ghostwriting Style Guide
+Filman's email communication style, derived from analysis of 129 sent emails. Full guide is in Notion (`32dc674aecec817198f2ead59e09873c`) and synced to Jarvis context as the `ghostwriting` page key.
+
+Key patterns:
+- **Internal team**: Casual, direct, heavy Indonesian. "Ok, proceed aja with both." "Approved and released ya."
+- **External partners**: Professional but friendly. "Hi [Name]," + full signature. "Would be great to discuss."
+- **Investors**: Most formal, personal, longer context. Always full signature with phone number.
+- **Language**: 95% English for external. Indonesian particles ("ya", "aja") for internal. Mixed in casual contexts.
+- **Structure**: Short paragraphs (1-3 sentences). Direct. Front-loads key information. Minimal formatting.
+- **Closings**: "Best regards, Filman Ferdian / Co-founder & CEO of Infinid / +62 811 1011 580"
+- **Actionability**: Direct commands internally, polite requests externally. Clear next steps always.

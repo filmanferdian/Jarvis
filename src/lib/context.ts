@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { ContextPageKey } from '@/lib/sync/notionContext';
 
-const ALL_PAGES: ContextPageKey[] = ['about_me', 'communication', 'work', 'growth', 'projects'];
+const ALL_PAGES: ContextPageKey[] = ['about_me', 'communication', 'work', 'growth', 'projects', 'ghostwriting'];
 const DEFAULT_PAGES: ContextPageKey[] = ['about_me', 'communication', 'work'];
 
 interface JarvisContext {
@@ -24,6 +24,7 @@ const SECTION_HEADERS: Record<ContextPageKey, string> = {
   work: 'WORK PRIORITIES',
   growth: 'GROWTH & LEARNING',
   projects: 'PROJECTS',
+  ghostwriting: 'GHOSTWRITING STYLE GUIDE',
 };
 
 const BASE_PERSONA = `You are Jarvis, a refined British butler and chief of staff to Filman Ferdian. You combine the discretion of Alfred Pennyworth with the technical capability of Iron Man's Jarvis. You are direct, concise, and proactive. You know Filman's context deeply and use it to provide relevant, personalized assistance.`;

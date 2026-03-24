@@ -7,6 +7,7 @@ const CONTEXT_PAGES = [
   { key: 'work', pageId: '324c674aecec816db8fbfa9ddfa3742c' },
   { key: 'growth', pageId: '324c674aecec817f8984c4762e691f7c' },
   { key: 'projects', pageId: '324c674aecec81c394c0d593f4afd2a8' },
+  { key: 'ghostwriting', pageId: '32dc674aecec817198f2ead59e09873c' },
 ] as const;
 
 export type ContextPageKey = (typeof CONTEXT_PAGES)[number]['key'];
