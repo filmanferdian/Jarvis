@@ -2,6 +2,18 @@
 
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
+import Link from 'next/link';
+
+interface TriageSummary {
+  total: number;
+  need_response: number;
+  drafts_created: number;
+}
+
+interface TriageData {
+  date: string;
+  summary: TriageSummary;
+}
 
 interface Kpi {
   id: string;
@@ -86,6 +98,11 @@ export default function KpiRow() {
     5 * 60 * 1000
   );
 
+  const { data: triageData } = usePolling<TriageData>(
+    () => fetchAuth('/api/emails/triage'),
+    5 * 60 * 1000
+  );
+
   // Display order — only these KPIs are shown, in this exact sequence
   const DISPLAY_ORDER = [
     'Training Readiness',
@@ -129,6 +146,31 @@ export default function KpiRow() {
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+      {/* Email Triage card — always first */}
+      {triageData && triageData.summary.total > 0 && (
+        <Link
+          href="/emails"
+          className="min-w-[180px] max-w-[220px] shrink-0 rounded-xl border border-jarvis-accent/30 bg-jarvis-bg-card p-4 hover:border-jarvis-accent/50 transition-colors"
+        >
+          <p className="text-[11px] uppercase tracking-wider text-jarvis-accent/70 mb-0.5">
+            Email Triage
+          </p>
+          <p className="text-[13px] text-jarvis-text-secondary mb-2">
+            {triageData.date}
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-semibold text-jarvis-accent font-mono">
+              {triageData.summary.need_response}
+            </span>
+            <span className="text-xs text-jarvis-text-dim">
+              / {triageData.summary.total}
+            </span>
+          </div>
+          <p className="text-[11px] text-jarvis-text-muted mt-1">
+            {triageData.summary.need_response} triaged, {triageData.summary.drafts_created} drafted
+          </p>
+        </Link>
+      )}
       {kpis.map((kpi) => {
         const trend = kpi.trend ? TREND_ICONS[kpi.trend] : null;
         const meaning = deriveMeaning(kpi);
