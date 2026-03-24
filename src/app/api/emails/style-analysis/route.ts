@@ -136,9 +136,10 @@ ${emailList}`;
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err) {
-    console.error('[API Error] Failed to analyze email style:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[API Error] Failed to analyze email style:', message);
     return NextResponse.json(
-      { error: 'Failed to analyze email style' },
+      { error: message },
       { status: 500 },
     );
   }
