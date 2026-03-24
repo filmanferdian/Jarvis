@@ -744,6 +744,130 @@ function adaptiveDelay(baseMs: number, consecutiveFailures: number): Promise<voi
   return new Promise((resolve) => setTimeout(resolve, backoff + jitter));
 }
 
+/** Fetch Garmin data for a specific date range (inclusive). Bypasses RETENTION_DAYS limit.
+ *  Note: data older than RETENTION_DAYS will be pruned on next daily sync.
+ *  Use computeBaseline=true to compute and save baselines to okr_targets instead. */
+export async function backfillDateRange(startDate: string, endDate: string, computeBaseline = false): Promise<BackfillResult & { skipped?: boolean; skipReason?: string; baselines?: Record<string, number> }> {
+  const blockStatus = await isGarminBlocked();
+  if (blockStatus.blocked) {
+    return {
+      days_synced: 0, days_enriched: 0, days_skipped: 0, days_failed: 0, activities_synced: 0,
+      skipped: true, skipReason: `Blocked until ${blockStatus.blockedUntil} (${blockStatus.reason})`,
+    };
+  }
+
+  const client = await createClient();
+  const result: BackfillResult = {
+    days_synced: 0, days_enriched: 0, days_skipped: 0, days_failed: 0, activities_synced: 0,
+  };
+  let consecutiveFailures = 0;
+
+  // Generate date list
+  const dates: string[] = [];
+  const current = new Date(startDate + 'T00:00:00Z');
+  const end = new Date(endDate + 'T00:00:00Z');
+  while (current <= end) {
+    dates.push(formatDate(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  for (const dateStr of dates) {
+    if (consecutiveFailures >= GARMIN_MAX_CONSECUTIVE_FAILURES) {
+      console.log(`[garmin] Date range backfill halted: ${consecutiveFailures} consecutive failures`);
+      await setGarminBlocked('consecutive-failures', GARMIN_COOLDOWN_DEFAULT_MS);
+      break;
+    }
+
+    const midLoopBlock = await isGarminBlocked();
+    if (midLoopBlock.blocked) break;
+
+    try {
+      const dateObj = new Date(dateStr + 'T00:00:00Z');
+      const rawData = await fetchAllEndpoints(client, dateStr, dateObj);
+      const record = buildDailyRecord(dateStr, rawData);
+
+      await supabase.from('garmin_daily').delete().eq('date', dateStr);
+      const { error } = await supabase.from('garmin_daily').insert(record);
+      if (!error) result.days_synced++;
+      consecutiveFailures = 0;
+      await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, 0);
+    } catch (err) {
+      console.error(`Date range backfill error for ${dateStr}:`, err);
+      result.days_failed++;
+      consecutiveFailures++;
+
+      if (isRateLimitError(err).isRateLimit) {
+        const { retryAfterMs } = isRateLimitError(err);
+        await setGarminBlocked('429-backfill', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        break;
+      }
+      await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, consecutiveFailures);
+    }
+  }
+
+  await saveCachedTokens(client);
+
+  // If computeBaseline, average the fetched rows and write to okr_targets
+  if (computeBaseline && result.days_synced > 0) {
+    const { data: rows } = await supabase
+      .from('garmin_daily')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate);
+
+    if (rows && rows.length > 0) {
+      const baselineMap: Record<string, { column: string; values: number[] }> = {
+        resting_hr: { column: 'resting_hr', values: [] },
+        steps: { column: 'steps', values: [] },
+        sleep_duration_seconds: { column: 'sleep_duration_seconds', values: [] },
+        stress_level: { column: 'stress_level', values: [] },
+        body_battery: { column: 'body_battery', values: [] },
+        hrv_7d_avg: { column: 'hrv_7d_avg', values: [] },
+        vo2_max: { column: 'vo2_max', values: [] },
+        fitness_age: { column: 'fitness_age', values: [] },
+      };
+
+      for (const row of rows) {
+        for (const [key, meta] of Object.entries(baselineMap)) {
+          const val = row[meta.column] as number | null;
+          if (val != null) baselineMap[key].values.push(val);
+        }
+      }
+
+      // Map garmin columns to okr_targets source_column
+      const baselines: Record<string, number> = {};
+      for (const [key, meta] of Object.entries(baselineMap)) {
+        if (meta.values.length > 0) {
+          const avg = Math.round((meta.values.reduce((a, b) => a + b, 0) / meta.values.length) * 10) / 10;
+          baselines[key] = avg;
+        }
+      }
+
+      // Write baselines to okr_targets where source_column matches
+      for (const [col, value] of Object.entries(baselines)) {
+        let writeValue = value;
+        // Convert sleep seconds to hours for the sleep_hours KR
+        if (col === 'sleep_duration_seconds') {
+          writeValue = Math.round((value / 3600) * 10) / 10;
+        }
+        await supabase
+          .from('okr_targets')
+          .update({ baseline_value: writeValue })
+          .eq('source_table', 'garmin_daily')
+          .eq('source_column', col)
+          .is('baseline_value', null);
+      }
+
+      // Clean up: delete the old rows that will be pruned anyway
+      await supabase.from('garmin_daily').delete().gte('date', startDate).lte('date', endDate);
+
+      return { ...result, baselines };
+    }
+  }
+
+  return result;
+}
+
 export async function backfillGarmin(force = false): Promise<BackfillResult & { skipped?: boolean; skipReason?: string }> {
   // Circuit breaker check
   const blockStatus = await isGarminBlocked();
