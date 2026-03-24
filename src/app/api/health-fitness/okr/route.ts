@@ -235,17 +235,23 @@ export const GET = withAuth(async () => {
       }
 
       // Garmin daily metrics
-      if (t.source_table === 'garmin_daily' && latestGarmin && t.source_column) {
-        // Use 7-day average for daily fluctuating metrics, latest for stable ones (vo2_max, fitness_age)
+      if (t.source_table === 'garmin_daily' && garminRows && garminRows.length > 0 && t.source_column) {
+        // Use 7-day average for daily fluctuating metrics, latest non-null for stable ones (vo2_max, fitness_age)
         const useAverage = AVERAGED_METRICS.includes(t.source_column);
-        let val = useAverage
-          ? (garmin7dAvg[t.source_column] ?? null)
-          : (latestGarmin[t.source_column] as number | null);
+        let val: number | null;
+        if (useAverage) {
+          val = garmin7dAvg[t.source_column] ?? null;
+        } else {
+          // Find most recent row with a non-null value for this column
+          const row = garminRows.find((r) => r[t.source_column!] != null);
+          val = row ? (row[t.source_column] as number | null) : null;
+        }
         // Convert sleep_duration_seconds to hours for sleep_hours KR
         if (t.key_result === 'sleep_hours' && val != null) {
           val = Math.round((val / 3600) * 10) / 10;
         }
-        return { value: val ?? null, date: latestGarmin.date };
+        const dateSource = useAverage ? garminRows[0] : garminRows.find((r) => r[t.source_column!] != null);
+        return { value: val ?? null, date: dateSource?.date ?? garminRows[0].date };
       }
 
       // Health measurements — map key_result to actual measurement_type
@@ -298,10 +304,18 @@ export const GET = withAuth(async () => {
       if (current == null || baseline == null) return null;
 
       if (direction === 'lower_is_better') {
+        // Already at or below target = 100%
+        if (current <= target) return 100;
         if (baseline === target) return 100;
+        // If baseline is already below target (better than goal), use current vs target directly
+        if (baseline <= target) {
+          return current <= target ? 100 : Math.max(0, Math.round((1 - (current - target) / target) * 100));
+        }
         const pct = ((baseline - current) / (baseline - target)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
       } else if (direction === 'higher_is_better') {
+        // Already at or above target = 100%
+        if (current >= target) return 100;
         if (baseline === target) return 100;
         const pct = ((current - baseline) / (target - baseline)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
@@ -357,11 +371,23 @@ export const GET = withAuth(async () => {
       objectiveMap.set(t.objective, existing);
     }
 
+    // Scoring: each objective = 20 points (5 × 20 = 100 total)
+    // Within each objective, KRs contribute equally, each capped at its max share
+    const POINTS_PER_OBJECTIVE = 20;
     const objectives: ObjectiveProgress[] = [];
     for (const [obj, krs] of objectiveMap) {
+      const totalKrs = krs.length;
+      const krWeight = totalKrs > 0 ? 100 / totalKrs : 0; // each KR's max contribution as % of objective
+
       const withProgress = krs.filter((kr) => kr.progress_pct != null);
       const overall = withProgress.length > 0
-        ? Math.round(withProgress.reduce((sum, kr) => sum + (kr.progress_pct ?? 0), 0) / withProgress.length)
+        ? Math.round(
+            krs.reduce((sum, kr) => {
+              // Each KR contributes proportionally, capped at its max share
+              const krPct = Math.min(kr.progress_pct ?? 0, 100); // cap at 100% — no overscoring
+              return sum + (krPct * krWeight / 100);
+            }, 0)
+          )
         : null;
 
       objectives.push({
@@ -372,8 +398,15 @@ export const GET = withAuth(async () => {
       });
     }
 
+    // Overall score: each objective contributes up to 20 points
+    const objectivesWithData = objectives.filter((o) => o.overall_pct != null);
+    const totalScore = objectivesWithData.length > 0
+      ? Math.round(objectivesWithData.reduce((sum, o) => sum + ((o.overall_pct ?? 0) * POINTS_PER_OBJECTIVE / 100), 0))
+      : null;
+
     return NextResponse.json({
       objectives,
+      totalScore,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
