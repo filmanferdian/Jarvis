@@ -18,6 +18,7 @@ interface KrProgress {
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
+  context?: string;
 }
 
 interface ObjectiveProgress {
