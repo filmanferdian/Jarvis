@@ -79,16 +79,6 @@ Sprint 11 added current events synthesis from newsletter emails and unified all 
 9. **Arc Reactor simplified mode for sm size** — 32px rendering has too much detail; simpler ring-and-glow for TopBar
 10. **JarvisOrb cleanup** — remove legacy `JarvisOrb.tsx` (no longer imported anywhere)
 
-## Sprint 12 Deliveries (Late Additions)
-
-### OKR Page Redesign
-- **Files changed:**
-  - `src/app/health/page.tsx` — layout reorder (Health Insights below O4)
-  - `src/components/health/OkrCard.tsx` — redesigned with status badges, units, baseline annotations, consistent formatting
-  - `src/app/api/health-fitness/okr/route.ts` — dynamic baseline computation from earliest Garmin/weight data
-- **No new env vars or migrations** — baselines computed dynamically from existing data; user can manually set `baseline_value` in `okr_targets` table to override
-- **Branch:** `claude/redesign-okr-page-DwHZA`
-
 ## Gotchas
 
 1. **Synthesis prompts use markdown** — all three prompts (briefing, email, news) produce markdown. The `renderMarkdown` helper in `src/lib/renderMarkdown.ts` converts to HTML for display. TTS reads from the raw text which may include `**` markers
