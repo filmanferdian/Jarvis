@@ -20,6 +20,12 @@
 - **Bullet point gaps:** Fixed in briefing and synthesis rendering
 - **Cron error visibility:** Added `logCronRun` to email synthesis cron for persistent error history
 - **Investigation:** Email missing slots on Mar 24 caused by Anthropic credit exhaustion, not code bug (Mar 23 had all 3 slots working)
+- **Email style analysis:** Scan sent emails from Outlook and Gmail, derive conversation style using Claude. UI trigger on utilities page.
+- **Ghostwriting style guide:** Created Notion page under About Filman with full email style guide derived from 129 sent emails. Added as `ghostwriting` context page key, synced to all Jarvis Claude calls via `allPages()`. Condensed version added to CLAUDE.md.
+- **Email triage + auto-draft:** Scan work inbox emails (filman@infinid.id Outlook, filman@group.infinid.id Gmail) during email synthesis cron. Claude classifies each email (need_response/informational/newsletter/notification/automated). For need_response emails, auto-generates draft replies using ghostwriting style and creates them in Outlook Drafts folder. Gmail drafts also supported after scope upgrade.
+- **Email triage UI:** New `/emails` page with summary cards, expandable need-response rows showing original email + draft preview, collapsible other-emails section. Sidebar nav added.
+- **Dashboard triage KPI card:** First card in KPI row showing triaged/total count (e.g. 3/31) with date and time slot label. Links to /emails page.
+- **OAuth scope upgrades:** Microsoft Mail.ReadWrite (for draft creation), Google gmail.compose (for Gmail drafts). Both require re-authentication after deploy.
 
 ## Key Decisions
 
@@ -27,6 +33,9 @@
 - **Fixed KPI display order** — Hardcoded in frontend component rather than DB ordering. Simpler, no migration needed, user controls what appears.
 - **7-day step average** — More meaningful than a single day's count which can swing wildly.
 - **3-day task visibility** — Full week was too long; 3 days keeps focus on immediate priorities.
+- **Ghostwriting as separate context page** — Kept distinct from Communication style (which covers AI interaction preferences). Ghostwriting is specifically for email voice/tone replication.
+- **Batch triage classification** — Single Claude call classifies all emails (not per-email), keeping costs low. Draft generation batches up to 3 emails per call.
+- **Outlook createReply for threading** — Uses Graph API createReply + PATCH pattern to properly thread draft replies in Outlook conversations.
 
 ## What Went Well
 
@@ -47,8 +56,13 @@
 
 ## Metrics
 
-- Version: 2.2.1 → 2.2.13+ (12+ patch deployments across 3 days)
+- Version: 2.2.1 → 2.2.12 (20+ patch deployments across 3 days)
 - Notion database rows created: 363 (of 364 target)
-- KPI cards: 9 → 6 (removed 3 redundant)
+- KPI cards: 9 → 6 health + 1 email triage (removed 3 redundant, added 1 new)
 - Dashboard cards: removed 1 (HealthCard)
-- Cron routes with logging: email-synthesis (others still missing)
+- Cron routes with logging: email-synthesis, email-triage
+- New pages: /emails (email triage), /contacts (contact scanner)
+- New Notion context page: ghostwriting (style guide from 129 sent emails)
+- New Supabase table: email_triage (migration-017)
+- OAuth scopes added: Microsoft Mail.ReadWrite, Google gmail.compose
+- Sent emails analyzed: 129 (style derivation)
