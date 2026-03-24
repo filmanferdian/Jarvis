@@ -35,6 +35,29 @@ Sprint 11 added current events synthesis from newsletter emails and unified all 
 | Morning Briefing | `/api/cron/morning-briefing` | Daily 7:30 WIB | x-cron-secret |
 | Fitness | `/api/cron/fitness` | Weekly Sunday 18:00 | x-cron-secret |
 | Notion Context | `/api/cron/notion-context` | Every 2 weeks | x-cron-secret |
+| Contact Scan | `/api/cron/contact-scan` | Weekly Sunday | x-cron-secret |
+
+## Sprint 12 Delivery (v2.2.9)
+
+### Contact Scanner
+- Scans Google Calendar + Outlook for external attendees
+- Filters internal domains (`@infinid.id`, `@pijar.com`, `@infinidgroup.co.id`) and meeting room resources
+- Matches against 233 existing Notion Contacts → updates "Last contact" date
+- New contacts staged in Supabase `scanned_contacts` table for triage
+- Dedicated `/contacts` page with summary cards, inline editing, batch sync to Notion
+- New env var: `NOTION_CONTACTS_DB_ID=ea7c674aecec8305800e019759d5929d`
+- New migration: `migration-016-scanned-contacts.sql` (applied)
+
+### User Actions Required
+1. **Set up cron-job.org** — Add `GET /api/cron/contact-scan` weekly (Sundays, e.g., 18:00 WIB) with `x-cron-secret` header
+2. **Triage initial contacts** — Visit `/contacts`, review the 14 pending contacts, edit names/companies, sync to Notion
+3. **Add `NOTION_CONTACTS_DB_ID`** on Railway env vars (value: `ea7c674aecec8305800e019759d5929d`)
+
+### Other Sprint 12 Fixes (v2.2.1–v2.2.8)
+- KPI cards curated (6 fixed cards), 7-day step average, tasks 3-day visibility
+- Fitness program Notion database (365 days), deload every 4 weeks
+- Email/news synthesis time_slot support, 2-period visibility
+- OKR fixes, dashboard cleanup, bullet point rendering
 
 ## Sprint 12 Candidates
 
