@@ -235,17 +235,23 @@ export const GET = withAuth(async () => {
       }
 
       // Garmin daily metrics
-      if (t.source_table === 'garmin_daily' && latestGarmin && t.source_column) {
-        // Use 7-day average for daily fluctuating metrics, latest for stable ones (vo2_max, fitness_age)
+      if (t.source_table === 'garmin_daily' && garminRows && garminRows.length > 0 && t.source_column) {
+        // Use 7-day average for daily fluctuating metrics, latest non-null for stable ones (vo2_max, fitness_age)
         const useAverage = AVERAGED_METRICS.includes(t.source_column);
-        let val = useAverage
-          ? (garmin7dAvg[t.source_column] ?? null)
-          : (latestGarmin[t.source_column] as number | null);
+        let val: number | null;
+        if (useAverage) {
+          val = garmin7dAvg[t.source_column] ?? null;
+        } else {
+          // Find most recent row with a non-null value for this column
+          const row = garminRows.find((r) => r[t.source_column!] != null);
+          val = row ? (row[t.source_column] as number | null) : null;
+        }
         // Convert sleep_duration_seconds to hours for sleep_hours KR
         if (t.key_result === 'sleep_hours' && val != null) {
           val = Math.round((val / 3600) * 10) / 10;
         }
-        return { value: val ?? null, date: latestGarmin.date };
+        const dateSource = useAverage ? garminRows[0] : garminRows.find((r) => r[t.source_column!] != null);
+        return { value: val ?? null, date: dateSource?.date ?? garminRows[0].date };
       }
 
       // Health measurements — map key_result to actual measurement_type
