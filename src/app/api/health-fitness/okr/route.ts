@@ -86,6 +86,41 @@ export const GET = withAuth(async () => {
       }
     }
 
+    // --- Dynamic baseline computation from earliest Garmin data ---
+    // For metrics with NULL baseline_value, compute from the 7 earliest days of Garmin data
+    // (proxy for "7 days prior to program start")
+    const { data: earliestGarminRows } = await supabase
+      .from('garmin_daily')
+      .select('*')
+      .order('date', { ascending: true })
+      .limit(7);
+
+    const garminEarlyAvg: Record<string, number | null> = {};
+    if (earliestGarminRows && earliestGarminRows.length > 0) {
+      const garminCols = [...AVERAGED_METRICS, 'vo2_max', 'fitness_age'];
+      for (const col of garminCols) {
+        const values = earliestGarminRows
+          .map((r) => r[col] as number | null)
+          .filter((v): v is number => v != null);
+        garminEarlyAvg[col] = values.length > 0
+          ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
+          : null;
+      }
+    }
+
+    // Earliest weight baseline
+    const { data: earliestWeights } = await supabase
+      .from('weight_log')
+      .select('weight_kg')
+      .order('date', { ascending: true })
+      .limit(7);
+
+    const earlyWeightAvg = earliestWeights && earliestWeights.length > 0
+      ? Math.round(
+          (earliestWeights.reduce((sum, w) => sum + Number(w.weight_kg), 0) / earliestWeights.length) * 10
+        ) / 10
+      : null;
+
     const { data: latestWeight } = await supabase
       .from('weight_log')
       .select('weight_kg, date')
@@ -183,25 +218,43 @@ export const GET = withAuth(async () => {
       return { value: null, date: null };
     }
 
-    function computeProgress(t: OkrTarget, current: number | null): number | null {
-      if (current == null || t.baseline_value == null) return null;
-      const baseline = t.baseline_value;
-      const target = t.target_value;
+    // Resolve effective baseline: DB value OR dynamically computed from earliest data
+    function resolveBaseline(t: OkrTarget): number | null {
+      if (t.baseline_value != null) return t.baseline_value;
 
-      if (t.target_direction === 'lower_is_better') {
+      // Weight: use earliest weight log average
+      if (t.key_result === 'weight') return earlyWeightAvg;
+
+      // Garmin-sourced metrics: use earliest Garmin data average
+      if (t.source_table === 'garmin_daily' && t.source_column) {
+        let val = garminEarlyAvg[t.source_column] ?? null;
+        // Convert sleep_duration_seconds to hours
+        if (t.key_result === 'sleep_hours' && val != null) {
+          val = Math.round((val / 3600) * 10) / 10;
+        }
+        return val;
+      }
+
+      return null;
+    }
+
+    function computeProgress(baseline: number | null, target: number, direction: string, current: number | null, targetMin: number | null, targetMax: number | null): number | null {
+      if (current == null || baseline == null) return null;
+
+      if (direction === 'lower_is_better') {
         if (baseline === target) return 100;
         const pct = ((baseline - current) / (baseline - target)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
-      } else if (t.target_direction === 'higher_is_better') {
+      } else if (direction === 'higher_is_better') {
         if (baseline === target) return 100;
         const pct = ((current - baseline) / (target - baseline)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
       }
       // range: check if within target_min-target_max
-      if (t.target_min != null && t.target_max != null) {
-        if (current >= t.target_min && current <= t.target_max) return 100;
-        if (current < t.target_min) {
-          const pct = ((current - baseline) / (t.target_min - baseline)) * 100;
+      if (targetMin != null && targetMax != null) {
+        if (current >= targetMin && current <= targetMax) return 100;
+        if (current < targetMin && baseline !== targetMin) {
+          const pct = ((current - baseline) / (targetMin - baseline)) * 100;
           return Math.max(0, Math.min(100, Math.round(pct)));
         }
       }
@@ -220,7 +273,8 @@ export const GET = withAuth(async () => {
     const objectiveMap = new Map<string, KrProgress[]>();
     for (const t of targets as OkrTarget[]) {
       const { value, date } = resolveCurrentValue(t);
-      const progress = computeProgress(t, value);
+      const effectiveBaseline = resolveBaseline(t);
+      const progress = computeProgress(effectiveBaseline, t.target_value, t.target_direction, value, t.target_min, t.target_max);
       const status = determineStatus(progress, value);
 
       const kr: KrProgress = {
@@ -228,7 +282,7 @@ export const GET = withAuth(async () => {
         target_value: t.target_value,
         target_direction: t.target_direction,
         unit: t.unit,
-        baseline_value: t.baseline_value,
+        baseline_value: effectiveBaseline,
         current_value: value,
         progress_pct: progress,
         last_updated: date,

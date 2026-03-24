@@ -154,11 +154,11 @@ export default function HealthPage() {
           </div>
         )}
 
-        {/* AI Health Insights */}
-        <HealthInsights />
-
         {/* Blood Work Panel (O4) */}
         <BloodWorkPanel entries={bloodWork} lastTestDate={lastBloodDate} />
+
+        {/* AI Health Insights — below O4 */}
+        <HealthInsights />
 
         {/* Manual Entry */}
         <ManualEntryForm onSaved={loadData} />
