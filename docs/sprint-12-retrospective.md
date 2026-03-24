@@ -37,6 +37,8 @@
 - **HRV decline redesigned:** Now computes week-over-week decline (Mon-Sun avg vs previous Mon-Sun avg) instead of raw HRV value. Shows context: "Prev week: 46 ms → This week: 50 ms".
 - **Body Battery removed from O5:** Unreliable as OKR metric (changes hourly, only synced 3x/day). O5 now has 3 KRs: Sleep, HRV Decline, Stress.
 - **Notion OKR page updated:** Removed Body Battery KR, updated HRV description to week-over-week comparison.
+- **VO2 Max / Fitness Age fix:** Stable metrics now scan backwards through recent rows to find first non-null value, instead of always reading today's (potentially incomplete) row.
+- **Progress calc fix:** `lower_is_better` metrics where baseline is already below target (e.g., stress 37 vs target 40) now correctly show 100% instead of red. Same for `higher_is_better` when current exceeds target.
 
 ## Key Decisions
 

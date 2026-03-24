@@ -92,6 +92,8 @@ New date range mode: `POST /api/sync/garmin/backfill?startDate=YYYY-MM-DD&endDat
 4. **Garmin data pruning** — `pruneOldRecords()` deletes data older than 56 days on each daily sync. Date range backfill with `computeBaseline=true` cleans up after itself to avoid data loss.
 5. **HRV decline needs both weeks** — returns null if either previous or current week has no Garmin data. Early in the week (Mon/Tue), current week has very few data points.
 6. **Steps uses `range` direction** — target_min=9000, target_max=12000. Current >= 9000 = 100%. Different from other `higher_is_better` metrics.
+7. **Stable Garmin metrics (VO2 Max, Fitness Age)** — today's row may have null if synced early. API scans backwards through recent rows to find first non-null value.
+8. **Progress calc edge case** — if baseline is already better than target (e.g., stress baseline 37 < target 40), current <= target = 100%. Without this, the formula produces negative/zero progress.
 
 ## Voice Configuration (unchanged)
 - **Voice:** Christopher (`G17SuINrv2H9FC6nvetn`) from ElevenLabs library
