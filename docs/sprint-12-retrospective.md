@@ -38,6 +38,18 @@
 - Sprint 12 is spread across multiple sessions — context handoff between sessions needs improvement
 - Deload schedule was wrong (only phase boundaries) and took user feedback to correct
 
+## OKR Page Redesign
+
+- **Layout reorder:** Health Insights moved below O4 (BloodWorkPanel) — previously appeared between OKR cards and O4, breaking the logical flow
+- **OkrCard redesign:** Each key result row now shows:
+  - Status badge (On track / Behind / Off track / No data)
+  - Current / Target values with consistent formatting and units (e.g., `9,500 / 9,000 steps`)
+  - Thicker progress bar with status-colored fill
+  - Baseline annotation below bar (`Baseline: 115.3 kg`)
+  - Progress percentage (`42% of goal`)
+- **Consistent value formatting:** Shared `formatMetricValue()` applied to baseline, current, and target — no more mismatched formats (e.g., `9,500` vs `9000`)
+- **Dynamic baseline computation:** API computes baselines from earliest 7 days of Garmin data and weight_log for metrics with NULL `baseline_value`. DB values always take priority over computed ones.
+
 ## Metrics
 
 - Version: 2.2.1 → 2.2.8 (7 patch deployments)
