@@ -169,8 +169,59 @@ export const GET = withAuth(async () => {
       ? Math.min(100, Math.round((recentActivities.length / 4) * 100))
       : null;
 
+    // --- HRV week-over-week decline computation ---
+    // Current week = Mon-today, Previous week = Mon-Sun before that
+    const todayDate = new Date(Date.now() + wibOffset);
+    const todayDay = todayDate.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const daysSinceMonday = todayDay === 0 ? 6 : todayDay - 1;
+
+    // Current week Monday
+    const currentWeekMon = new Date(todayDate);
+    currentWeekMon.setUTCDate(currentWeekMon.getUTCDate() - daysSinceMonday);
+    const currentWeekMonStr = currentWeekMon.toISOString().split('T')[0];
+
+    // Previous week Monday and Sunday
+    const prevWeekMon = new Date(currentWeekMon);
+    prevWeekMon.setUTCDate(prevWeekMon.getUTCDate() - 7);
+    const prevWeekMonStr = prevWeekMon.toISOString().split('T')[0];
+    const prevWeekSun = new Date(currentWeekMon);
+    prevWeekSun.setUTCDate(prevWeekSun.getUTCDate() - 1);
+    const prevWeekSunStr = prevWeekSun.toISOString().split('T')[0];
+
+    const { data: hrvWeekRows } = await supabase
+      .from('garmin_daily')
+      .select('date, hrv_7d_avg')
+      .gte('date', prevWeekMonStr)
+      .lte('date', todayWib)
+      .not('hrv_7d_avg', 'is', null);
+
+    let hrvDeclinePct: number | null = null;
+    let hrvPrevWeekAvg: number | null = null;
+
+    if (hrvWeekRows && hrvWeekRows.length > 0) {
+      const prevWeekVals = hrvWeekRows
+        .filter((r) => r.date >= prevWeekMonStr && r.date <= prevWeekSunStr)
+        .map((r) => r.hrv_7d_avg as number);
+      // Exclude today from current week
+      const currentWeekVals = hrvWeekRows
+        .filter((r) => r.date >= currentWeekMonStr && r.date !== todayWib)
+        .map((r) => r.hrv_7d_avg as number);
+
+      if (prevWeekVals.length > 0 && currentWeekVals.length > 0) {
+        hrvPrevWeekAvg = Math.round((prevWeekVals.reduce((a, b) => a + b, 0) / prevWeekVals.length) * 10) / 10;
+        const currentAvg = Math.round((currentWeekVals.reduce((a, b) => a + b, 0) / currentWeekVals.length) * 10) / 10;
+        const decline = ((hrvPrevWeekAvg - currentAvg) / hrvPrevWeekAvg) * 100;
+        hrvDeclinePct = Math.max(0, Math.round(decline * 10) / 10); // 0 if HRV improved
+      }
+    }
+
     // Resolve current values for each target
     function resolveCurrentValue(t: OkrTarget): { value: number | null; date: string | null } {
+      // HRV decline — week-over-week comparison
+      if (t.key_result === 'hrv_decline_pct') {
+        return { value: hrvDeclinePct, date: todayWib };
+      }
+
       // Training completion — computed from Garmin activities
       if (t.key_result === 'training_completion') {
         return { value: trainingCompletion, date: todayWib };
@@ -220,6 +271,9 @@ export const GET = withAuth(async () => {
 
     // Resolve effective baseline: DB value OR dynamically computed from earliest data
     function resolveBaseline(t: OkrTarget): number | null {
+      // HRV decline: baseline is always 0% (no decline), show prev week avg as context
+      if (t.key_result === 'hrv_decline_pct') return 0;
+
       if (t.baseline_value != null) return t.baseline_value;
 
       // Weight: use earliest weight log average
