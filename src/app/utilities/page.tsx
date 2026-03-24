@@ -62,6 +62,9 @@ export default function UtilitiesPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [styleAnalysis, setStyleAnalysis] = useState<string | null>(null);
+  const [styleLoading, setStyleLoading] = useState(false);
+  const [styleError, setStyleError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -220,6 +223,51 @@ export default function UtilitiesPage() {
             </div>
           </div>
         )}
+        {/* Email Style Analysis */}
+        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+          <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-2">Email Style Analysis</h2>
+          <p className="text-xs text-jarvis-text-dim mb-4">
+            Fetch your recent sent emails from Outlook &amp; Gmail and analyze your communication style with Claude.
+          </p>
+          {!styleAnalysis ? (
+            <button
+              onClick={async () => {
+                setStyleLoading(true);
+                setStyleError(null);
+                try {
+                  const res = await fetchAuth<{ analysis: string; emailCount: number; errors?: string[] }>(
+                    '/api/emails/style-analysis',
+                  );
+                  setStyleAnalysis(res.analysis);
+                  if (res.errors?.length) setStyleError(`Warnings: ${res.errors.join(', ')}`);
+                } catch (err) {
+                  setStyleError(err instanceof Error ? err.message : 'Failed to analyze');
+                } finally {
+                  setStyleLoading(false);
+                }
+              }}
+              disabled={styleLoading}
+              className="px-4 py-2 text-sm rounded-lg bg-jarvis-accent text-white hover:bg-jarvis-accent/90 disabled:opacity-50 transition-colors"
+            >
+              {styleLoading ? 'Analyzing sent emails…' : 'Analyze My Email Style'}
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <button
+                onClick={() => setStyleAnalysis(null)}
+                className="text-xs text-jarvis-accent hover:underline"
+              >
+                Run again
+              </button>
+              <div className="text-sm text-jarvis-text-secondary whitespace-pre-wrap leading-relaxed max-h-[60vh] overflow-y-auto">
+                {styleAnalysis}
+              </div>
+            </div>
+          )}
+          {styleError && (
+            <p className="mt-2 text-xs text-jarvis-danger">{styleError}</p>
+          )}
+        </div>
       </div>
     </AppShell>
   );

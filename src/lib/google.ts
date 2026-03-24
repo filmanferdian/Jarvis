@@ -211,6 +211,94 @@ export async function fetchRecentEmails(
   return emails;
 }
 
+export interface SentEmailDetail {
+  subject: string;
+  to: string;
+  date: string;
+  body: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractTextBody(payload: any): string {
+  // Direct body (single-part message)
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+  }
+
+  // Multipart: recurse into parts looking for text/plain first, then text/html
+  if (payload.parts) {
+    // First pass: text/plain
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+      }
+    }
+    // Second pass: recurse into nested multipart
+    for (const part of payload.parts) {
+      if (part.mimeType?.startsWith('multipart/')) {
+        const nested = extractTextBody(part);
+        if (nested) return nested;
+      }
+    }
+    // Fallback: text/html with tags stripped
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/html' && part.body?.data) {
+        const html = Buffer.from(part.body.data, 'base64url').toString('utf-8');
+        return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+    }
+  }
+
+  return '';
+}
+
+export async function fetchSentEmailsWithBody(
+  accessToken: string,
+  fromEmail: string,
+  limit: number = 50,
+): Promise<SentEmailDetail[]> {
+  const query = `in:sent from:${fromEmail}`;
+  const listUrl =
+    `${GMAIL_BASE_URL}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${limit}`;
+
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!listRes.ok) {
+    const errText = await listRes.text();
+    throw new Error(`Gmail sent list error: ${listRes.status} ${errText}`);
+  }
+
+  const listData = await listRes.json();
+  const messageIds: string[] = (listData.messages || []).map((m: { id: string }) => m.id);
+  if (messageIds.length === 0) return [];
+
+  const results: SentEmailDetail[] = [];
+  for (const msgId of messageIds.slice(0, limit)) {
+    const msgRes = await fetch(
+      `${GMAIL_BASE_URL}/users/me/messages/${msgId}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!msgRes.ok) continue;
+
+    const msg = await msgRes.json();
+    const headers: { name: string; value: string }[] = msg.payload?.headers || [];
+    const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || '(No subject)';
+    const to = headers.find((h: { name: string }) => h.name === 'To')?.value || 'unknown';
+    const body = extractTextBody(msg.payload).slice(0, 3000);
+
+    results.push({
+      subject,
+      to,
+      date: new Date(Number(msg.internalDate)).toISOString(),
+      body,
+    });
+  }
+
+  return results;
+}
+
 // --- Google Calendar API ---
 
 interface GoogleCalendarEvent {

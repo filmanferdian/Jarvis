@@ -233,6 +233,49 @@ export async function fetchRecentEmails(
   }));
 }
 
+export interface SentEmailDetail {
+  subject: string;
+  to: string;
+  date: string;
+  body: string;
+}
+
+export async function fetchSentEmailsWithBody(
+  accessToken: string,
+  limit: number = 50,
+): Promise<SentEmailDetail[]> {
+  const url =
+    `${GRAPH_BASE_URL}/me/mailFolders/SentItems/messages?$top=${limit}&$orderby=sentDateTime desc&$select=subject,toRecipients,sentDateTime,body`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Graph SentItems API error: ${res.status} ${errText}`);
+  }
+
+  const data = await res.json();
+  return (data.value || []).map((msg: {
+    subject?: string;
+    toRecipients?: { emailAddress?: { address?: string } }[];
+    sentDateTime?: string;
+    body?: { contentType?: string; content?: string };
+  }) => {
+    let body = msg.body?.content || '';
+    if (msg.body?.contentType === 'html') {
+      body = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return {
+      subject: msg.subject || '(No subject)',
+      to: msg.toRecipients?.[0]?.emailAddress?.address || 'unknown',
+      date: msg.sentDateTime || '',
+      body: body.slice(0, 3000),
+    };
+  });
+}
+
 // --- Calendar Transform ---
 
 export function transformGraphEvent(event: GraphEvent): CalendarEventRow {
