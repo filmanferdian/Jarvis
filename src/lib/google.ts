@@ -218,7 +218,16 @@ interface GoogleCalendarEvent {
   summary?: string;
   start: { dateTime?: string; date?: string; timeZone?: string };
   end: { dateTime?: string; date?: string; timeZone?: string };
+  attendees?: {
+    email: string;
+    displayName?: string;
+    responseStatus?: string;
+    self?: boolean;
+  }[];
 }
+
+// Re-export for contact scanner
+export type { GoogleCalendarEvent };
 
 export interface CalendarEventRow {
   event_id: string;
@@ -282,4 +291,42 @@ export async function fetchCalendarEvents(
 
   const data = await res.json();
   return data.items || [];
+}
+
+/** Fetch calendar events with pagination — for contact scanning over wider date ranges */
+export async function fetchCalendarEventsPaginated(
+  accessToken: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GoogleCalendarEvent[]> {
+  const allEvents: GoogleCalendarEvent[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      maxResults: '250',
+      timeZone: 'Asia/Jakarta',
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+
+    const url = `${CALENDAR_BASE_URL}/calendars/primary/events?${params.toString()}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Google Calendar API error: ${res.status} ${errText}`);
+    }
+
+    const data = await res.json();
+    allEvents.push(...(data.items || []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return allEvents;
 }

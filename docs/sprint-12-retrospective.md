@@ -52,7 +52,31 @@
 
 ## Metrics
 
-- Version: 2.2.1 → 2.2.8 (7 patch deployments)
+- Version: 2.2.1 → 2.2.9 (8 patch deployments)
 - Notion database rows created: 363 (of 364 target)
 - KPI cards: 9 → 6 (removed 3 redundant)
 - Dashboard cards: removed 1 (HealthCard)
+- New page: `/contacts` — calendar invite contact scanner
+- New cron: `/api/cron/contact-scan` — weekly contact scanning
+- External contacts scanned: 14 from 209 calendar events (4-week backfill)
+
+## Contact Scanner (v2.2.9)
+
+Scans Google Calendar and Outlook calendar invites for external attendees, matches against the existing Notion Contacts database (233 entries), and surfaces new contacts for manual triage.
+
+**Internal domains filtered:** `@infinid.id` (all subdomains), `@pijar.com`, `@infinidgroup.co.id`, `@resource.calendar.google.com`
+
+**Flow:** Scan → Supabase cache → User reviews name/company in triage table → Sync selected to Notion
+
+**Files created:**
+- `src/lib/contacts.ts` — domain filtering, attendee extraction
+- `src/lib/sync/contactScan.ts` — scan orchestration, Notion matching + Last contact updates
+- `src/app/api/contacts/` — 4 routes (GET, scan, store, update)
+- `src/app/api/cron/contact-scan/route.ts` — weekly cron
+- `src/app/contacts/page.tsx` — dedicated page with summary cards + triage table
+- `supabase/migration-016-scanned-contacts.sql`
+
+**Files modified:**
+- `src/lib/google.ts` — added `attendees` to `GoogleCalendarEvent`, added paginated fetch
+- `src/lib/microsoft.ts` — added `attendees` to `GraphEvent`
+- `src/components/Sidebar.tsx` — added Contacts nav link

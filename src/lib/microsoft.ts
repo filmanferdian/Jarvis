@@ -21,7 +21,15 @@ interface GraphEvent {
   isAllDay: boolean;
   start: { dateTime: string; timeZone: string };
   end: { dateTime: string; timeZone: string };
+  attendees?: {
+    emailAddress: { name: string; address: string };
+    type: string;
+    status: { response: string };
+  }[];
 }
+
+// Re-export for contact scanner
+export type { GraphEvent };
 
 export interface CalendarEventRow {
   event_id: string;
