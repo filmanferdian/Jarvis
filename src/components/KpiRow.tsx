@@ -19,7 +19,7 @@ interface TriageData {
 function formatTriageDate(dateStr: string, slot: string): string {
   const [, month, day] = dateStr.split('-');
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)} — ${slot}`;
+  return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)} - ${slot}`;
 }
 
 interface Kpi {
@@ -159,23 +159,20 @@ export default function KpiRow() {
           href="/emails"
           className="min-w-[180px] max-w-[220px] shrink-0 rounded-xl border border-jarvis-accent/30 bg-jarvis-bg-card p-4 hover:border-jarvis-accent/50 transition-colors"
         >
-          <p className="text-[11px] uppercase tracking-wider text-jarvis-accent/70 mb-0.5">
-            Email Triage
+          <p className="text-[11px] uppercase tracking-wider text-jarvis-text-dim mb-0.5">
+            Work
           </p>
           <p className="text-[13px] text-jarvis-text-secondary mb-2">
-            Needs Response
+            Email Triage
           </p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold text-jarvis-accent font-mono">
+          <div className="flex items-baseline gap-1 mb-1">
+            <span className="text-2xl font-semibold text-jarvis-text-primary font-mono">
               {triageData.summary.need_response}
             </span>
             <span className="text-xs text-jarvis-text-dim">
               / {triageData.summary.total}
             </span>
           </div>
-          <p className="text-[11px] text-jarvis-text-muted mt-1">
-            {triageData.summary.drafts_created} drafted
-          </p>
           <p className="text-[10px] text-jarvis-text-dim mt-2">
             {formatTriageDate(triageData.date, triageData.latestSlot)}
           </p>
