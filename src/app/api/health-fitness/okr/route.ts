@@ -304,10 +304,18 @@ export const GET = withAuth(async () => {
       if (current == null || baseline == null) return null;
 
       if (direction === 'lower_is_better') {
+        // Already at or below target = 100%
+        if (current <= target) return 100;
         if (baseline === target) return 100;
+        // If baseline is already below target (better than goal), use current vs target directly
+        if (baseline <= target) {
+          return current <= target ? 100 : Math.max(0, Math.round((1 - (current - target) / target) * 100));
+        }
         const pct = ((baseline - current) / (baseline - target)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
       } else if (direction === 'higher_is_better') {
+        // Already at or above target = 100%
+        if (current >= target) return 100;
         if (baseline === target) return 100;
         const pct = ((current - baseline) / (target - baseline)) * 100;
         return Math.max(0, Math.min(100, Math.round(pct)));
