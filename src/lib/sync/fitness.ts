@@ -282,10 +282,10 @@ async function extractWithClaude(programContent: string, subpageContents: string
 
 IMPORTANT RULES:
 1. Today's date is ${todayWib} (WIB timezone).
-2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly.
+2. current_week MUST be ${currentWeek}. This was determined from the program's milestones table date ranges. Do NOT override this with any week number you find elsewhere in the content — use ${currentWeek} exactly. Ignore any "← current" markers in the milestones table; they may be stale.
 3. Look at the program edit log at the bottom for the latest changes.
 4. Sub-pages are provided as reference context. Only apply Ramadan-specific adjustments (eating window, schedule, macro changes) if Ramadan is currently active based on today's date. Outside of Ramadan, use the standard schedule and eating window from the main program content.
-5. The cardio schedule varies by week. Look for the "WEEKS 1-12 CARDIO SCHEDULE" table — it has columns for each day (Mon, Tue, Wed, Thu, Fri, Sat, Sun). Extract cardio values from Week ${currentWeek}'s row and map each column to the corresponding day in cardio_schedule.
+5. CARDIO EXTRACTION (critical): Find the "WEEKS 1-12 CARDIO SCHEDULE" table (columns: Week, Dates, Mon, Tue, Wed, Thu, Fri, Sat, Sun, Total/Week). Locate the row where Week = ${currentWeek}. Copy each day's cell value VERBATIM — preserve the exact activity type ("walk" vs "run"), exact duration, and any BPM targets. Do NOT use values from adjacent weeks. Double-check: Wednesday and Saturday are typically "run" sessions, not "walk".
 
 Return ONLY valid JSON matching this exact structure:
 {
