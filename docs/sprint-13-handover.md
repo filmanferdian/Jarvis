@@ -94,6 +94,9 @@ New date range mode: `POST /api/sync/garmin/backfill?startDate=YYYY-MM-DD&endDat
 6. **Steps uses `range` direction** — target_min=9000, target_max=12000. Current >= 9000 = 100%. Different from other `higher_is_better` metrics.
 7. **Stable Garmin metrics (VO2 Max, Fitness Age)** — today's row may have null if synced early. API scans backwards through recent rows to find first non-null value.
 8. **Progress calc edge case** — if baseline is already better than target (e.g., stress baseline 37 < target 40), current <= target = 100%. Without this, the formula produces negative/zero progress.
+9. **OKR scoring is weighted** — each objective = 20 points, KRs equally weighted within, each capped at 100%. Total score = sum of objective contributions (0-100). No overscoring from strong metrics.
+10. **Lean mass is a floor metric** — uses `range` direction with target_min=74. Current >= 74 = 100%. Different from other `higher_is_better` metrics.
+11. **Training adherence deactivated** — removed from O3. O3 now has 3 KRs: Dead Hang, Steps, OHS.
 
 ## Voice Configuration (unchanged)
 - **Voice:** Christopher (`G17SuINrv2H9FC6nvetn`) from ElevenLabs library

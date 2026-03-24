@@ -39,6 +39,9 @@
 - **Notion OKR page updated:** Removed Body Battery KR, updated HRV description to week-over-week comparison.
 - **VO2 Max / Fitness Age fix:** Stable metrics now scan backwards through recent rows to find first non-null value, instead of always reading today's (potentially incomplete) row.
 - **Progress calc fix:** `lower_is_better` metrics where baseline is already below target (e.g., stress 37 vs target 40) now correctly show 100% instead of red. Same for `higher_is_better` when current exceeds target.
+- **Lean mass as floor metric:** Changed to `range` direction (floor at 74 kg). Current >= 74 = 100%. Tracks preservation, not improvement.
+- **Training adherence removed from O3:** Deactivated — O3 now has 3 KRs (Dead Hang, Steps, OHS).
+- **Weighted OKR scoring:** Each objective = 20 points (5 × 20 = 100). KRs contribute equally within objective, each capped at 100% — no overscoring from strong metrics compensating weak ones.
 
 ## Key Decisions
 
