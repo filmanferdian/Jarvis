@@ -12,7 +12,14 @@ interface TriageSummary {
 
 interface TriageData {
   date: string;
+  latestSlot: string;
   summary: TriageSummary;
+}
+
+function formatTriageDate(dateStr: string, slot: string): string {
+  const [, month, day] = dateStr.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)} — ${slot}`;
 }
 
 interface Kpi {
@@ -156,7 +163,7 @@ export default function KpiRow() {
             Email Triage
           </p>
           <p className="text-[13px] text-jarvis-text-secondary mb-2">
-            {triageData.date}
+            Needs Response
           </p>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-semibold text-jarvis-accent font-mono">
@@ -167,7 +174,10 @@ export default function KpiRow() {
             </span>
           </div>
           <p className="text-[11px] text-jarvis-text-muted mt-1">
-            {triageData.summary.need_response} triaged, {triageData.summary.drafts_created} drafted
+            {triageData.summary.drafts_created} drafted
+          </p>
+          <p className="text-[10px] text-jarvis-text-dim mt-2">
+            {formatTriageDate(triageData.date, triageData.latestSlot)}
           </p>
         </Link>
       )}

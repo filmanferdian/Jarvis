@@ -59,5 +59,18 @@ export const GET = withAuth(async (_req: NextRequest) => {
       received_at: r.received_at,
     }));
 
-  return NextResponse.json({ date, summary, needResponse, otherEmails });
+  // Determine latest time slot from most recent created_at
+  const latestCreatedAt = rows.reduce((latest, r) => {
+    const t = new Date(r.created_at).getTime();
+    return t > latest ? t : latest;
+  }, 0);
+  let latestSlot = 'Morning';
+  if (latestCreatedAt > 0) {
+    const wib = new Date(latestCreatedAt + 7 * 60 * 60 * 1000);
+    const hour = wib.getUTCHours();
+    if (hour >= 17 || hour < 5) latestSlot = 'Evening';
+    else if (hour >= 11) latestSlot = 'Afternoon';
+  }
+
+  return NextResponse.json({ date, latestSlot, summary, needResponse, otherEmails });
 });
