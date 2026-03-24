@@ -25,6 +25,7 @@ interface KrProgress {
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
+  context?: string;
 }
 
 interface ObjectiveProgress {
@@ -197,6 +198,7 @@ export const GET = withAuth(async () => {
 
     let hrvDeclinePct: number | null = null;
     let hrvPrevWeekAvg: number | null = null;
+    let hrvCurrentWeekAvg: number | null = null;
 
     if (hrvWeekRows && hrvWeekRows.length > 0) {
       const prevWeekVals = hrvWeekRows
@@ -209,8 +211,8 @@ export const GET = withAuth(async () => {
 
       if (prevWeekVals.length > 0 && currentWeekVals.length > 0) {
         hrvPrevWeekAvg = Math.round((prevWeekVals.reduce((a, b) => a + b, 0) / prevWeekVals.length) * 10) / 10;
-        const currentAvg = Math.round((currentWeekVals.reduce((a, b) => a + b, 0) / currentWeekVals.length) * 10) / 10;
-        const decline = ((hrvPrevWeekAvg - currentAvg) / hrvPrevWeekAvg) * 100;
+        hrvCurrentWeekAvg = Math.round((currentWeekVals.reduce((a, b) => a + b, 0) / currentWeekVals.length) * 10) / 10;
+        const decline = ((hrvPrevWeekAvg - hrvCurrentWeekAvg) / hrvPrevWeekAvg) * 100;
         hrvDeclinePct = Math.max(0, Math.round(decline * 10) / 10); // 0 if HRV improved
       }
     }
@@ -331,6 +333,12 @@ export const GET = withAuth(async () => {
       const progress = computeProgress(effectiveBaseline, t.target_value, t.target_direction, value, t.target_min, t.target_max);
       const status = determineStatus(progress, value);
 
+      // Build context string for metrics that need extra info
+      let context: string | undefined;
+      if (t.key_result === 'hrv_decline_pct' && hrvPrevWeekAvg != null && hrvCurrentWeekAvg != null) {
+        context = `Prev week: ${Math.round(hrvPrevWeekAvg)} ms → This week: ${Math.round(hrvCurrentWeekAvg)} ms`;
+      }
+
       const kr: KrProgress = {
         key_result: t.key_result,
         target_value: t.target_value,
@@ -341,6 +349,7 @@ export const GET = withAuth(async () => {
         progress_pct: progress,
         last_updated: date,
         status,
+        ...(context ? { context } : {}),
       };
 
       const existing = objectiveMap.get(t.objective) || [];

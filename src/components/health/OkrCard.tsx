@@ -10,6 +10,7 @@ interface KrProgress {
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
+  context?: string;
 }
 
 interface OkrCardProps {
@@ -210,10 +211,10 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
                 )}
               </div>
 
-              {/* Row 3: Baseline and gap annotation */}
+              {/* Row 3: Context or baseline annotation */}
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-[10px] text-jarvis-text-dim">
-                  {hasBaseline ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}` : 'No baseline'}
+                  {kr.context ? kr.context : hasBaseline ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}` : 'No baseline'}
                 </span>
                 {hasData && hasBaseline && kr.progress_pct != null && (
                   <span className="text-[10px] text-jarvis-text-dim">
