@@ -10,3 +10,6 @@ CREATE TABLE IF NOT EXISTS notion_context (
   last_edited TEXT,
   synced_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE notion_context ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for notion_context" ON notion_context FOR ALL USING (true);

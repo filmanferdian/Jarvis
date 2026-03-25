@@ -27,3 +27,6 @@ CREATE INDEX idx_email_triage_category ON email_triage(category);
 
 INSERT INTO sync_status (sync_type) VALUES ('email-triage')
   ON CONFLICT (sync_type) DO NOTHING;
+
+ALTER TABLE email_triage ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for email_triage" ON email_triage FOR ALL USING (true);

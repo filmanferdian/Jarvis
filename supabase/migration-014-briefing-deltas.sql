@@ -12,3 +12,6 @@ CREATE TABLE IF NOT EXISTS briefing_deltas (
 );
 
 CREATE INDEX IF NOT EXISTS idx_briefing_deltas_date ON briefing_deltas(date);
+
+ALTER TABLE briefing_deltas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for briefing_deltas" ON briefing_deltas FOR ALL USING (true);
