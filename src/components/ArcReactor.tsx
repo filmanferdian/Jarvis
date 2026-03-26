@@ -86,6 +86,7 @@ export default function ArcReactor({ state = 'idle', size = 'md', className = ''
   const sparksRef = useRef<Spark[]>([]);
   const timeRef = useRef(0);
   const stateRef = useRef(state);
+  const isMobileRef = useRef(false);
   const pixelSize = SIZE_MAP[size];
 
   // Update state ref
@@ -111,7 +112,8 @@ export default function ArcReactor({ state = 'idle', size = 'md', className = ''
     const cx = w / 2;
     const cy = h / 2;
     const r = Math.min(cx, cy) * 0.88;
-    const isSmall = w <= 40; // Simplified rendering for sm size
+    // Simplified rendering for small canvas OR mobile screens (saves battery)
+    const isSmall = w <= 40 || (w <= 80 && isMobileRef.current);
 
     ctx.clearRect(0, 0, w, h);
 
@@ -368,6 +370,9 @@ export default function ArcReactor({ state = 'idle', size = 'md', className = ''
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const isMobile = window.innerWidth < 768;
+    isMobileRef.current = isMobile;
+
     const dpr = window.devicePixelRatio || 1;
     const displaySize = pixelSize;
     canvas.width = displaySize * dpr;
@@ -379,20 +384,33 @@ export default function ArcReactor({ state = 'idle', size = 'md', className = ''
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
-    // Initialize sparks
-    sparksRef.current = initSparks(STATE_CONFIG[stateRef.current].sparkCount);
+    // Initialize sparks — fewer on mobile to reduce GPU load
+    const sparkCount = isMobile && size !== 'full'
+      ? Math.min(2, STATE_CONFIG[stateRef.current].sparkCount)
+      : STATE_CONFIG[stateRef.current].sparkCount;
+    sparksRef.current = initSparks(sparkCount);
 
-    const animate = () => {
-      timeRef.current += 0.016; // ~60fps
+    // Throttle to ~30fps on mobile for non-fullscreen sizes (saves battery)
+    const frameInterval = (isMobile && size !== 'full') ? 33 : 16;
+    let lastFrame = 0;
+
+    const animate = (now: number) => {
+      animRef.current = requestAnimationFrame(animate);
+      if (now - lastFrame < frameInterval) return;
+      lastFrame = now;
+
+      timeRef.current += frameInterval / 1000;
       const config = STATE_CONFIG[stateRef.current];
 
       // Adjust spark count dynamically
-      if (sparksRef.current.length !== config.sparkCount) {
-        sparksRef.current = initSparks(config.sparkCount);
+      const targetSparks = isMobile && size !== 'full'
+        ? Math.min(2, config.sparkCount)
+        : config.sparkCount;
+      if (sparksRef.current.length !== targetSparks) {
+        sparksRef.current = initSparks(targetSparks);
       }
 
       draw(ctx, displaySize, displaySize, timeRef.current);
-      animRef.current = requestAnimationFrame(animate);
     };
 
     animRef.current = requestAnimationFrame(animate);
@@ -400,7 +418,7 @@ export default function ArcReactor({ state = 'idle', size = 'md', className = ''
     return () => {
       cancelAnimationFrame(animRef.current);
     };
-  }, [pixelSize, draw, initSparks]);
+  }, [pixelSize, size, draw, initSparks]);
 
   // Check reduced motion preference
   const prefersReducedMotion = typeof window !== 'undefined'

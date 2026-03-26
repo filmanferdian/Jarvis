@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSpeaking } from '@/contexts/SpeakingContext';
 
 interface TTSButtonProps {
   text: string;
@@ -16,10 +17,19 @@ function isIOS(): boolean {
 export default function TTSButton({ text, audioUrl }: TTSButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { setSpeaking, registerStopFn } = useSpeaking();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync speaking state to context overlay
+  useEffect(() => {
+    setSpeaking(isPlaying);
+  }, [isPlaying, setSpeaking]);
+
+  // Register stop function so overlay can stop playback
+  const stopPlaybackRef = useRef<() => void>(() => {});
 
   // Cleanup on unmount
   useEffect(() => {
@@ -28,8 +38,9 @@ export default function TTSButton({ text, audioUrl }: TTSButtonProps) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       if (audioRef.current) audioRef.current.pause();
+      setSpeaking(false);
     };
-  }, []);
+  }, [setSpeaking]);
 
   const stopPlayback = () => {
     // Abort in-flight fetch
@@ -56,6 +67,12 @@ export default function TTSButton({ text, audioUrl }: TTSButtonProps) {
     setIsPlaying(false);
     setIsLoading(false);
   };
+
+  // Keep the ref and context registration in sync
+  stopPlaybackRef.current = stopPlayback;
+  useEffect(() => {
+    registerStopFn(() => stopPlaybackRef.current());
+  }, [registerStopFn]);
 
   const fallbackToWebSpeech = () => {
     if (!('speechSynthesis' in window)) return;

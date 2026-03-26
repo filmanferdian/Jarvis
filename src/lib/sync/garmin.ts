@@ -446,6 +446,30 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
         .upsert(rec, { onConflict: 'activity_id' });
       if (!error) activitiesSynced++;
     }
+
+    // Auto-detect 10k run: find fastest run >=9.5km and record as health measurement
+    const runs10k = actRecords.filter(
+      (r) => r.activity_type?.includes('run') && r.distance_meters != null && r.distance_meters >= 9500 && r.duration_seconds != null
+    );
+    if (runs10k.length > 0) {
+      const fastest = runs10k.reduce((best, r) =>
+        (r.duration_seconds! < best.duration_seconds!) ? r : best
+      );
+      // Upsert to health_measurements (date from activity start, not today)
+      const runDate = fastest.started_at
+        ? new Date(fastest.started_at).toISOString().split('T')[0]
+        : today;
+      await supabase.from('health_measurements').delete()
+        .eq('date', runDate)
+        .eq('measurement_type', 'run_10k_seconds');
+      await supabase.from('health_measurements').insert({
+        date: runDate,
+        measurement_type: 'run_10k_seconds',
+        value: fastest.duration_seconds,
+        unit: 'seconds',
+        source: 'garmin',
+      });
+    }
   }
 
   // Auto-update domain KPIs for Health & Fitness

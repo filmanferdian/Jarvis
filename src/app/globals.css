@@ -122,28 +122,6 @@ body {
 .animate-reactor-spin-med { animation: reactor-ring-spin 12s linear infinite; }
 .animate-reactor-spin-fast { animation: reactor-ring-spin 4s linear infinite; }
 
-/* ── Jarvis Orb Animations (legacy, still used by JarvisOrb) ── */
-@keyframes orb-breathe {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.08); }
-}
-
-@keyframes orb-speak {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  25% { opacity: 0.7; transform: scale(1.15); }
-  75% { opacity: 0.5; transform: scale(1.05); }
-}
-
-@keyframes orb-listen {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.12); }
-}
-
-@keyframes orb-think {
-  0%, 100% { opacity: 0.4; transform: scale(1.02); }
-  50% { opacity: 0.6; transform: scale(1.06); }
-}
-
 @keyframes wave-bar {
   0%, 100% { transform: scaleY(0.4); }
   50% { transform: scaleY(1); }
@@ -159,10 +137,6 @@ body {
   100% { transform: scale(2); opacity: 0; }
 }
 
-.animate-orb-breathe { animation: orb-breathe 4s ease-in-out infinite; }
-.animate-orb-speak { animation: orb-speak 1.5s ease-in-out infinite; }
-.animate-orb-listen { animation: orb-listen 2s ease-in-out infinite; }
-.animate-orb-think { animation: orb-think 2.5s ease-in-out infinite; }
 .animate-wave-bar { animation: wave-bar 0.8s ease-in-out infinite; }
 .animate-ping-slow { animation: ping-slow 2s ease-out infinite; }
 .animate-ping-slower { animation: ping-slower 2.5s ease-out infinite; }
@@ -177,10 +151,6 @@ body {
   .animate-reactor-spin-slow,
   .animate-reactor-spin-med,
   .animate-reactor-spin-fast,
-  .animate-orb-breathe,
-  .animate-orb-speak,
-  .animate-orb-listen,
-  .animate-orb-think,
   .animate-wave-bar,
   .animate-ping-slow,
   .animate-ping-slower,
