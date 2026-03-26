@@ -24,6 +24,23 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const start = Date.now();
 
+  // Content-Type enforcement for mutating API requests (CSRF protection)
+  // Forms can POST cross-origin without CORS preflight; requiring JSON blocks this vector
+  if (
+    pathname.startsWith('/api/') &&
+    ['POST', 'PUT', 'PATCH'].includes(req.method) &&
+    !pathname.startsWith('/api/auth/google') &&
+    !pathname.startsWith('/api/auth/microsoft')
+  ) {
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json(
+        { error: 'Content-Type must be application/json' },
+        { status: 415 },
+      );
+    }
+  }
+
   // Rate limiting for auth login (brute force protection)
   if (pathname === '/api/auth/login' && req.method === 'POST') {
     if (!checkRateLimit('login', 5, 60_000)) {
@@ -39,6 +56,16 @@ export function middleware(req: NextRequest) {
     if (!checkRateLimit('weight', 10, 3600_000)) {
       return NextResponse.json(
         { error: 'Too many weight submissions. Try again later.' },
+        { status: 429 },
+      );
+    }
+  }
+
+  // Rate limiting for AI endpoints (burst protection)
+  if (pathname.startsWith('/api/voice/') && req.method === 'POST') {
+    if (!checkRateLimit('voice', 20, 60_000)) {
+      return NextResponse.json(
+        { error: 'Too many AI requests. Try again later.' },
         { status: 429 },
       );
     }

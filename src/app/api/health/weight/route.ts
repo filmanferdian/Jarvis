@@ -9,7 +9,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     const { date } = body as { weight_kg?: unknown; date?: string };
 
     // Extract numeric weight from whatever iOS Shortcuts sends
-    console.log('weight raw body:', JSON.stringify(body));
+    console.log('weight request received, keys:', Object.keys(body).join(','));
 
     function extractNumber(val: unknown): number {
       if (typeof val === 'number') return val;
@@ -45,7 +45,7 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     if (!weight_kg || isNaN(weight_kg) || weight_kg <= 0) {
       return NextResponse.json(
-        { error: 'weight_kg is required and must be a positive number', received: body },
+        { error: 'weight_kg is required and must be a positive number' },
         { status: 400 },
       );
     }
