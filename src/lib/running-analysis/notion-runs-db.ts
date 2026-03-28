@@ -5,7 +5,7 @@
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
-const RUNS_DB_ID = '88f904d6-d50b-4261-a4db-2a224211a7b9';
+const RUNS_DB_ID = '061105bb-bd86-464b-b344-c86d89c771ca';
 
 function notionHeaders(apiKey: string) {
   return {
