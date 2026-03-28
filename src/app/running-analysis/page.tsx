@@ -120,8 +120,8 @@ export default function RunningAnalysisPage() {
         <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
           <h1 className="text-[17px] font-semibold text-jarvis-text-primary mb-1">Running Analysis</h1>
           <p className="text-[13px] text-jarvis-text-muted">
-            Automatic weekly analysis of outdoor running data. Runs every Monday at 6am WIB,
-            analyzing the previous Mon–Sun week. Ingests from Garmin → Notion Runs DB →
+            Automatic weekly analysis of outdoor running data. Runs every Saturday at 12pm WIB,
+            analyzing Mon–Sat of the current week. Ingests from Garmin → Notion Runs DB →
             Weekly Insights DB → Dashboard.
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function RunningAnalysisPage() {
                 placeholder="defaults to previous week"
               />
               <p className="text-[11px] text-jarvis-text-dim mt-1">
-                Analyzes the Mon–Sun week containing this date. Leave empty for previous week.
+                Analyzes Mon–today of the week containing this date. Leave empty for current week.
               </p>
             </div>
 
