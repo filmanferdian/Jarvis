@@ -3,8 +3,8 @@ import { withCronAuth } from '@/lib/cronAuth';
 import { runRunningAnalysis } from '@/lib/running-analysis';
 import { markSynced } from '@/lib/syncTracker';
 
-// GET: Cron trigger — runs every Monday at 6am WIB (Sunday 23:00 UTC)
-// Analyzes the previous Mon–Sun week's outdoor running data.
+// GET: Cron trigger — runs every Saturday at 12pm WIB (05:00 UTC)
+// Analyzes Mon–today of the current week's outdoor running data.
 export const GET = withCronAuth(async (_req: NextRequest) => {
   try {
     const result = await runRunningAnalysis();
