@@ -230,7 +230,7 @@ async function checkBudgetOrBlock(): Promise<void> {
   }
 }
 
-async function createClient(retries = GARMIN_LOGIN_RETRIES): Promise<GarminConnect> {
+export async function createGarminClient(retries = GARMIN_LOGIN_RETRIES): Promise<GarminConnect> {
   // Check circuit breaker before any API contact
   const blockStatus = await isGarminBlocked();
   if (blockStatus.blocked) {
@@ -372,7 +372,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
     };
   }
 
-  const client = await createClient();
+  const client = await createGarminClient();
   const dateObj = new Date(`${today}T00:00:00+07:00`);
 
   // Fetch all 10 endpoints sequentially with 1s delay between each call
@@ -780,7 +780,7 @@ export async function backfillDateRange(startDate: string, endDate: string, comp
     };
   }
 
-  const client = await createClient();
+  const client = await createGarminClient();
   const result: BackfillResult = {
     days_synced: 0, days_enriched: 0, days_skipped: 0, days_failed: 0, activities_synced: 0,
   };
@@ -903,7 +903,7 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
     };
   }
 
-  const client = await createClient();
+  const client = await createGarminClient();
   const result: BackfillResult = {
     days_synced: 0,
     days_enriched: 0,
