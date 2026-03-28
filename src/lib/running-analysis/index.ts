@@ -65,22 +65,12 @@ function getWeekRange(dateStr: string): { weekStart: string; weekEnd: string } {
   };
 }
 
-/** Get the previous Mon–Sun week from WIB today */
-function getPreviousWeekRange(): { weekStart: string; weekEnd: string } {
+/** Get the current Mon–today range in WIB (used for Saturday trigger) */
+function getCurrentWeekRange(): { weekStart: string; weekEnd: string } {
   const wibNow = getWibNow();
   const wibToday = wibNow.toISOString().split('T')[0];
-  const { weekStart: thisWeekMon } = getWeekRange(wibToday);
-
-  // Go back 7 days from this week's Monday
-  const prevMon = new Date(`${thisWeekMon}T00:00:00Z`);
-  prevMon.setUTCDate(prevMon.getUTCDate() - 7);
-  const prevSun = new Date(prevMon);
-  prevSun.setUTCDate(prevMon.getUTCDate() + 6);
-
-  return {
-    weekStart: prevMon.toISOString().split('T')[0],
-    weekEnd: prevSun.toISOString().split('T')[0],
-  };
+  const { weekStart } = getWeekRange(wibToday);
+  return { weekStart, weekEnd: wibToday };
 }
 
 interface GarminActivityRow {
@@ -247,7 +237,7 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
   if (options.date) {
     weekRange = getWeekRange(options.date);
   } else {
-    weekRange = getPreviousWeekRange();
+    weekRange = getCurrentWeekRange();
   }
 
   const { weekStart, weekEnd } = weekRange;
