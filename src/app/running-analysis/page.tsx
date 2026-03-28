@@ -115,9 +115,6 @@ export default function RunningAnalysisPage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<TriggerResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dateOverride, setDateOverride] = useState('');
-  const [analysisOnly, setAnalysisOnly] = useState(false);
-  const [forceResync, setForceResync] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -156,16 +153,11 @@ export default function RunningAnalysisPage() {
     setError(null);
 
     try {
-      const body: Record<string, unknown> = {};
-      if (dateOverride) body.date = dateOverride;
-      if (analysisOnly) body.analysis_only = true;
-      if (forceResync) body.force_resync = true;
-
       const res = await fetch('/api/running-analysis', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
       });
 
       const data = await res.json();
@@ -382,53 +374,18 @@ export default function RunningAnalysisPage() {
         </div>
 
         {/* Manual Trigger */}
-        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5 space-y-4">
-          <h2 className="text-[13px] font-medium text-jarvis-text-primary uppercase tracking-wider">
-            Manual Trigger
-          </h2>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[12px] text-jarvis-text-muted mb-1">
-                Week date override <span className="text-jarvis-text-dim">(YYYY-MM-DD, optional)</span>
-              </label>
-              <input
-                type="date"
-                value={dateOverride}
-                onChange={(e) => setDateOverride(e.target.value)}
-                className="bg-jarvis-bg border border-jarvis-border rounded-lg px-3 py-1.5 text-[13px] text-jarvis-text-primary focus:outline-none focus:border-jarvis-accent w-48"
-              />
-              <p className="text-[11px] text-jarvis-text-dim mt-1">
-                Analyzes Mon–today of the week containing this date. Leave empty for current week.
-              </p>
-            </div>
-
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 text-[13px] text-jarvis-text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={analysisOnly}
-                  onChange={(e) => setAnalysisOnly(e.target.checked)}
-                  className="accent-jarvis-accent"
-                />
-                Analysis only <span className="text-jarvis-text-dim">(skip Notion ingestion)</span>
-              </label>
-              <label className="flex items-center gap-2 text-[13px] text-jarvis-text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={forceResync}
-                  onChange={(e) => setForceResync(e.target.checked)}
-                  className="accent-jarvis-accent"
-                />
-                Force re-sync <span className="text-jarvis-text-dim">(overwrite existing)</span>
-              </label>
-            </div>
+        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[13px] text-jarvis-text-primary font-medium mb-0.5">Run this week's analysis</p>
+            <p className="text-[12px] text-jarvis-text-dim">
+              Pulls Mon – today, ingests new runs, generates Claude analysis.
+              {running && ' This may take 1–2 minutes…'}
+            </p>
           </div>
-
           <button
             onClick={handleTrigger}
             disabled={running}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-jarvis-accent text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-jarvis-accent text-white text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {running ? (
               <>
@@ -436,18 +393,12 @@ export default function RunningAnalysisPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Running analysis...
+                Running…
               </>
             ) : (
               'Run Analysis'
             )}
           </button>
-
-          {running && (
-            <p className="text-[12px] text-jarvis-text-dim">
-              This may take 1–2 minutes — Garmin API calls are rate-limited with 1.5s delays.
-            </p>
-          )}
         </div>
 
         {/* Error */}
