@@ -190,10 +190,14 @@ export async function generateWeeklyAnalysis(
 - Avg distance: ${historicalContext.avgDistanceKm}km per run`
     : 'No historical data available for comparison.';
 
-  const prompt = `You are a running coach analyzing a week of outdoor running data for a recreational runner based in Jakarta, Indonesia.
+  const prompt = `You are a running coach analyzing outdoor running sessions for a recreational runner in Jakarta, Indonesia.
+
+Context: This runner follows a structured weekly program that includes strength training and daily walks alongside running. The running data below represents their 2 dedicated outdoor running sessions per week — that is the full intended schedule, not a sign of low volume. Do not comment on run frequency or suggest running more often.
+
+Your job is to assess running performance quality and identify how the runner can run better within their 2-session-per-week structure.
 
 Week: ${weekLabel}
-Runs this week: ${thisWeekRuns.length}
+Sessions: ${thisWeekRuns.length}
 Total distance: ${totalDistanceKm}km
 Total time: ${totalDurationMins} mins
 Average pace: ${weekAvgPace}/km
@@ -205,15 +209,15 @@ ${runsDetail}
 
 ${historicalNote}
 
-Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points — just paragraphs). Be specific and data-driven. Acknowledge the Jakarta heat/humidity context when relevant.
+Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points). Be specific and data-driven. Reference the actual numbers. Acknowledge Jakarta heat/humidity when it's a relevant factor.
 
-Section 1 — HOW WAS THIS WEEK (2-3 sentences): Overall characterization of the week's training. Volume, intensity, consistency.
+Section 1 — HOW WAS THIS WEEK (2-3 sentences): Quality of the running sessions — pace, effort, how the body responded. Not about how many runs were done.
 
-Section 2 — WHAT'S GOOD (2-3 sentences): Specific positives from the data — what's improving, what's executing well.
+Section 2 — WHAT'S GOOD (2-3 sentences): Specific performance positives from the data — pace trend, HR efficiency, form metrics, training effect.
 
-Section 3 — WHAT NEEDS WORK (2-3 sentences): Honest assessment of weaknesses or concerning patterns in the data.
+Section 3 — WHAT NEEDS WORK (2-3 sentences): Running-specific weaknesses in the data — decoupling, cadence, pace consistency, HR drift, or similar.
 
-Section 4 — FOCUS NEXT WEEK (2-3 sentences): Specific, actionable recommendations for the upcoming week.
+Section 4 — FOCUS NEXT WEEK (2-3 sentences): Concrete cues or targets for the next 2 running sessions to improve performance. Be specific (e.g. target pace range, cadence target, effort level).
 
 Respond in this exact JSON format:
 {
