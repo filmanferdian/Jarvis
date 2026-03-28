@@ -284,6 +284,8 @@ export interface FullEmail {
   internetMessageId: string;
   from: string;
   fromName: string;
+  to: string;
+  cc: string;
   subject: string;
   date: string;
   body: string;
@@ -298,7 +300,7 @@ export async function fetchRecentEmailsFull(
 ): Promise<FullEmail[]> {
   const since = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
   const url =
-    `${GRAPH_BASE_URL}/me/messages?$filter=receivedDateTime ge ${since}&$top=${limit}&$orderby=receivedDateTime desc&$select=id,from,subject,bodyPreview,receivedDateTime,body,conversationId,internetMessageId`;
+    `${GRAPH_BASE_URL}/me/messages?$filter=receivedDateTime ge ${since}&$top=${limit}&$orderby=receivedDateTime desc&$select=id,from,toRecipients,ccRecipients,subject,bodyPreview,receivedDateTime,body,conversationId,internetMessageId`;
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -313,6 +315,8 @@ export async function fetchRecentEmailsFull(
   return (data.value || []).map((msg: {
     id?: string;
     from?: { emailAddress?: { address?: string; name?: string } };
+    toRecipients?: { emailAddress?: { address?: string; name?: string } }[];
+    ccRecipients?: { emailAddress?: { address?: string; name?: string } }[];
     subject?: string;
     bodyPreview?: string;
     receivedDateTime?: string;
@@ -324,12 +328,22 @@ export async function fetchRecentEmailsFull(
     if (msg.body?.contentType === 'html') {
       body = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     }
+    const toAddresses = (msg.toRecipients || [])
+      .map((r) => r.emailAddress?.address || '')
+      .filter(Boolean)
+      .join(', ');
+    const ccAddresses = (msg.ccRecipients || [])
+      .map((r) => r.emailAddress?.address || '')
+      .filter(Boolean)
+      .join(', ');
     return {
       messageId: msg.id || '',
       conversationId: msg.conversationId || '',
       internetMessageId: msg.internetMessageId || '',
       from: msg.from?.emailAddress?.address || 'unknown',
       fromName: msg.from?.emailAddress?.name || '',
+      to: toAddresses,
+      cc: ccAddresses,
       subject: msg.subject || '(No subject)',
       date: msg.receivedDateTime || '',
       body: body.slice(0, 5000),

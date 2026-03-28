@@ -359,6 +359,8 @@ export interface FullEmail {
   threadId: string;
   from: string;
   fromName: string;
+  to: string;
+  cc: string;
   subject: string;
   date: string;
   body: string;
@@ -403,6 +405,8 @@ export async function fetchRecentEmailsFull(
     const msg = await msgRes.json();
     const headers: { name: string; value: string }[] = msg.payload?.headers || [];
     const fromHeader = headers.find((h: { name: string }) => h.name === 'From')?.value || 'unknown';
+    const toHeader = headers.find((h: { name: string }) => h.name === 'To')?.value || '';
+    const ccHeader = headers.find((h: { name: string }) => h.name === 'Cc')?.value || '';
     const subject = headers.find((h: { name: string }) => h.name === 'Subject')?.value || '(No subject)';
 
     // Parse "Name <email>" format
@@ -417,6 +421,8 @@ export async function fetchRecentEmailsFull(
       threadId: msg.threadId || '',
       from: fromAddress,
       fromName,
+      to: toHeader,
+      cc: ccHeader,
       subject,
       date: new Date(Number(msg.internalDate)).toISOString(),
       body,

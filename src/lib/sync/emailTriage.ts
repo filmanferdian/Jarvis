@@ -26,6 +26,8 @@ interface UnifiedEmail {
   source: string;
   from: string;
   fromName: string;
+  to: string;
+  cc: string;
   subject: string;
   date: string;
   body: string;
@@ -68,6 +70,8 @@ async function fetchWorkEmails(): Promise<{ emails: UnifiedEmail[]; errors: stri
         source: 'outlook',
         from: e.from,
         fromName: e.fromName,
+        to: e.to,
+        cc: e.cc,
         subject: e.subject,
         date: e.date,
         body: e.body,
@@ -89,6 +93,8 @@ async function fetchWorkEmails(): Promise<{ emails: UnifiedEmail[]; errors: stri
         source: `gmail:${WORK_GMAIL.email}`,
         from: e.from,
         fromName: e.fromName,
+        to: e.to,
+        cc: e.cc,
         subject: e.subject,
         date: e.date,
         body: e.body,
@@ -125,18 +131,23 @@ async function classifyEmails(emails: UnifiedEmail[]): Promise<ClassifiedEmail[]
   const emailList = emails
     .map(
       (e, i) =>
-        `[${i}] From: ${e.fromName ? `${e.fromName} <${e.from}>` : e.from}\nSubject: ${e.subject}\nPreview: ${e.snippet.slice(0, 200)}`,
+        `[${i}] From: ${e.fromName ? `${e.fromName} <${e.from}>` : e.from}\nTo: ${e.to || 'unknown'}\nCC: ${e.cc || 'none'}\nSubject: ${e.subject}\nPreview: ${e.snippet.slice(0, 200)}`,
     )
     .join('\n\n');
 
-  const prompt = `Classify each email below into exactly one category. The recipient is Filman Ferdian, CEO of Infinid.
+  const prompt = `Classify each email below into exactly one category. The recipient is Filman Ferdian, CEO of Infinid (filman@infinid.id, filman@group.infinid.id).
 
 Categories:
-- need_response: Direct question or request to Filman, or a real person expecting a reply (not automated)
-- informational: FYI, status updates, reports, shared documents (no reply expected)
-- newsletter: Marketing emails, digests, subscriptions, promotional content
+- need_response: A real person directly asking Filman or his team a question, making a request, or expecting a reply. Must be in the TO field (not just CC'd). Excludes calendar invites, meeting RSVPs, mass emails, and promotional outreach.
+- informational: FYI, status updates, reports, shared documents, calendar invites, meeting acceptances/declines, emails where Filman is only CC'd (no reply expected)
+- newsletter: Marketing emails, digests, subscriptions, promotional content, generic vendor outreach
 - notification: System alerts, calendar notifications, CI/CD, monitoring
 - automated: Auto-generated transactional emails (receipts, confirmations, password resets)
+
+Rules:
+- Calendar invites and meeting notifications → always informational
+- Generic promotional or cold vendor outreach → always newsletter
+- If Filman is only in CC (not TO), classify as informational unless he is explicitly asked to act
 
 Return ONLY a JSON array, no other text:
 [{"index": 0, "category": "need_response", "reason": "brief reason"}, ...]
@@ -235,6 +246,9 @@ Rules:
 - Use Indonesian particles (ya, aja) only for internal/casual contexts
 - Do NOT include a signature block (it will be added automatically)
 - Do NOT include "Dear" — use "Hi [Name]," or skip greeting for brief replies
+- Be DIRECT — answer the question or confirm the action immediately. Do NOT repeat or paraphrase what the sender said. No mirroring like "Regarding your question about X..." or "Thank you for sharing about Y..."
+- Skip preamble. No "Thank you for your email", "Hope you're doing well", or "I appreciate you reaching out"
+- If they asked a question, answer it first. If they requested something, confirm or state next steps
 
 Return each draft separated by ===DRAFT_SEPARATOR===
 
