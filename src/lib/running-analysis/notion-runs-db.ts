@@ -315,6 +315,21 @@ function buildProperties(run: RunActivity): Record<string, unknown> {
   return props;
 }
 
+/** Find an existing Runs DB page by Garmin ID, returns page ID or null */
+export async function findRunPageByGarminId(apiKey: string, garminId: string): Promise<string | null> {
+  const res = await fetch(`${NOTION_API}/databases/${RUNS_DB_ID}/query`, {
+    method: 'POST',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify({
+      filter: { property: 'Garmin ID', rich_text: { equals: garminId } },
+      page_size: 1,
+    }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.results?.[0]?.id ?? null;
+}
+
 /** Create a new page in the Runs DB for the given activity */
 export async function createRunPage(apiKey: string, run: RunActivity): Promise<string> {
   const properties = buildProperties(run);
@@ -342,6 +357,19 @@ export async function createRunPage(apiKey: string, run: RunActivity): Promise<s
 
   const data = await res.json();
   return data.id;
+}
+
+/** Patch properties on an existing Runs DB page (used by force_resync) */
+export async function patchRunPage(apiKey: string, pageId: string, run: RunActivity): Promise<void> {
+  const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
+    method: 'PATCH',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify({ properties: buildProperties(run) }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Notion patch page failed: ${err}`);
+  }
 }
 
 /** Fetch all runs from the Runs DB for a date range, for analysis */
@@ -380,5 +408,16 @@ export async function getRunsForPeriod(
     cursor = data.next_cursor ?? undefined;
   }
 
-  return pages;
+  // Deduplicate by Garmin ID — keep first occurrence (ascending date order)
+  const seen = new Set<string>();
+  return pages.filter((page) => {
+    const gid = (page as Record<string, unknown> & { properties?: Record<string, unknown> })
+      .properties?.['Garmin ID'];
+    const garminId = (gid as { rich_text?: { plain_text: string }[] })?.rich_text?.[0]?.plain_text;
+    if (garminId) {
+      if (seen.has(garminId)) return false;
+      seen.add(garminId);
+    }
+    return true;
+  });
 }

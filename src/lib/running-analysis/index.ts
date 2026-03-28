@@ -13,7 +13,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
-import { getExistingGarminIds, createRunPage, getRunsForPeriod, RunActivity } from './notion-runs-db';
+import { getExistingGarminIds, createRunPage, patchRunPage, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
 import { updateRunningLogDashboard } from './dashboard-update';
@@ -287,8 +287,20 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
         // Build RunActivity object
         const runActivity = extractRunActivity(row, enriched);
 
-        // Write to Notion Runs DB
-        await createRunPage(notionApiKey, runActivity);
+        // Write to Notion Runs DB — patch if exists (force_resync), create if new
+        if (options.forceResync) {
+          const existingPageId = await findRunPageByGarminId(notionApiKey, row.activity_id);
+          if (existingPageId) {
+            await patchRunPage(notionApiKey, existingPageId, runActivity);
+            console.log(`[running-analysis] Patched existing Notion page for ${row.activity_id}`);
+          } else {
+            await createRunPage(notionApiKey, runActivity);
+            console.log(`[running-analysis] Created Notion page for ${row.activity_id}`);
+          }
+        } else {
+          await createRunPage(notionApiKey, runActivity);
+          console.log(`[running-analysis] Created Notion page for ${row.activity_id}`);
+        }
         activitiesIngested++;
         console.log(`[running-analysis] Created Notion page for ${row.activity_id}`);
       } catch (err) {
