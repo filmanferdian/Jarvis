@@ -7,6 +7,23 @@
 import { supabase } from '@/lib/supabase';
 import { WeeklyAnalysis } from './analysis-engine';
 
+export interface WeeklyInsightEntry {
+  weekLabel: string;
+  weekStart: string;
+  weekEnd: string;
+  runsLogged: number;
+  totalDistanceKm: number;
+  totalDurationMins: number;
+  avgPacePerKm: string;
+  avgHr: number | null;
+  totalTrainingLoad: number;
+  howWasThisWeek: string;
+  whatsGood: string;
+  whatNeedsWork: string;
+  focusNextWeek: string;
+  generatedAt: string;
+}
+
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 // Running Log page — parent for the Weekly Insights DB
@@ -126,6 +143,53 @@ async function findExistingInsight(
   if (!res.ok) return null;
   const data = await res.json();
   return data.results?.[0]?.id ?? null;
+}
+
+function parseInsightPage(page: Record<string, unknown>): WeeklyInsightEntry {
+  const props = page.properties as Record<string, unknown>;
+  const getText = (key: string) =>
+    ((props[key] as { rich_text?: { plain_text: string }[] })?.rich_text?.[0]?.plain_text) ?? '';
+  const getNum = (key: string) =>
+    ((props[key] as { number?: number })?.number) ?? 0;
+  const getDate = (key: string) =>
+    ((props[key] as { date?: { start: string } })?.date?.start) ?? '';
+  const getTitle = () =>
+    ((props['Week'] as { title?: { plain_text: string }[] })?.title?.[0]?.plain_text) ?? '';
+
+  return {
+    weekLabel: getTitle(),
+    weekStart: getDate('Week Start'),
+    weekEnd: getDate('Week End'),
+    runsLogged: getNum('Runs Logged'),
+    totalDistanceKm: getNum('Total Distance (km)'),
+    totalDurationMins: getNum('Total Time (min)'),
+    avgPacePerKm: getText('Avg Pace'),
+    avgHr: ((props['Avg HR'] as { number?: number })?.number) ?? null,
+    totalTrainingLoad: getNum('Total Training Load'),
+    howWasThisWeek: getText('How Was This Week'),
+    whatsGood: getText("What's Good"),
+    whatNeedsWork: getText('What Needs Work'),
+    focusNextWeek: getText('Focus Next Week'),
+    generatedAt: getDate('Generated At'),
+  };
+}
+
+/** Fetch all Weekly Insights entries, newest first */
+export async function getWeeklyInsights(apiKey: string): Promise<WeeklyInsightEntry[]> {
+  const dbId = await getOrCreateWeeklyInsightsDb(apiKey);
+
+  const res = await fetch(`${NOTION_API}/databases/${dbId}/query`, {
+    method: 'POST',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify({
+      page_size: 100,
+      sorts: [{ property: 'Week Start', direction: 'descending' }],
+    }),
+  });
+
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.results as Record<string, unknown>[]).map(parseInsightPage);
 }
 
 /** Write or update a Weekly Insights entry */
