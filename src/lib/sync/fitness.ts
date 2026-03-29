@@ -1,8 +1,5 @@
 import { supabase } from '@/lib/supabase';
 
-// Notion database ID for the Program Schedule
-const FITNESS_DB_ID = process.env.NOTION_FITNESS_DB_ID;
-
 export interface FitnessContext {
   current_week: number;
   current_phase: string;
@@ -64,126 +61,25 @@ interface DailyHabits {
   lights_out: string;
 }
 
-// --- Notion Database Query ---
-
-interface NotionPage {
-  id: string;
-  properties: Record<string, unknown>;
-  last_edited_time: string;
-}
-
-interface NotionQueryResponse {
-  results: NotionPage[];
-  has_more: boolean;
-  next_cursor: string | null;
-}
-
-function extractTitle(prop: unknown): string {
-  const p = prop as { title?: { plain_text: string }[] };
-  return p?.title?.[0]?.plain_text || '';
-}
-
-function extractSelect(prop: unknown): string | null {
-  const p = prop as { select?: { name: string } };
-  return p?.select?.name || null;
-}
-
-function extractDate(prop: unknown): string | null {
-  const p = prop as { date?: { start: string } };
-  return p?.date?.start || null;
-}
-
-function extractNumber(prop: unknown): number | null {
-  const p = prop as { number?: number | null };
-  return p?.number ?? null;
-}
-
-function extractRichText(prop: unknown): string {
-  const p = prop as { rich_text?: { plain_text: string }[] };
-  return p?.rich_text?.map((t) => t.plain_text).join('') || '';
-}
-
-function extractCheckbox(prop: unknown): boolean {
-  const p = prop as { checkbox?: boolean };
-  return p?.checkbox ?? false;
-}
+// --- Supabase program_schedule row ---
 
 interface ScheduleRow {
-  day_label: string;
+  day_number: number;
   date: string;
+  day_of_week: string;
   week: number;
   phase: string;
-  day_type: string; // 'Training' | 'Rest'
-  training: string;
+  day_type: 'Training' | 'Rest';
+  training: string | null;
   cardio: string;
+  deload: boolean;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+  steps_target: number;
   eating_open: string;
   eating_close: string;
-  deload: boolean;
-  steps_target: number | null;
-}
-
-function parseNotionRow(page: NotionPage): ScheduleRow {
-  const p = page.properties;
-  return {
-    day_label: extractTitle(p['Day']),
-    date: extractDate(p['Date']) || '',
-    week: extractNumber(p['Week']) || 0,
-    phase: extractSelect(p['Phase']) || '',
-    day_type: extractSelect(p['Day Type']) || 'Rest',
-    training: extractRichText(p['Training']),
-    cardio: extractRichText(p['Cardio']),
-    calories: extractNumber(p['Calories']) || 0,
-    protein: extractNumber(p['Protein']) || 0,
-    carbs: extractNumber(p['Carbs']) || 0,
-    fat: extractNumber(p['Fat']) || 0,
-    eating_open: extractRichText(p['Eating Open']) || '12:00',
-    eating_close: extractRichText(p['Eating Close']) || '20:00',
-    deload: extractCheckbox(p['Deload']),
-    steps_target: extractNumber(p['Steps Target']),
-  };
-}
-
-async function queryNotionDatabase(filter: Record<string, unknown>): Promise<NotionPage[]> {
-  const notionApiKey = process.env.NOTION_API_KEY;
-  if (!notionApiKey || !FITNESS_DB_ID) throw new Error('Notion credentials not configured');
-
-  const allPages: NotionPage[] = [];
-  let hasMore = true;
-  let startCursor: string | undefined;
-
-  while (hasMore) {
-    const body: Record<string, unknown> = { page_size: 100, filter };
-    if (startCursor) body.start_cursor = startCursor;
-
-    const res = await fetch(
-      `https://api.notion.com/v1/databases/${FITNESS_DB_ID}/query`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${notionApiKey}`,
-          'Content-Type': 'application/json',
-          'Notion-Version': '2022-06-28',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Notion API error: ${res.status} ${err}`);
-    }
-
-    const data: NotionQueryResponse = await res.json();
-    allPages.push(...data.results);
-    hasMore = data.has_more;
-    startCursor = data.next_cursor || undefined;
-  }
-
-  return allPages;
 }
 
 // --- Sync Logic ---
@@ -199,63 +95,78 @@ export interface FitnessSyncResult {
 export async function syncFitness(force = false): Promise<FitnessSyncResult> {
   const timestamp = new Date().toISOString();
 
-  if (!FITNESS_DB_ID) {
-    throw new Error('NOTION_FITNESS_DB_ID not configured');
-  }
-
   // Get today's date in WIB
   const wibOffset = 7 * 60 * 60 * 1000;
   const wibDate = new Date(Date.now() + wibOffset);
   const today = wibDate.toISOString().split('T')[0];
 
-  // Query today's row from Notion database
-  const todayPages = await queryNotionDatabase({
-    property: 'Date',
-    date: { equals: today },
-  });
-
-  if (todayPages.length === 0) {
-    console.warn(`[fitness] No schedule row found for ${today}`);
-    return { synced: false, skipped: true, current_week: 0, current_phase: '', timestamp };
-  }
-
-  const todayRow = parseNotionRow(todayPages[0]);
-
-  // Check if data changed since last sync (unless forced)
+  // Skip if already synced today (unless forced)
   if (!force) {
     const { data: existing } = await supabase
       .from('fitness_context')
-      .select('notion_last_edited, synced_at')
+      .select('synced_at')
       .order('synced_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (existing?.notion_last_edited === todayPages[0].last_edited_time) {
-      return { synced: false, skipped: true, current_week: todayRow.week, current_phase: todayRow.phase, timestamp };
+    if (existing?.synced_at) {
+      const lastSyncWib = new Date(new Date(existing.synced_at).getTime() + wibOffset);
+      const lastSyncDate = lastSyncWib.toISOString().split('T')[0];
+      if (lastSyncDate === today) {
+        // Already synced today — fetch week/phase for the response
+        const { data: ctx } = await supabase
+          .from('fitness_context')
+          .select('current_week, current_phase')
+          .single();
+        return {
+          synced: false,
+          skipped: true,
+          current_week: ctx?.current_week || 0,
+          current_phase: ctx?.current_phase || '',
+          timestamp,
+        };
+      }
     }
   }
 
-  // Fetch the full week's rows to build training_day_map and cardio_schedule
-  const weekPages = await queryNotionDatabase({
-    property: 'Week',
-    number: { equals: todayRow.week },
-  });
+  // Query today's row from program_schedule
+  const { data: todayRows, error: todayErr } = await supabase
+    .from('program_schedule')
+    .select('*')
+    .eq('date', today)
+    .limit(1);
 
-  const weekRows = weekPages.map(parseNotionRow).sort((a, b) => a.date.localeCompare(b.date));
+  if (todayErr) throw todayErr;
 
-  // Map rows to day-of-week for training_day_map and cardio_schedule
-  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  if (!todayRows || todayRows.length === 0) {
+    console.warn(`[fitness] No schedule row found for ${today}`);
+    return { synced: false, skipped: true, current_week: 0, current_phase: '', timestamp };
+  }
+
+  const todayRow = todayRows[0] as ScheduleRow;
+
+  // Fetch the full week's rows
+  const { data: weekRows, error: weekErr } = await supabase
+    .from('program_schedule')
+    .select('*')
+    .eq('week', todayRow.week)
+    .order('date', { ascending: true });
+
+  if (weekErr) throw weekErr;
+
+  const rows = (weekRows || []) as ScheduleRow[];
+
+  // Build training_day_map and cardio_schedule keyed by lowercase day name
   const trainingDayMap: Record<string, TrainingDay> = {};
   const cardioSchedule: Record<string, string> = {};
 
-  for (const row of weekRows) {
-    const d = new Date(row.date + 'T00:00:00Z');
-    const dayName = dayNames[d.getUTCDay()];
+  for (const row of rows) {
+    const dayName = row.day_of_week.toLowerCase();
 
     trainingDayMap[dayName] = {
       type: row.day_type === 'Training' ? (row.training || 'Training') : 'Rest',
-      focus: row.day_type === 'Training' ? row.training : 'Recovery',
-      exercises: [], // Exercise details not in the database — kept for interface compatibility
+      focus: row.day_type === 'Training' ? (row.training || 'Training') : 'Recovery',
+      exercises: [],
       total_sets: 0,
       duration: '',
     };
@@ -263,9 +174,9 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     cardioSchedule[dayName] = row.cardio || 'REST';
   }
 
-  // Build macro targets from week's rows — find a training day and rest day for each macro set
-  const trainingRow = weekRows.find((r) => r.day_type === 'Training') || todayRow;
-  const restRow = weekRows.find((r) => r.day_type === 'Rest') || todayRow;
+  // Build macro targets from a training day and rest day in the week
+  const trainingRow = rows.find((r) => r.day_type === 'Training') || todayRow;
+  const restRow = rows.find((r) => r.day_type === 'Rest') || todayRow;
 
   const macroTraining: MacroTargets = {
     calories: trainingRow.calories,
@@ -286,28 +197,29 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     close: todayRow.eating_close,
   };
 
-  // Determine next deload week by finding the nearest future deload row
+  // Find next deload week
   let nextDeloadWeek: number | null = null;
   if (!todayRow.deload) {
-    const deloadPages = await queryNotionDatabase({
-      and: [
-        { property: 'Deload', checkbox: { equals: true } },
-        { property: 'Date', date: { after: today } },
-      ],
-    });
-    if (deloadPages.length > 0) {
-      const deloadRows = deloadPages.map(parseNotionRow).sort((a, b) => a.date.localeCompare(b.date));
+    const { data: deloadRows } = await supabase
+      .from('program_schedule')
+      .select('week')
+      .eq('deload', true)
+      .gt('date', today)
+      .order('date', { ascending: true })
+      .limit(1);
+
+    if (deloadRows && deloadRows.length > 0) {
       nextDeloadWeek = deloadRows[0].week;
     }
   }
 
-  // Upsert to Supabase (delete old, insert new — single row)
+  // Upsert to fitness_context (delete old, insert new — single row)
   await supabase.from('fitness_context').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
   const { error } = await supabase.from('fitness_context').insert({
     current_week: todayRow.week,
     current_phase: todayRow.phase,
-    phase_end_week: null, // Not tracked in per-day database
+    phase_end_week: null,
     phase_tone: null,
     training_day_map: trainingDayMap,
     cardio_schedule: cardioSchedule,
@@ -320,14 +232,14 @@ export async function syncFitness(force = false): Promise<FitnessSyncResult> {
     steps_target: todayRow.steps_target,
     special_notes: todayRow.deload ? 'Deload week' : null,
     active_subpages: [],
-    notion_page_id: FITNESS_DB_ID,
-    notion_last_edited: todayPages[0].last_edited_time,
+    notion_page_id: null,
+    notion_last_edited: null,
     synced_at: timestamp,
   });
 
   if (error) throw error;
 
-  console.log(`[fitness] Synced from Notion database: Week ${todayRow.week}, ${todayRow.phase}, ${todayRow.day_type}`);
+  console.log(`[fitness] Synced from program_schedule: Week ${todayRow.week}, ${todayRow.phase}, ${todayRow.day_type}`);
 
   return {
     synced: true,
