@@ -59,6 +59,32 @@ Sprint 13 delivered security hardening (7 fixes), 10k run auto-detection from Ga
 | Notion Context | `/api/cron/notion-context` | Every 2 weeks | x-cron-secret |
 | Contact Scan | `/api/cron/contact-scan` | Weekly Sunday | x-cron-secret |
 
+## Sprint 14 Progress
+
+### Completed — Fitness Program Schedule Fix + Migration
+
+**Problem:** The Notion "Program Schedule" database had two data integrity issues:
+1. Day numbers off by +7 after Day 49 (Days 50-56 missing, causing gap)
+2. All Wednesday and Saturday cardio entries stored as "walk" instead of "run", with wrong durations
+
+**Fix applied:**
+- Created `scripts/fix-fitness-schedule.mjs` to batch-update 345 Notion pages (corrected day labels and cardio values)
+- Created `program_schedule` Supabase table (364 rows) as the new source of truth
+- Rewrote `src/lib/sync/fitness.ts` to read from `program_schedule` instead of Notion API
+
+**Impact:**
+- Fitness sync no longer depends on Notion API (faster, no external call)
+- Cardio data now correctly shows runs for Wed/Sat (e.g., "55min Z2 run" for Week 9 Saturday)
+- Change detection simplified: skips re-sync if already synced today (WIB date), unless forced
+
+**Files changed:**
+- `src/lib/sync/fitness.ts` — full rewrite (74 insertions, 162 deletions)
+- `scripts/fix-fitness-schedule.mjs` — new one-time Notion fix script
+
+**New table:** `program_schedule` (created manually in Supabase)
+- Primary key: `day_number` (integer)
+- Columns: date, day_of_week, week, phase, day_type, training, cardio, deload, calories, protein, carbs, fat, steps_target, eating_open, eating_close, optional_evening_cardio
+
 ## Sprint 14 Candidates
 
 ### P0 — Carry-Forward

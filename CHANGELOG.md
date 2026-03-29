@@ -4,6 +4,18 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [2.4.7] — 2026-03-29 (Sprint 14)
+
+### Changed
+- Fitness sync rewritten: reads from Supabase `program_schedule` table instead of Notion API — faster, simpler, no external API dependency
+
+### Fixed
+- Fitness program schedule: corrected 345 Notion database entries (day numbering off by +7 after Day 49, all Wed/Sat cardio stored as "walk" instead of "run")
+
+### Added
+- `program_schedule` table in Supabase (364 rows) as single source of truth for daily fitness program data
+- `scripts/fix-fitness-schedule.mjs` — one-time Notion database correction script
+
 ## [2.1.4] — 2026-03-21 (Sprint 12)
 
 ### Changed
