@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "2.4.8",
+  "version": "2.4.7",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
