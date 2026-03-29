@@ -138,16 +138,18 @@ async function classifyEmails(emails: UnifiedEmail[]): Promise<ClassifiedEmail[]
   const prompt = `Classify each email below into exactly one category. The recipient is Filman Ferdian, CEO of Infinid (filman@infinid.id, filman@group.infinid.id).
 
 Categories:
-- need_response: A real person directly asking Filman or his team a question, making a request, or expecting a reply. Must be in the TO field (not just CC'd). Excludes calendar invites, meeting RSVPs, mass emails, and promotional outreach.
+- need_response: A real person directly asking Filman or his team a question, making a request, or expecting a reply. Must be in the TO field (not just CC'd). The sender must be a human who would read a reply. Excludes calendar invites, meeting RSVPs, mass emails, promotional outreach, and system-generated emails.
 - informational: FYI, status updates, reports, shared documents, calendar invites, meeting acceptances/declines, emails where Filman is only CC'd (no reply expected)
 - newsletter: Marketing emails, digests, subscriptions, promotional content, generic vendor outreach
-- notification: System alerts, calendar notifications, CI/CD, monitoring
+- notification: System alerts, calendar notifications, CI/CD, monitoring, billing/payment alerts, account warnings, service status emails
 - automated: Auto-generated transactional emails (receipts, confirmations, password resets)
 
 Rules:
 - Calendar invites and meeting notifications → always informational
 - Generic promotional or cold vendor outreach → always newsletter
 - If Filman is only in CC (not TO), classify as informational unless he is explicitly asked to act
+- Emails from no-reply addresses or SaaS platforms (Atlassian, AWS, Google, Stripe, etc.) about billing, payment failures, account status → notification or automated, NEVER need_response
+- If the sender is a system/platform (not a real person who would read a reply), it cannot be need_response
 
 Return ONLY a JSON array, no other text:
 [{"index": 0, "category": "need_response", "reason": "brief reason"}, ...]
