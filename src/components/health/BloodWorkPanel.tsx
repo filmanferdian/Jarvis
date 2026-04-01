@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface BloodWorkEntry {
   marker_name: string;
   value: number;
@@ -14,21 +16,20 @@ interface BloodWorkPanelProps {
   lastTestDate: string | null;
 }
 
-const MARKER_LABELS: Record<string, string> = {
-  hba1c: 'HbA1c',
-  fasting_glucose: 'Fasting Glucose',
-  triglycerides: 'Triglycerides',
-  hdl: 'HDL Cholesterol',
-  ldl: 'LDL Cholesterol',
-  total_cholesterol: 'Total Cholesterol',
-  testosterone: 'Testosterone',
-};
+const CATEGORIES: { label: string; markers: string[] }[] = [
+  { label: 'Lipid Panel', markers: ['Cholesterol Total', 'LDL Direct', 'HDL', 'Trigliserida', 'Non-HDL Cholesterol', 'Apo-B'] },
+  { label: 'Ratios', markers: ['Rasio LDL/Apo-B', 'Rasio TG/HDL'] },
+  { label: 'Metabolic', markers: ['HbA1c', 'Glukosa Puasa', 'Asam Urat'] },
+  { label: 'Liver', markers: ['GOT (AST)', 'GPT (ALT)', 'Gamma GT'] },
+  { label: 'Kidney', markers: ['Kreatinin', 'eGFR (CKD-EPI)'] },
+  { label: 'Inflammation', markers: ['hs-CRP'] },
+  { label: 'CBC', markers: ['Hemoglobin', 'Hematokrit', 'Eritrosit', 'Leukosit', 'Trombosit', 'MCV', 'MCH', 'MCHC', 'RDW-CV', 'Eosinofil'] },
+];
 
 function getStatus(entry: BloodWorkEntry): 'normal' | 'borderline' | 'out_of_range' {
   if (entry.reference_low == null && entry.reference_high == null) return 'normal';
   if (entry.reference_low != null && entry.value < entry.reference_low) return 'out_of_range';
   if (entry.reference_high != null && entry.value > entry.reference_high) return 'out_of_range';
-  // Borderline: within 10% of range boundary
   if (entry.reference_low != null) {
     const margin = entry.reference_low * 0.1;
     if (entry.value < entry.reference_low + margin) return 'borderline';
@@ -47,63 +48,87 @@ const STATUS_CLASSES = {
 };
 
 export default function BloodWorkPanel({ entries, lastTestDate }: BloodWorkPanelProps) {
-  return (
-    <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <span className="text-[10px] font-mono text-jarvis-accent uppercase tracking-wider">O4</span>
-          <h3 className="text-sm font-semibold text-jarvis-text-primary">Metabolic & Hormonal</h3>
-        </div>
-        {lastTestDate && (
-          <span className="text-xs text-jarvis-text-dim">Last panel: {lastTestDate}</span>
-        )}
-      </div>
+  const [expanded, setExpanded] = useState(false);
 
-      {entries.length === 0 ? (
-        <p className="text-xs text-jarvis-text-dim py-4 text-center">
-          No blood work recorded yet. Next due: quarterly Prodia HL II panel.
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-jarvis-text-muted border-b border-jarvis-border">
-                <th className="text-left py-1 font-normal">Marker</th>
-                <th className="text-right py-1 font-normal">Value</th>
-                <th className="text-right py-1 font-normal">Range</th>
-                <th className="text-right py-1 font-normal">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => {
-                const status = getStatus(entry);
-                return (
-                  <tr key={entry.marker_name} className="border-b border-jarvis-border/50">
-                    <td className="py-1.5 text-jarvis-text-secondary">
-                      {MARKER_LABELS[entry.marker_name] || entry.marker_name}
-                    </td>
-                    <td className={`py-1.5 text-right font-mono ${STATUS_CLASSES[status]}`}>
-                      {entry.value} {entry.unit}
-                    </td>
-                    <td className="py-1.5 text-right text-jarvis-text-dim font-mono">
-                      {entry.reference_low != null && entry.reference_high != null
-                        ? `${entry.reference_low}–${entry.reference_high}`
-                        : entry.reference_low != null
-                          ? `>${entry.reference_low}`
-                          : entry.reference_high != null
-                            ? `<${entry.reference_high}`
-                            : '—'}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      <span className={`${STATUS_CLASSES[status]}`}>
-                        {status === 'normal' ? '✓' : status === 'borderline' ? '⚠' : '✗'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+  if (entries.length === 0) return null;
+
+  const entryMap = new Map<string, BloodWorkEntry>();
+  for (const e of entries) {
+    if (!entryMap.has(e.marker_name)) entryMap.set(e.marker_name, e);
+  }
+
+  const outOfRange = entries.filter((e) => getStatus(e) === 'out_of_range').length;
+
+  const categorized = CATEGORIES.map((cat) => ({
+    label: cat.label,
+    entries: cat.markers
+      .map((m) => ({ label: m, entry: entryMap.get(m) }))
+      .filter((r): r is { label: string; entry: BloodWorkEntry } => r.entry != null),
+  })).filter((cat) => cat.entries.length > 0);
+
+  const allCategorized = new Set(CATEGORIES.flatMap((c) => c.markers));
+  const uncategorized = entries.filter((e) => !allCategorized.has(e.marker_name));
+  if (uncategorized.length > 0) {
+    categorized.push({
+      label: 'Other',
+      entries: uncategorized.map((e) => ({ label: e.marker_name, entry: e })),
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card/50">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-3 text-xs text-jarvis-text-muted hover:text-jarvis-text-secondary transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <span className="font-medium">Full Blood Panel</span>
+          <span className="text-jarvis-text-dim">
+            {entries.length} markers{outOfRange > 0 ? ` \u00B7 ${outOfRange} flagged` : ''}
+            {lastTestDate ? ` \u00B7 ${lastTestDate}` : ''}
+          </span>
+        </span>
+        <span className="text-[10px]">{expanded ? '\u25B2' : '\u25BC'}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-jarvis-border/50">
+          {categorized.map((cat) => (
+            <div key={cat.label}>
+              <div className="text-[10px] font-mono text-jarvis-text-muted uppercase tracking-wider mb-1 mt-2">
+                {cat.label}
+              </div>
+              <table className="w-full text-xs">
+                <tbody>
+                  {cat.entries.map(({ label, entry }) => {
+                    const status = getStatus(entry);
+                    return (
+                      <tr key={label} className="border-b border-jarvis-border/30">
+                        <td className="py-1.5 text-jarvis-text-secondary w-[40%]">{label}</td>
+                        <td className={`py-1.5 text-right font-mono ${STATUS_CLASSES[status]} w-[25%]`}>
+                          {entry.value} {entry.unit}
+                        </td>
+                        <td className="py-1.5 text-right text-jarvis-text-dim font-mono w-[25%]">
+                          {entry.reference_low != null && entry.reference_high != null
+                            ? `${entry.reference_low}\u2013${entry.reference_high}`
+                            : entry.reference_low != null
+                              ? `>${entry.reference_low}`
+                              : entry.reference_high != null
+                                ? `<${entry.reference_high}`
+                                : '\u2014'}
+                        </td>
+                        <td className="py-1.5 text-right w-[10%]">
+                          <span className={STATUS_CLASSES[status]}>
+                            {status === 'normal' ? '\u2713' : status === 'borderline' ? '\u26A0' : '\u2717'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       )}
     </div>

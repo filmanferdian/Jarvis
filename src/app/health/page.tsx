@@ -133,11 +133,11 @@ export default function HealthPage() {
           </div>
         )}
 
-        {/* OKR Cards */}
+        {/* OKR Cards: O1–O4 */}
         {okrData && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {okrData.objectives
-              .filter((o) => o.objective !== 'O4')
+              .filter((o) => o.objective !== 'O5')
               .map((obj) => (
                 <OkrCard
                   key={obj.objective}
@@ -150,10 +150,23 @@ export default function HealthPage() {
           </div>
         )}
 
-        {/* Blood Work Panel (O4) */}
+        {/* Full Blood Work Panel (collapsible details below O4) */}
         <BloodWorkPanel entries={bloodWork} lastTestDate={lastBloodDate} />
 
-        {/* AI Health Insights — below O4 */}
+        {/* OKR Card: O5 */}
+        {okrData && okrData.objectives
+          .filter((o) => o.objective === 'O5')
+          .map((obj) => (
+            <OkrCard
+              key={obj.objective}
+              objective={obj.objective}
+              label={obj.label}
+              keyResults={obj.key_results}
+              overallPct={obj.overall_pct}
+            />
+          ))}
+
+        {/* AI Health Insights */}
         <HealthInsights />
 
         {/* Manual Entry */}
