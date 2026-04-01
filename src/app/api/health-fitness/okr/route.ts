@@ -268,9 +268,17 @@ export const GET = withAuth(async () => {
         return m ? { value: m.value, date: m.date } : { value: null, date: null };
       }
 
-      // Blood work
+      // Blood work — map OKR key_result to actual marker_name in DB
       if (t.source_table === 'blood_work') {
-        const b = latestBlood[t.key_result];
+        const bloodWorkNameMap: Record<string, string> = {
+          hba1c: 'HbA1c',
+          fasting_glucose: 'Glukosa Puasa',
+          triglycerides: 'Trigliserida',
+          hdl: 'HDL',
+          testosterone: 'Testosterone',
+        };
+        const markerName = bloodWorkNameMap[t.key_result] || t.key_result;
+        const b = latestBlood[markerName];
         return b ? { value: b.value, date: b.date } : { value: null, date: null };
       }
 
