@@ -49,22 +49,59 @@ Sprint 14 delivered the Running Analysis automation: a full pipeline from Garmin
 5. **analysis_only flag for pre-Garmin-sync weeks** — Weeks before Mar 16 have no garmin_activities in Supabase. Use `analysis_only: true` to generate insights from existing Notion data only.
 6. **Dashboard update is pattern-match based** — If Running Log page structure changes significantly, the block patcher may miss. Check `dashboardUpdated: false` in results.
 
-## Sprint 15 Candidates
+## Sprint 15 Deliverables
+
+### Blood Work Integration (v2.4.8, 2026-04-01)
+
+**Problem:** 27 blood work markers from Prodia Bona Indah (Apr 1 draw) were inserted into Supabase `blood_work` table via Claude Chat, but none showed in Jarvis due to three issues:
+1. No GET endpoint — health page fetched `/api/health-fitness/blood-work` but the route didn't exist
+2. Marker name mismatch — OKR targets use snake_case keys (`hba1c`, `fasting_glucose`) but DB has Prodia lab names (`HbA1c`, `Glukosa Puasa`)
+3. O4 rendered as a separate custom panel instead of a standard OkrCard
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `src/app/api/health-fitness/blood-work/route.ts` | **New.** GET endpoint returning all blood work entries ordered by test_date DESC |
+| `src/app/api/health-fitness/okr/route.ts` | Added `bloodWorkNameMap` in `resolveCurrentValue()` to translate OKR key_result → DB marker_name |
+| `src/app/health/page.tsx` | O4 now renders as standard OkrCard (removed O4 filter). O5 positioned after collapsible blood panel. |
+| `src/components/health/BloodWorkPanel.tsx` | Rewritten as collapsible "Full Blood Panel" detail — 27 markers grouped into 7 categories (Lipid, Ratios, Metabolic, Liver, Kidney, Inflammation, CBC) |
+| `package.json` | Version bump 2.4.7 → 2.4.8 |
+
+**Data changes (Supabase, not via migration):**
+- `okr_targets` baseline_value set for 4 markers: HbA1c=5.4, fasting_glucose=94, triglycerides=108, hdl=57
+
+**Marker name mapping:**
+| OKR key_result | DB marker_name |
+|----------------|---------------|
+| hba1c | HbA1c |
+| fasting_glucose | Glukosa Puasa |
+| triglycerides | Trigliserida |
+| hdl | HDL |
+| testosterone | Testosterone |
+
+**Result:** OKR overall score jumped 35% → 44%. O4 shows 43% (HDL, HbA1c, TG on track; glucose off track at 94 vs target 90).
+
+### Key Gotchas
+1. **Prodia lab names ≠ English marker names** — The `bloodWorkNameMap` in the OKR route must be updated if new markers are added with different naming conventions.
+2. **Baselines set via direct SQL, not migration** — The 4 baseline values were UPDATEd directly in Supabase. Future blood draws will show progress against these Apr 1 baselines.
+3. **BloodWorkPanel categories are hardcoded** — The 7 category groups in `BloodWorkPanel.tsx` match the Prodia HL II panel. Markers not in any category fall into "Other".
+4. **Testosterone and BP have no data yet** — These show as "No data" in the O4 card. Testosterone baseline will be set when first test result is available.
+
+## Sprint 15 Remaining Candidates
 
 ### P0 — Carry-Forward
 1. **Verify current events synthesis quality** — check newsletter distillation over real data
-2. **OKR baselines remaining** — 6 KRs still missing baselines (blood work / manual metrics scheduled for Apr 1)
+2. ~~**OKR baselines remaining**~~ — ✅ Done for blood work (4 of 6). BP and testosterone still pending data.
 
 ### P1 — Running Analysis Enhancements
-3. **Running Analysis results view** — Show Weekly Insights history in the UI (table or cards of past weeks), not just trigger controls
-4. **Trend sparklines for running** — 7-day pace, HR, distance charts on the Running Analysis page
-5. **Backfill missing Garmin enrichment** — Feb 4 – Mar 22 runs in Notion have no weather/splits/decoupling (only added manually). Could fetch retroactively if Garmin still has the data.
-6. **force_resync update vs create** — Currently creates a new Notion page even if one exists. Should PATCH the existing page properties instead to avoid needing manual archive cleanup.
+3. **Trend sparklines for running** — 7-day pace, HR, distance charts on the Running Analysis page
+4. **Backfill missing Garmin enrichment** — Feb 4 – Mar 22 runs in Notion have no weather/splits/decoupling
 
 ### P1 — Health & Fitness
-7. **Trend sparkline charts** — 7-day mini charts for each OKR metric on `/health` page (deferred from Sprint 13)
-8. **Garmin sync health visibility** — surface circuit breaker state, last sync time, API budget remaining
+5. **Trend sparkline charts** — 7-day mini charts for each OKR metric on `/health` page (deferred from Sprint 13)
+6. **Garmin sync health visibility** — surface circuit breaker state, last sync time, API budget remaining
 
 ### P2 — Polish
-9. **Security monitoring dashboard** — show rate limit hits, auth failures in `/utilities`
-10. **Mobile dashboard layout** — optimize card grid for small screens
+7. **Security monitoring dashboard** — show rate limit hits, auth failures in `/utilities`
+8. **Mobile dashboard layout** — optimize card grid for small screens
