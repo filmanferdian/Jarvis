@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth';
+import { withCronAuth } from '@/lib/cronAuth';
 import { runRunningAnalysis } from '@/lib/running-analysis';
 import { markSynced } from '@/lib/syncTracker';
 
@@ -8,7 +8,7 @@ import { markSynced } from '@/lib/syncTracker';
 //   date: string (YYYY-MM-DD) — analyze the week containing this date; defaults to previous week
 //   analysis_only: boolean — skip data ingestion, only run analysis
 //   force_resync: boolean — re-ingest even if Garmin ID already in Notion
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withCronAuth(async (req: NextRequest) => {
   try {
     let date: string | undefined;
     let analysisOnly = false;
@@ -37,7 +37,7 @@ export const POST = withAuth(async (req: NextRequest) => {
 });
 
 // GET: Status of last running analysis run
-export const GET = withAuth(async () => {
+export const GET = withCronAuth(async () => {
   try {
     const { supabase } = await import('@/lib/supabase');
 
