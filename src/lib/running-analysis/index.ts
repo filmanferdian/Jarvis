@@ -203,7 +203,7 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
     calories: row.calories,
     cadenceSpm: avgRunCadence ? Math.round(avgRunCadence) : null,
     strideCm,
-    gctMs: avgGroundContactTime,
+    gctMs: avgGroundContactTime != null ? Math.round(avgGroundContactTime) : null,
     vertOscCm,
     vertRatioPct,
     avgPowerW: avgPower ? Math.round(avgPower) : null,

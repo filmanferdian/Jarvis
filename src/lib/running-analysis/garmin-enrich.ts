@@ -56,55 +56,92 @@ function speedToPace(speedMs: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+/** Find descriptor index by key, checking both 'key' and 'metricsKey' field names */
+function findDescriptorIndex(
+  descriptors: Record<string, unknown>[],
+  keyName: string
+): number {
+  const idx = descriptors.findIndex(
+    (d) => (d.key as string) === keyName || (d.metricsKey as string) === keyName
+  );
+  return idx;
+}
+
 function calcDecoupling(
-  metricDescriptors: { metricsKey: string; number: number }[],
+  metricDescriptors: Record<string, unknown>[],
   activityDetailMetrics: { metrics: number[] }[]
 ): number | null {
-  const hrIdx = metricDescriptors.findIndex((d) => d.metricsKey === 'directHeartRate');
-  const paceIdx = metricDescriptors.findIndex((d) => d.metricsKey === 'directSpeed');
-  if (hrIdx === -1 || paceIdx === -1 || activityDetailMetrics.length < 4) return null;
+  const tsIdx = findDescriptorIndex(metricDescriptors, 'directTimestamp');
+  const hrIdx = findDescriptorIndex(metricDescriptors, 'directHeartRate');
+  if (hrIdx === -1) {
+    console.warn('[garmin-enrich] Decoupling: metricDescriptors did not contain directHeartRate');
+    return null;
+  }
+  if (tsIdx === -1) {
+    console.warn('[garmin-enrich] Decoupling: metricDescriptors did not contain directTimestamp');
+    return null;
+  }
+  if (activityDetailMetrics.length < 4) {
+    console.warn(`[garmin-enrich] Decoupling: activityDetailMetrics too short (${activityDetailMetrics.length})`);
+    return null;
+  }
 
+  // Collect data points with valid HR and timestamp
   const dataPoints = activityDetailMetrics
     .map((m) => ({
+      ts: m.metrics[tsIdx],
       hr: m.metrics[hrIdx],
-      pace: m.metrics[paceIdx],
     }))
-    .filter((p) => p.hr > 0 && p.pace > 0);
+    .filter((p) => p.hr != null && p.hr > 0 && p.ts != null);
 
-  if (dataPoints.length < 10) return null;
+  if (dataPoints.length < 10) {
+    console.warn(`[garmin-enrich] Decoupling: only ${dataPoints.length} valid data points`);
+    return null;
+  }
 
-  // Take first 80% of activity duration, split that in half
-  const cutoff = Math.floor(dataPoints.length * 0.8);
-  const first = dataPoints.slice(0, Math.floor(cutoff / 2));
-  const second = dataPoints.slice(Math.floor(cutoff / 2), cutoff);
+  // Calculate total duration and 80% cutoff by timestamp
+  const startTs = dataPoints[0].ts;
+  const endTs = dataPoints[dataPoints.length - 1].ts;
+  const totalDuration = endTs - startTs;
+  const cutoff80 = startTs + totalDuration * 0.8;
+  const midpoint40 = startTs + totalDuration * 0.4;
 
-  if (first.length === 0 || second.length === 0) return null;
+  // First half: 0-40% of duration, Second half: 40-80% of duration
+  const firstHalf = dataPoints.filter((p) => p.ts >= startTs && p.ts < midpoint40);
+  const secondHalf = dataPoints.filter((p) => p.ts >= midpoint40 && p.ts < cutoff80);
 
-  const avgHrFirst = first.reduce((s, p) => s + p.hr, 0) / first.length;
-  const avgHrSecond = second.reduce((s, p) => s + p.hr, 0) / second.length;
+  if (firstHalf.length === 0 || secondHalf.length === 0) {
+    console.warn('[garmin-enrich] Decoupling: empty half after timestamp split');
+    return null;
+  }
+
+  const avgHrFirst = firstHalf.reduce((s, p) => s + p.hr, 0) / firstHalf.length;
+  const avgHrSecond = secondHalf.reduce((s, p) => s + p.hr, 0) / secondHalf.length;
 
   if (avgHrFirst === 0) return null;
 
-  // Decoupling = HR drift as percentage
   const decoupling = ((avgHrSecond - avgHrFirst) / avgHrFirst) * 100;
-
   return Math.round(decoupling * 10) / 10;
 }
 
 function extractPerfCondition(
-  metricDescriptors: { metricsKey: string; number: number }[],
+  metricDescriptors: Record<string, unknown>[],
   activityDetailMetrics: { metrics: number[] }[]
 ): number | null {
-  const idx = metricDescriptors.findIndex((d) => d.metricsKey === 'directPerformanceCondition');
-  if (idx === -1) return null;
+  const idx = findDescriptorIndex(metricDescriptors, 'directPerformanceCondition');
+  if (idx === -1) {
+    console.warn('[garmin-enrich] PerfCondition: metricDescriptors did not contain directPerformanceCondition');
+    return null;
+  }
 
-  // Find last non-null, non-zero value
+  // Find last non-null, non-zero value (stabilized score)
   for (let i = activityDetailMetrics.length - 1; i >= 0; i--) {
     const val = activityDetailMetrics[i].metrics[idx];
     if (val !== null && val !== undefined && val !== 0) {
       return val;
     }
   }
+  console.warn('[garmin-enrich] PerfCondition: no non-zero value found in activityDetailMetrics');
   return null;
 }
 
@@ -163,7 +200,7 @@ export async function enrichActivity(activityId: string): Promise<EnrichedActivi
         maxHr: (lap.maxHR as number) ?? null,
         cadence: avgRunCadence ? Math.round(avgRunCadence) : null,
         strideCm: strideLen ? Math.round(strideLen * 10) / 10 : null,
-        gctMs: (lap.groundContactTime as number) ?? null,
+        gctMs: (lap.groundContactTime as number) != null ? Math.round(lap.groundContactTime as number) : null,
         powerW: (lap.averagePower as number) ?? null,
         vertOscCm: (lap.verticalOscillation as number) != null
           ? Math.round((lap.verticalOscillation as number) * 10) / 10
@@ -195,17 +232,20 @@ export async function enrichActivity(activityId: string): Promise<EnrichedActivi
   let decouplingPct: number | null = null;
   if (detailsResult) {
     const details = detailsResult as {
-      metricDescriptors?: { metricsKey: string; number: number }[];
+      metricDescriptors?: Record<string, unknown>[];
       activityDetailMetrics?: { metrics: number[] }[];
     };
     const descriptors = details?.metricDescriptors ?? [];
     const metrics = details?.activityDetailMetrics ?? [];
     if (descriptors.length > 0 && metrics.length > 0) {
+      // Log available keys for diagnostics
+      const availableKeys = descriptors.map((d) => (d.key as string) || (d.metricsKey as string) || 'unknown');
+      console.log(`[garmin-enrich] Available metric keys for ${activityId}: ${availableKeys.join(', ')}`);
       perfCondition = extractPerfCondition(descriptors, metrics);
       decouplingPct = calcDecoupling(descriptors, metrics);
       console.log(`[garmin-enrich] PerfCondition=${perfCondition}, Decoupling=${decouplingPct} for ${activityId}`);
     } else {
-      console.warn(`[garmin-enrich] Details response missing descriptors/metrics for ${activityId}`);
+      console.warn(`[garmin-enrich] Details response missing descriptors (${descriptors.length}) or metrics (${metrics.length}) for ${activityId}`);
     }
   }
 
