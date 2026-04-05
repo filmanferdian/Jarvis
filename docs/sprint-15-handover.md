@@ -106,6 +106,32 @@ Sprint 14 delivered the Running Analysis automation: a full pipeline from Garmin
 3. **BloodWorkPanel categories are hardcoded** — The 7 category groups in `BloodWorkPanel.tsx` match the Prodia HL II panel. Markers not in any category fall into "Other".
 4. **Testosterone and BP have no data yet** — These show as "No data" in the O4 card. Testosterone baseline will be set when first test result is available.
 
+### Contact Ignore Feature (v2.4.11, 2026-04-05)
+
+**Problem:** Contacts scanned from calendar invites that the user doesn't want to sync to Notion (recruiters, one-off attendees, bots) sit in the Pending Triage list indefinitely with no way to dismiss them. Re-scanning brings them back every time.
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `supabase/migration-018-contacts-ignored-status.sql` | **New.** Adds `'ignored'` to `scanned_contacts.status` CHECK constraint |
+| `src/app/api/contacts/ignore/route.ts` | **New.** POST (ignore selected emails) + DELETE (restore single email) |
+| `src/app/api/contacts/route.ts` | `filter=all` now excludes ignored contacts; added `filter=ignored` |
+| `src/lib/sync/contactScan.ts` | Scan skips contacts with `status='ignored'` — won't overwrite back to `'new'` |
+| `src/app/contacts/page.tsx` | Ignore button in triage, collapsible Ignored section with Restore action |
+| `package.json` | Version bump 2.4.8 → 2.4.11 (2.4.9–2.4.10 used by other sessions) |
+
+**Status lifecycle update:**
+```
+new → ignored (via Ignore button)
+ignored → new (via Restore button)
+ignored contacts skipped entirely during scan
+```
+
+### Key Gotchas
+1. **Migration numbering** — Migration 018 in the SQL file adds ignored status. A separate migration 018 was applied earlier for RLS (see Sprint logs). Both applied successfully but naming may confuse. Check Supabase migration history if in doubt.
+2. **Default filter excludes ignored** — `GET /api/contacts?filter=all` uses `.neq('status', 'ignored')`. To see ignored contacts, use `filter=ignored` explicitly.
+
 ## Sprint 15 Remaining Candidates
 
 ### P0 — Carry-Forward
