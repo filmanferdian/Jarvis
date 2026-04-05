@@ -15,12 +15,26 @@ export const GET = withAuth(async () => {
 
   const todayWib = new Date(Date.now() + WIB_OFFSET).toISOString().split('T')[0];
 
-  const [insights, runPages] = await Promise.all([
+  // Fetch independently so one failure doesn't block the other
+  let insights: Awaited<ReturnType<typeof getWeeklyInsights>> = [];
+  let recentRuns: ReturnType<typeof extractRunSummaries> = [];
+
+  const [insightsResult, runsResult] = await Promise.allSettled([
     getWeeklyInsights(notionApiKey),
     getRunsForPeriod(notionApiKey, '2026-01-01', todayWib),
   ]);
 
-  const recentRuns = extractRunSummaries(runPages).reverse();
+  if (insightsResult.status === 'fulfilled') {
+    insights = insightsResult.value;
+  } else {
+    console.error('[insights] Failed to fetch weekly insights:', insightsResult.reason);
+  }
+
+  if (runsResult.status === 'fulfilled') {
+    recentRuns = extractRunSummaries(runsResult.value).reverse();
+  } else {
+    console.error('[insights] Failed to fetch runs:', runsResult.reason);
+  }
 
   return NextResponse.json({ insights, recentRuns });
 });

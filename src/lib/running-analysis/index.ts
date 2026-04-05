@@ -302,7 +302,6 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
           console.log(`[running-analysis] Created Notion page for ${row.activity_id}`);
         }
         activitiesIngested++;
-        console.log(`[running-analysis] Created Notion page for ${row.activity_id}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`Activity ${row.activity_id}: ${msg}`);

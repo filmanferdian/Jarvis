@@ -135,8 +135,8 @@ export default function RunningAnalysisPage() {
       if (data.insights.length > 0) {
         setExpandedWeek(data.insights[0].weekStart);
       }
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.error('[running-analysis] Failed to load insights:', err);
     } finally {
       setInsightsLoading(false);
     }

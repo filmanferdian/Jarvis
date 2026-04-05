@@ -43,7 +43,7 @@ export const GET = withAuth(async () => {
 
     const { data } = await supabase
       .from('sync_status')
-      .select('last_synced_at, last_result, last_error, records_synced')
+      .select('last_synced_at, last_result, last_error, events_synced')
       .eq('sync_type', 'running-analysis')
       .single();
 
@@ -51,7 +51,7 @@ export const GET = withAuth(async () => {
       lastRun: data?.last_synced_at ?? null,
       lastResult: data?.last_result ?? null,
       lastError: data?.last_error ?? null,
-      recordsSynced: data?.records_synced ?? 0,
+      recordsSynced: data?.events_synced ?? 0,
     });
   } catch {
     return NextResponse.json({ lastRun: null, lastResult: null, lastError: null, recordsSynced: 0 });
