@@ -19,6 +19,14 @@ export interface SplitData {
   pacePerKm: string;
   avgHr: number | null;
   maxHr: number | null;
+  cadence: number | null;
+  strideCm: number | null;
+  gctMs: number | null;
+  powerW: number | null;
+  vertOscCm: number | null;
+  vertRatioPct: number | null;
+  elevGain: number | null;
+  elevLoss: number | null;
 }
 
 export interface WeatherData {
@@ -40,9 +48,9 @@ function fToC(f: number | null): number | null {
   return Math.round((f - 32) * 5 / 9 * 10) / 10;
 }
 
-function secondsToPace(seconds: number, distanceM: number): string {
-  if (!distanceM || !seconds) return '--:--';
-  const paceSecPerKm = (seconds / distanceM) * 1000;
+function speedToPace(speedMs: number): string {
+  if (!speedMs || speedMs <= 0) return '--:--';
+  const paceSecPerKm = 1000 / speedMs;
   const mins = Math.floor(paceSecPerKm / 60);
   const secs = Math.round(paceSecPerKm % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -65,7 +73,7 @@ function calcDecoupling(
 
   if (dataPoints.length < 10) return null;
 
-  // Split at 80% mark (first 80% = aerobic, last 20% = late)
+  // Take first 80% of activity duration, split that in half
   const cutoff = Math.floor(dataPoints.length * 0.8);
   const first = dataPoints.slice(0, Math.floor(cutoff / 2));
   const second = dataPoints.slice(Math.floor(cutoff / 2), cutoff);
@@ -74,15 +82,11 @@ function calcDecoupling(
 
   const avgHrFirst = first.reduce((s, p) => s + p.hr, 0) / first.length;
   const avgHrSecond = second.reduce((s, p) => s + p.hr, 0) / second.length;
-  const avgPaceFirst = first.reduce((s, p) => s + p.pace, 0) / first.length;
-  const avgPaceSecond = second.reduce((s, p) => s + p.pace, 0) / second.length;
 
-  if (avgPaceFirst === 0 || avgHrFirst === 0) return null;
+  if (avgHrFirst === 0) return null;
 
-  // Decoupling = (HR/pace ratio drift) as percentage
-  const ratioFirst = avgHrFirst / avgPaceFirst;
-  const ratioSecond = avgHrSecond / avgPaceSecond;
-  const decoupling = ((ratioSecond - ratioFirst) / ratioFirst) * 100;
+  // Decoupling = HR drift as percentage
+  const decoupling = ((avgHrSecond - avgHrFirst) / avgHrFirst) * 100;
 
   return Math.round(decoupling * 10) / 10;
 }
@@ -94,7 +98,7 @@ function extractPerfCondition(
   const idx = metricDescriptors.findIndex((d) => d.metricsKey === 'directPerformanceCondition');
   if (idx === -1) return null;
 
-  // Find last non-zero value
+  // Find last non-null, non-zero value
   for (let i = activityDetailMetrics.length - 1; i >= 0; i--) {
     const val = activityDetailMetrics[i].metrics[idx];
     if (val !== null && val !== undefined && val !== 0) {
@@ -107,70 +111,102 @@ function extractPerfCondition(
 export async function enrichActivity(activityId: string): Promise<EnrichedActivityData> {
   const client = await createGarminClient();
 
-  const results = await Promise.allSettled([
-    (async () => {
-      const data = await client.get(`${API_BASE}/activity-service/activity/${activityId}/splits`);
-      await delay(CALL_DELAY_MS);
-      return data;
-    })(),
-    (async () => {
-      await delay(CALL_DELAY_MS);
-      const data = await client.get(`${API_BASE}/activity-service/activity/${activityId}/weather`);
-      await delay(CALL_DELAY_MS);
-      return data;
-    })(),
-    (async () => {
-      await delay(CALL_DELAY_MS * 2);
-      return client.get(`${API_BASE}/activity-service/activity/${activityId}/details?maxChartSize=2000&maxPolylineSize=100`);
-    })(),
-  ]);
+  // Make calls sequentially with delays to avoid rate limiting
+  let splitsResult: unknown = null;
+  let weatherResult: unknown = null;
+  let detailsResult: unknown = null;
+
+  try {
+    splitsResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/splits`);
+    console.log(`[garmin-enrich] Splits fetched for ${activityId}`);
+  } catch (err) {
+    console.error(`[garmin-enrich] Splits fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
+  }
+
+  await delay(CALL_DELAY_MS);
+
+  try {
+    weatherResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/weather`);
+    console.log(`[garmin-enrich] Weather fetched for ${activityId}`);
+  } catch (err) {
+    console.error(`[garmin-enrich] Weather fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
+  }
+
+  await delay(CALL_DELAY_MS);
+
+  try {
+    detailsResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/details?maxChartSize=2000&maxPolylineSize=100`);
+    console.log(`[garmin-enrich] Details fetched for ${activityId}`);
+  } catch (err) {
+    console.error(`[garmin-enrich] Details fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
+  }
 
   // Parse splits
   const splits: SplitData[] = [];
-  if (results[0].status === 'fulfilled') {
-    const splitsData = results[0].value as { lapDTOs?: Record<string, unknown>[] };
+  if (splitsResult) {
+    const splitsData = splitsResult as { lapDTOs?: Record<string, unknown>[] };
     const laps = splitsData?.lapDTOs ?? [];
-    laps.forEach((lap, i) => {
-      const distM = (lap.distanceInMeters as number) ?? 0;
-      const durS = (lap.elapsedDuration as number) ?? 0;
+    for (let i = 0; i < laps.length; i++) {
+      const lap = laps[i];
+      const distM = (lap.distance as number) ?? (lap.distanceInMeters as number) ?? 0;
+      const durS = (lap.duration as number) ?? (lap.elapsedDuration as number) ?? 0;
+      const avgSpeed = (lap.averageSpeed as number) ?? 0;
+      const avgRunCadence = (lap.averageRunCadence as number) ?? null;
+      const strideLen = (lap.strideLength as number) ?? null;
+
       splits.push({
         lapIndex: i + 1,
         distanceMeters: distM,
         durationSeconds: durS,
-        pacePerKm: secondsToPace(durS, distM),
+        pacePerKm: avgSpeed > 0 ? speedToPace(avgSpeed) : '--:--',
         avgHr: (lap.averageHR as number) ?? null,
         maxHr: (lap.maxHR as number) ?? null,
+        cadence: avgRunCadence ? Math.round(avgRunCadence) : null,
+        strideCm: strideLen ? Math.round(strideLen * 10) / 10 : null,
+        gctMs: (lap.groundContactTime as number) ?? null,
+        powerW: (lap.averagePower as number) ?? null,
+        vertOscCm: (lap.verticalOscillation as number) != null
+          ? Math.round((lap.verticalOscillation as number) * 10) / 10
+          : null,
+        vertRatioPct: (lap.verticalRatio as number) != null
+          ? Math.round((lap.verticalRatio as number) * 10) / 10
+          : null,
+        elevGain: (lap.elevationGain as number) ?? null,
+        elevLoss: (lap.elevationLoss as number) ?? null,
       });
-    });
+    }
   }
 
-  // Parse weather
+  // Parse weather — Garmin uses field names `temp` and `apparentTemp`
   const weather: WeatherData = { tempC: null, feelsLikeC: null, humidity: null, description: null };
-  if (results[1].status === 'fulfilled') {
-    const w = results[1].value as {
-      temperature?: number;
-      apparentTemperature?: number;
-      relativeHumidity?: number;
-      weatherTypeDTO?: { desc?: string };
-    };
-    weather.tempC = fToC(w?.temperature ?? null);
-    weather.feelsLikeC = fToC(w?.apparentTemperature ?? null);
-    weather.humidity = w?.relativeHumidity ?? null;
-    weather.description = w?.weatherTypeDTO?.desc ?? null;
+  if (weatherResult) {
+    const w = weatherResult as Record<string, unknown>;
+    const rawTemp = (w.temp as number) ?? (w.temperature as number) ?? null;
+    const rawApparentTemp = (w.apparentTemp as number) ?? (w.apparentTemperature as number) ?? null;
+    weather.tempC = fToC(rawTemp);
+    weather.feelsLikeC = fToC(rawApparentTemp);
+    weather.humidity = (w.relativeHumidity as number) ?? null;
+    const weatherType = w.weatherTypeDTO as { desc?: string } | undefined;
+    weather.description = weatherType?.desc ?? null;
   }
 
-  // Parse details
+  // Parse details — performance condition and decoupling
   let perfCondition: number | null = null;
   let decouplingPct: number | null = null;
-  if (results[2].status === 'fulfilled') {
-    const details = results[2].value as {
+  if (detailsResult) {
+    const details = detailsResult as {
       metricDescriptors?: { metricsKey: string; number: number }[];
       activityDetailMetrics?: { metrics: number[] }[];
     };
     const descriptors = details?.metricDescriptors ?? [];
     const metrics = details?.activityDetailMetrics ?? [];
-    perfCondition = extractPerfCondition(descriptors, metrics);
-    decouplingPct = calcDecoupling(descriptors, metrics);
+    if (descriptors.length > 0 && metrics.length > 0) {
+      perfCondition = extractPerfCondition(descriptors, metrics);
+      decouplingPct = calcDecoupling(descriptors, metrics);
+      console.log(`[garmin-enrich] PerfCondition=${perfCondition}, Decoupling=${decouplingPct} for ${activityId}`);
+    } else {
+      console.warn(`[garmin-enrich] Details response missing descriptors/metrics for ${activityId}`);
+    }
   }
 
   return { splits, weather, perfCondition, decouplingPct };

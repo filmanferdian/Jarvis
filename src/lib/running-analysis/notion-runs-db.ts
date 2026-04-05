@@ -56,6 +56,15 @@ export interface RunActivity {
     durationSeconds: number;
     pacePerKm: string;
     avgHr: number | null;
+    maxHr: number | null;
+    cadence: number | null;
+    strideCm: number | null;
+    gctMs: number | null;
+    powerW: number | null;
+    vertOscCm: number | null;
+    vertRatioPct: number | null;
+    elevGain: number | null;
+    elevLoss: number | null;
   }[];
 }
 
@@ -120,34 +129,43 @@ function buildPageContent(run: RunActivity): object[] {
       },
     });
 
-    // Table header
+    // Table header — 11 columns
+    const cell = (content: string) => [{ type: 'text', text: { content } }];
     const tableRows: object[] = [
       {
         object: 'block',
         type: 'table_row',
         table_row: {
           cells: [
-            [{ type: 'text', text: { content: 'Km' } }],
-            [{ type: 'text', text: { content: 'Dist (m)' } }],
-            [{ type: 'text', text: { content: 'Time' } }],
-            [{ type: 'text', text: { content: 'Pace' } }],
-            [{ type: 'text', text: { content: 'Avg HR' } }],
+            cell('Km'), cell('Pace'), cell('Avg HR'), cell('Max HR'),
+            cell('Cadence'), cell('Stride (cm)'), cell('GCT (ms)'),
+            cell('Power (W)'), cell('Vert Osc (cm)'), cell('Vert Ratio'),
+            cell('Elev +/- (m)'),
           ],
         },
       },
     ];
 
     for (const split of run.splits) {
+      const elevStr = (split.elevGain != null || split.elevLoss != null)
+        ? `+${Math.round(split.elevGain ?? 0)} / -${Math.round(split.elevLoss ?? 0)}`
+        : '—';
       tableRows.push({
         object: 'block',
         type: 'table_row',
         table_row: {
           cells: [
-            [{ type: 'text', text: { content: String(split.lapIndex) } }],
-            [{ type: 'text', text: { content: String(Math.round(split.distanceMeters)) } }],
-            [{ type: 'text', text: { content: secondsToTimeStr(split.durationSeconds) } }],
-            [{ type: 'text', text: { content: split.pacePerKm } }],
-            [{ type: 'text', text: { content: split.avgHr ? String(split.avgHr) : '—' } }],
+            cell(String(split.lapIndex)),
+            cell(split.pacePerKm),
+            cell(split.avgHr != null ? String(split.avgHr) : '—'),
+            cell(split.maxHr != null ? String(split.maxHr) : '—'),
+            cell(split.cadence != null ? String(split.cadence) : '—'),
+            cell(split.strideCm != null ? String(split.strideCm) : '—'),
+            cell(split.gctMs != null ? String(Math.round(split.gctMs)) : '—'),
+            cell(split.powerW != null ? String(Math.round(split.powerW)) : '—'),
+            cell(split.vertOscCm != null ? String(split.vertOscCm) : '—'),
+            cell(split.vertRatioPct != null ? `${split.vertRatioPct}%` : '—'),
+            cell(elevStr),
           ],
         },
       });
@@ -157,7 +175,7 @@ function buildPageContent(run: RunActivity): object[] {
       object: 'block',
       type: 'table',
       table: {
-        table_width: 5,
+        table_width: 11,
         has_column_header: true,
         has_row_header: false,
         children: tableRows,
@@ -359,8 +377,9 @@ export async function createRunPage(apiKey: string, run: RunActivity): Promise<s
   return data.id;
 }
 
-/** Patch properties on an existing Runs DB page (used by force_resync) */
+/** Patch properties and content on an existing Runs DB page (used by force_resync) */
 export async function patchRunPage(apiKey: string, pageId: string, run: RunActivity): Promise<void> {
+  // Update properties
   const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
     method: 'PATCH',
     headers: notionHeaders(apiKey),
@@ -369,6 +388,34 @@ export async function patchRunPage(apiKey: string, pageId: string, run: RunActiv
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Notion patch page failed: ${err}`);
+  }
+
+  // Delete existing children blocks and replace with new content
+  try {
+    const childrenRes = await fetch(`${NOTION_API}/blocks/${pageId}/children?page_size=100`, {
+      headers: notionHeaders(apiKey),
+    });
+    if (childrenRes.ok) {
+      const childrenData = await childrenRes.json();
+      for (const block of childrenData.results ?? []) {
+        await fetch(`${NOTION_API}/blocks/${block.id}`, {
+          method: 'DELETE',
+          headers: notionHeaders(apiKey),
+        });
+      }
+    }
+
+    // Append new content blocks
+    const children = buildPageContent(run);
+    if (children.length > 0) {
+      await fetch(`${NOTION_API}/blocks/${pageId}/children`, {
+        method: 'PATCH',
+        headers: notionHeaders(apiKey),
+        body: JSON.stringify({ children }),
+      });
+    }
+  } catch (err) {
+    console.warn('[notion-runs-db] Could not update page content:', err);
   }
 }
 
