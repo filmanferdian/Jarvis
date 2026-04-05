@@ -85,6 +85,13 @@ interface GarminActivityRow {
   raw_json: Record<string, unknown> | null;
 }
 
+/** Extract city name from activity name like "Bandung Running" → "Bandung" */
+function extractLocationFromName(name: string): string | null {
+  if (!name) return null;
+  const match = name.match(/^(.+?)\s+Running$/i);
+  return match ? match[1] : null;
+}
+
 function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityData): RunActivity {
   const raw = row.raw_json ?? {};
 
@@ -121,7 +128,7 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
 
   // Stride length
   const avgStrideLength = raw.avgStrideLength as number | null;
-  const strideCm = avgStrideLength ? Math.round(avgStrideLength * 100 * 10) / 10 : null;
+  const strideCm = avgStrideLength ? Math.round(avgStrideLength * 10) / 10 : null;
 
   // Ground contact time
   const avgGroundContactTime = raw.avgGroundContactTime as number | null;
@@ -143,10 +150,21 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
 
   // Training effect
   const aerobicEffect = raw.aerobicTrainingEffect as number | null;
-  const aerobicLabel = raw.aerobicTrainingEffectMessage as string | null;
-  const trainingEffect = aerobicLabel && aerobicEffect != null
-    ? `${aerobicLabel} (Aerobic ${aerobicEffect})`
-    : (aerobicLabel ?? null);
+  const aerobicLabelRaw = raw.aerobicTrainingEffectMessage as string | null;
+  let trainingEffect: string | null = null;
+  if (aerobicLabelRaw && aerobicEffect != null) {
+    // Strip numeric suffix (_1, _7, etc.) and convert UPPER_SNAKE_CASE to Title Case
+    const stripped = aerobicLabelRaw.replace(/_\d+$/, '');
+    const titleCase = stripped
+      .toLowerCase()
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    const roundedEffect = Math.round(aerobicEffect * 10) / 10;
+    trainingEffect = `${titleCase} (Aerobic ${roundedEffect})`;
+  } else if (aerobicLabelRaw) {
+    trainingEffect = aerobicLabelRaw;
+  }
 
   // VO2 Max
   const vo2Max = raw.vO2MaxValue as number | null;
@@ -155,17 +173,18 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
   const elevGain = raw.elevationGain as number | null;
   const elevGainM = elevGain ? Math.round(elevGain * 10) / 10 : null;
 
-  // Fastest km pace
+  // Fastest km pace — find the full-km lap with fastest pace
   let fastestKmPace: string | null = null;
   if (enriched.splits.length > 0) {
-    const fastestSplit = enriched.splits
-      .filter((s) => s.distanceMeters >= 900)
-      .sort((a, b) => {
-        const paceA = a.durationSeconds / a.distanceMeters;
-        const paceB = b.durationSeconds / b.distanceMeters;
-        return paceA - paceB;
-      })[0];
-    if (fastestSplit) fastestKmPace = fastestSplit.pacePerKm;
+    const fullKmSplits = enriched.splits.filter((s) => s.distanceMeters >= 900);
+    if (fullKmSplits.length > 0) {
+      const fastestSplit = fullKmSplits.reduce((best, s) => {
+        const paceS = s.durationSeconds / s.distanceMeters;
+        const bestPace = best.durationSeconds / best.distanceMeters;
+        return paceS < bestPace ? s : best;
+      });
+      fastestKmPace = `Km ${fastestSplit.lapIndex} -- ${fastestSplit.pacePerKm} /km`;
+    }
   }
 
   // HR zones from raw_json
@@ -182,7 +201,7 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
     avgHr: row.avg_hr,
     maxHr: (raw.maxHR as number) ?? null,
     calories: row.calories,
-    cadenceSpm: avgRunCadence ? Math.round(avgRunCadence * 2) : null, // Garmin stores half-cadence
+    cadenceSpm: avgRunCadence ? Math.round(avgRunCadence) : null,
     strideCm,
     gctMs: avgGroundContactTime,
     vertOscCm,
@@ -193,7 +212,7 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
     vo2Max: vo2Max ? Math.round(vo2Max) : null,
     elevGainM,
     fastestKmPace,
-    location: 'Jakarta',
+    location: (raw.locationName as string) || extractLocationFromName((raw.activityName as string) ?? '') || 'Jakarta',
     tempC: enriched.weather.tempC,
     feelsLikeC: enriched.weather.feelsLikeC,
     humidityPct: enriched.weather.humidity,
