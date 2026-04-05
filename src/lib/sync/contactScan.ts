@@ -198,13 +198,17 @@ export async function scanCalendarContacts(
   );
 
   for (const contact of allContacts) {
+    // Skip ignored contacts — don't overwrite their status
+    const prevRecord = existingMap.get(contact.email) as {
+      status?: string; event_count: number; first_seen_date: string; sources: string[];
+    } | undefined;
+    if (prevRecord?.status === 'ignored') continue;
+
     const notionPageId = notionMap.get(contact.email);
     const isExisting = !!notionPageId;
 
     // Merge with previously scanned data
-    const prev = existingMap.get(contact.email) as {
-      event_count: number; first_seen_date: string; sources: string[];
-    } | undefined;
+    const prev = prevRecord;
 
     const mergedEventCount = prev
       ? prev.event_count + contact.event_count

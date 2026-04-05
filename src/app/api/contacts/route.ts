@@ -11,6 +11,8 @@ export const GET = withAuth(async (req: NextRequest) => {
   if (filter === 'new') query = query.eq('status', 'new');
   else if (filter === 'existing') query = query.eq('status', 'existing');
   else if (filter === 'synced') query = query.eq('status', 'synced');
+  else if (filter === 'ignored') query = query.eq('status', 'ignored');
+  else query = query.neq('status', 'ignored'); // 'all' excludes ignored by default
 
   query = query.order('last_seen_date', { ascending: false });
 
