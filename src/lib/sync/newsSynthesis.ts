@@ -2,14 +2,15 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import {
   getValidAccessToken as getMicrosoftToken,
-  fetchRecentEmails as fetchOutlookEmails,
+  fetchRecentEmailsFull as fetchOutlookEmails,
 } from '@/lib/microsoft';
-import type { EmailSummary } from '@/lib/microsoft';
+import type { FullEmail as OutlookFullEmail } from '@/lib/microsoft';
 import {
   getAllConnectedAccounts,
   getValidAccessToken as getGoogleToken,
-  fetchRecentEmails as fetchGmailEmails,
+  fetchRecentEmailsFull as fetchGmailEmails,
 } from '@/lib/google';
+import type { FullEmail as GmailFullEmail } from '@/lib/google';
 import { buildJarvisContext } from '@/lib/context';
 
 // --- Newsletter source whitelist ---
@@ -27,7 +28,7 @@ const NEWS_SOURCES: Record<string, NewsSource> = {
 // NYT subjects to skip (non-news)
 const NYT_SKIP_PATTERNS = /gameplay|crossword|well:|watching:|good list/i;
 
-function isNewsEmail(email: EmailSummary): boolean {
+function isNewsEmail(email: { from: string; subject: string }): boolean {
   const from = email.from || '';
   for (const source of Object.values(NEWS_SOURCES)) {
     if (source.match(from)) {
@@ -41,7 +42,7 @@ function isNewsEmail(email: EmailSummary): boolean {
   return false;
 }
 
-function getSourceLabel(email: EmailSummary): string {
+function getSourceLabel(email: { from: string }): string {
   const from = email.from || '';
   for (const source of Object.values(NEWS_SOURCES)) {
     if (source.match(from)) return source.label;
@@ -97,7 +98,8 @@ export async function syncNews(): Promise<NewsSyncResult> {
     sinceTimestamp = new Date(Date.now() - defaultHours * 60 * 60 * 1000).toISOString();
   }
 
-  const allEmails: EmailSummary[] = [];
+  type NewsEmail = OutlookFullEmail | GmailFullEmail;
+  const allEmails: NewsEmail[] = [];
   const errors: string[] = [];
 
   // 1. Fetch from Microsoft Outlook
@@ -166,10 +168,13 @@ export async function syncNews(): Promise<NewsSyncResult> {
   const sourcesUsed = [...new Set(newsEmails.map(getSourceLabel))];
 
   // Build prompt
+  const MAX_BODY_LENGTH = 3000;
   const emailList = newsEmails
     .map(
-      (e, i) =>
-        `${i + 1}. [${getSourceLabel(e)}] From: ${e.from}\n   Subject: ${e.subject}\n   Preview: ${e.snippet}`,
+      (e, i) => {
+        const content = (e.body || e.snippet || '').slice(0, MAX_BODY_LENGTH);
+        return `${i + 1}. [${getSourceLabel(e)}] From: ${e.from}\n   Subject: ${e.subject}\n   Content:\n${content}`;
+      },
     )
     .join('\n\n');
 

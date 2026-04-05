@@ -82,6 +82,24 @@ Sprint 14 delivered the Running Analysis automation: a full pipeline from Garmin
 
 **Result:** OKR overall score jumped 35% → 44%. O4 shows 43% (HDL, HbA1c, TG on track; glucose off track at 94 vs target 90).
 
+### RLS Security Fix (v2.4.9, 2026-04-01)
+
+**Problem:** Supabase flagged a critical security issue — 4 tables had Row-Level Security disabled, making them publicly accessible via the anon key.
+
+**Tables fixed:** `notion_context`, `briefing_deltas`, `email_triage`, `program_schedule`
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `supabase/migration-018-enable-rls.sql` | **New.** Enables RLS + permissive policy on all 4 tables |
+| `package.json` | Version bump 2.4.8 → 2.4.9 |
+
+**Notes:**
+- App uses `service_role` key which bypasses RLS, so no functional impact
+- This is defense-in-depth to prevent accidental exposure via anon key
+- Migration applied directly to production via Supabase SQL Editor
+
 ### Key Gotchas
 1. **Prodia lab names ≠ English marker names** — The `bloodWorkNameMap` in the OKR route must be updated if new markers are added with different naming conventions.
 2. **Baselines set via direct SQL, not migration** — The 4 baseline values were UPDATEd directly in Supabase. Future blood draws will show progress against these Apr 1 baselines.
