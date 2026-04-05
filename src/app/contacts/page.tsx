@@ -12,7 +12,7 @@ interface ScannedContact {
   last_seen_date: string;
   event_count: number;
   sources: string[];
-  status: 'new' | 'existing' | 'synced';
+  status: 'new' | 'existing' | 'synced' | 'ignored';
   notion_page_id: string | null;
 }
 
@@ -49,8 +49,11 @@ export default function ContactsPage() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ignoring, setIgnoring] = useState(false);
   const [editingCell, setEditingCell] = useState<{ email: string; field: 'name' | 'company' | 'phone' } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [ignoredContacts, setIgnoredContacts] = useState<ScannedContact[]>([]);
+  const [showIgnored, setShowIgnored] = useState(false);
 
   const fetchContacts = useCallback(async () => {
     try {
@@ -66,9 +69,22 @@ export default function ContactsPage() {
     }
   }, []);
 
+  const fetchIgnored = useCallback(async () => {
+    try {
+      const res = await fetch('/api/contacts?filter=ignored', { credentials: 'include' });
+      if (res.ok) {
+        const json = await res.json();
+        setIgnoredContacts(json.contacts || []);
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
     fetchContacts();
-  }, [fetchContacts]);
+    fetchIgnored();
+  }, [fetchContacts, fetchIgnored]);
 
   const handleScan = async (mode: 'backfill' | 'weekly') => {
     setScanning(true);
@@ -120,6 +136,48 @@ export default function ContactsPage() {
       // silently fail
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleIgnore = async () => {
+    if (selected.size === 0) return;
+    setIgnoring(true);
+    try {
+      const emails = Array.from(selected).filter((email) =>
+        (data?.contacts || []).some((c) => c.email === email && c.status === 'new'),
+      );
+      const res = await fetch('/api/contacts/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ emails }),
+      });
+      if (res.ok) {
+        setSelected(new Set());
+        await fetchContacts();
+        await fetchIgnored();
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIgnoring(false);
+    }
+  };
+
+  const handleRestore = async (email: string) => {
+    try {
+      const res = await fetch('/api/contacts/ignore', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        await fetchContacts();
+        await fetchIgnored();
+      }
+    } catch {
+      // silently fail
     }
   };
 
@@ -247,13 +305,22 @@ export default function ContactsPage() {
                   {newContacts.length}
                 </span>
               </h2>
-              <button
-                onClick={handleSync}
-                disabled={syncing || selected.size === 0}
-                className="px-3 py-1.5 text-xs rounded-lg bg-jarvis-accent text-white hover:bg-jarvis-accent/80 transition-colors disabled:opacity-30"
-              >
-                {syncing ? 'Syncing...' : `Sync ${selected.size} to Notion`}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleIgnore}
+                  disabled={ignoring || selected.size === 0}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-jarvis-border text-jarvis-text-muted hover:bg-jarvis-bg-hover transition-colors disabled:opacity-30"
+                >
+                  {ignoring ? 'Ignoring...' : `Ignore ${selected.size}`}
+                </button>
+                <button
+                  onClick={handleSync}
+                  disabled={syncing || selected.size === 0}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-jarvis-accent text-white hover:bg-jarvis-accent/80 transition-colors disabled:opacity-30"
+                >
+                  {syncing ? 'Syncing...' : `Sync ${selected.size} to Notion`}
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -415,6 +482,67 @@ export default function ContactsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Ignored contacts (collapsible) */}
+        {!loading && ignoredContacts.length > 0 && (
+          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+            <button
+              onClick={() => setShowIgnored(!showIgnored)}
+              className="flex items-center gap-2 text-[15px] font-medium text-jarvis-text-primary w-full text-left"
+            >
+              <span className="text-xs text-jarvis-text-dim">{showIgnored ? '▼' : '▶'}</span>
+              Ignored
+              <span className="text-xs font-mono text-jarvis-text-dim">
+                {ignoredContacts.length}
+              </span>
+            </button>
+
+            {showIgnored && (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-jarvis-border text-jarvis-text-dim">
+                      <th className="pb-2 pr-3 text-left">Name</th>
+                      <th className="pb-2 pr-3 text-left">Email</th>
+                      <th className="pb-2 pr-3 text-left">Company</th>
+                      <th className="pb-2 pr-3 text-left">Last Seen</th>
+                      <th className="pb-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ignoredContacts.map((contact) => (
+                      <tr
+                        key={contact.email}
+                        className="border-b border-jarvis-border/50 hover:bg-jarvis-bg-hover transition-colors"
+                      >
+                        <td className="py-2 pr-3 text-jarvis-text-muted">
+                          {contact.name || contact.email.split('@')[0]}
+                        </td>
+                        <td className="py-2 pr-3 text-jarvis-text-dim font-mono">
+                          {contact.email}
+                        </td>
+                        <td className="py-2 pr-3 text-jarvis-text-dim">
+                          {contact.company || '-'}
+                        </td>
+                        <td className="py-2 pr-3 text-jarvis-text-dim font-mono">
+                          {contact.last_seen_date}
+                        </td>
+                        <td className="py-2 text-right">
+                          <button
+                            onClick={() => handleRestore(contact.email)}
+                            className="text-xs text-jarvis-accent hover:text-jarvis-accent/80 transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
