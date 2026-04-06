@@ -182,3 +182,5 @@ ignored contacts skipped entirely during scan
 ### Gotchas for Next Session
 - The 3 fixed cron routes will show green on the health dashboard after their next cron-job.org trigger (not immediately).
 - Railway cost is now shown as usage-based ($5/mo base minimum). Actual billing may exceed $5 in heavy months.
+- ElevenLabs quota bar now pulls live data from their `/v1/user/subscription` API (credits used, limit, reset date). No longer relies on local character count which was inaccurate.
+- **Google OAuth expired** for `filmanferdian@gmail.com` and `filmanferdian21@gmail.com`. Re-auth via: `https://jarvis-production-9aea.up.railway.app/api/auth/google` (visit twice, pick each account).
