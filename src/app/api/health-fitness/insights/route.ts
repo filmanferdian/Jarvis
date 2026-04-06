@@ -10,6 +10,31 @@ function getWibToday(): string {
   return new Date(now.getTime() + wibOffset).toISOString().split('T')[0];
 }
 
+/** Format date as "5 Apr" */
+function fmtDate(dateStr: string): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const [, m, d] = dateStr.split('-');
+  return `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+}
+
+/** Compute weight trend summary from recent entries */
+function computeWeightTrend(weights: Array<{ date: string; weight_kg: number | string }>): string {
+  if (weights.length < 2) return 'Insufficient data for trend.';
+
+  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  const oldest = sorted[0];
+  const newest = sorted[sorted.length - 1];
+  const oldVal = Number(oldest.weight_kg);
+  const newVal = Number(newest.weight_kg);
+  const diff = newVal - oldVal;
+  const direction = diff > 0.3 ? 'UP' : diff < -0.3 ? 'DOWN' : 'STABLE';
+
+  // Recent 3-entry trend
+  const recent3 = sorted.slice(-3).map(w => `${fmtDate(w.date)}: ${Number(w.weight_kg).toFixed(1)}kg`);
+
+  return `${direction} ${Math.abs(diff).toFixed(1)}kg over ${sorted.length} entries (${fmtDate(oldest.date)} to ${fmtDate(newest.date)}). Recent: ${recent3.join(' → ')}`;
+}
+
 // GET: Generate AI health insights based on recent data (cached daily)
 export const GET = withAuth(async () => {
   try {
@@ -37,13 +62,14 @@ export const GET = withAuth(async () => {
       });
     }
 
-    // Gather recent data for analysis
+    // Gather recent data for analysis — 30-day window for weight, 7-day for Garmin
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const [garminRes, weightRes, measureRes, bloodRes, fitnessRes, okrRes] = await Promise.allSettled([
       supabase.from('garmin_daily').select('*').gte('date', sevenDaysAgo).order('date'),
-      supabase.from('weight_log').select('*').gte('date', sevenDaysAgo).order('date'),
-      supabase.from('health_measurements').select('*').order('date', { ascending: false }).limit(10),
+      supabase.from('weight_log').select('*').gte('date', thirtyDaysAgo).order('date'),
+      supabase.from('health_measurements').select('*').order('date', { ascending: false }).limit(15),
       supabase.from('blood_work').select('*').order('test_date', { ascending: false }).limit(10),
       supabase.from('fitness_context').select('current_week, current_phase').limit(1).single(),
       supabase.from('okr_targets').select('objective, key_result, target_value, unit, baseline_value').eq('is_active', true),
@@ -56,22 +82,25 @@ export const GET = withAuth(async () => {
     const fitness = fitnessRes.status === 'fulfilled' ? fitnessRes.value.data : null;
     const okrTargets = okrRes.status === 'fulfilled' ? okrRes.value.data || [] : [];
 
-    // Build data summary for Claude
+    // Build enriched data summary
     const garminSummary = garminDays.length > 0
-      ? garminDays.map(d => `${d.date}: steps=${d.steps}, rhr=${d.resting_hr}, sleep=${d.sleep_score}, stress=${d.stress_level}, hrv=${d.hrv_7d_avg}, bb=${d.body_battery}, vo2=${d.vo2_max}`).join('\n')
+      ? garminDays.map(d => `${d.date}: steps=${d.steps}, rhr=${d.resting_hr}, sleep_score=${d.sleep_score}, sleep_hrs=${d.sleep_duration_seconds ? (Number(d.sleep_duration_seconds) / 3600).toFixed(1) : '?'}, stress=${d.stress_level}, hrv=${d.hrv_7d_avg}, bb=${d.body_battery}, vo2=${d.vo2_max}`).join('\n')
       : 'No Garmin data available for the last 7 days.';
 
+    const weightTrend = computeWeightTrend(weights);
+
     const weightSummary = weights.length > 0
-      ? weights.map(w => `${w.date}: ${w.weight_kg}kg`).join(', ')
+      ? `30-day entries: ${weights.map(w => `${w.date}: ${Number(w.weight_kg).toFixed(1)}kg`).join(', ')}\nTREND: ${weightTrend}`
       : 'No weight data.';
 
+    // Group measurements by type with date for staleness detection
     const measureSummary = measurements.length > 0
-      ? measurements.map(m => `${m.date}: ${m.measurement_type}=${m.value}${m.unit}`).join(', ')
+      ? measurements.map(m => `${m.measurement_type}=${m.value}${m.unit} (${fmtDate(m.date)})`).join(', ')
       : 'No body measurements recorded yet.';
 
     const bloodSummary = bloodWork.length > 0
-      ? bloodWork.map(b => `${b.test_date}: ${b.marker_name}=${b.value}${b.unit}`).join(', ')
-      : 'No blood work recorded. Next due: quarterly Prodia HL II panel.';
+      ? bloodWork.map(b => `${b.marker_name}=${b.value}${b.unit} (${fmtDate(b.test_date)})`).join(', ')
+      : 'No blood work recorded.';
 
     const okrSummary = okrTargets.map(t =>
       `${t.objective}/${t.key_result}: target=${t.target_value}${t.unit}, baseline=${t.baseline_value ?? 'n/a'}`
@@ -89,13 +118,13 @@ export const GET = withAuth(async () => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
+        max_tokens: 600,
         temperature: 0.3,
         messages: [{
           role: 'user',
           content: `${ctx.systemPrompt}
 
-Analyze the following 7-day health data and provide a concise executive summary for the transformation program.
+You are generating a weekly health check-in for a body transformation program. Be direct and data-driven. No fluff. Short sentences. Front-load key information. Flag what's actually concerning vs what's fine.
 
 CURRENT CONTEXT:
 ${fitness ? `Week ${fitness.current_week}, ${fitness.current_phase}` : 'Unknown week/phase'}
@@ -106,22 +135,33 @@ ${okrSummary}
 LAST 7 DAYS GARMIN DATA:
 ${garminSummary}
 
-WEIGHT TREND:
+WEIGHT (30 DAYS):
 ${weightSummary}
 
-BODY MEASUREMENTS:
+BODY MEASUREMENTS (with dates):
 ${measureSummary}
 
-BLOOD WORK:
+BLOOD WORK (with dates):
 ${bloodSummary}
 
-Generate 4-6 bullet points. Each should be actionable or insightful. Include:
-- Trend observations (improving/declining/stable)
-- Progress toward OKR targets (on track / behind / at risk)
-- Stale data warnings (metrics not measured recently)
-- Upcoming reminders (blood work due, measurements overdue)
+Write exactly 3 sections. Use this format:
 
-Keep each bullet under 20 words. Use plain text, no markdown. Start each bullet with a status indicator: ✓ (on track), ⚠ (needs attention), ✗ (off track), → (trend observation).`,
+WHAT'S WORKING
+- 2-3 bullets. Cite specific numbers and dates. Only include things actually trending in the right direction.
+
+NEEDS ATTENTION
+- 2-3 bullets. Be honest about negative trends. Include the actual numbers showing the problem. Flag stale data (measurements older than 2 weeks).
+
+FOCUS THIS WEEK
+- 1-2 concrete, actionable items based on what needs attention. Be specific (e.g., "get DEXA scan" not "track body composition").
+
+Rules:
+- Each bullet should be 1 sentence, max 25 words.
+- Use actual numbers from the data. Don't round excessively.
+- If weight is trending UP, say so clearly — don't frame it as "down from baseline" if recent trend is upward.
+- Compare recent trend (last 2-3 data points) not just baseline vs current.
+- Flag any measurement older than 14 days as stale.
+- Plain text only. No markdown, no bold, no headers beyond the 3 section names.`,
         }],
       }),
     });
