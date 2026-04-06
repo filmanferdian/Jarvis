@@ -149,3 +149,36 @@ ignored contacts skipped entirely during scan
 ### P2 — Polish
 7. **Security monitoring dashboard** — show rate limit hits, auth failures in `/utilities`
 8. **Mobile dashboard layout** — optimize card grid for small screens
+
+---
+
+## Ship: v2.4.13 — Integration Health + Utilities Improvements (2026-04-06)
+
+**Commit:** `4b714e2` on `claude/condescending-jang`, merged to `main`
+
+### What Changed
+
+**Integration Health — Fix 4 Red Integrations:**
+- Added `markSynced()` + `logCronRun()` to `google-calendar`, `outlook-calendar`, and `notion-tasks` cron routes. These were running fine but never updating `sync_status`, so the health dashboard showed them as stale for 11 days.
+- Filtered `running-weekly-insights-db-id` from the health dashboard (internal cache entry, not a real integration).
+
+**Integration Health — UI Improvements:**
+- Added a description metadata registry for all 11 integrations with proper display names.
+- Added hover tooltips (CSS `group-hover`) showing each integration's description.
+
+**API Usage — Cost Tracking Improvements:**
+- Filtered free services (Garmin, Google, Microsoft, Notion) from the API usage table — only Claude, OpenAI, ElevenLabs now shown.
+- Added previous month cost comparison: usage API now returns `prev_month` data, frontend shows current vs previous month side-by-side in the cost estimate card.
+- Railway billing reclassified from fixed to usage-based ($5/mo base).
+
+### Files Modified
+- `src/app/api/cron/google-calendar/route.ts` — markSynced + logCronRun
+- `src/app/api/cron/outlook-calendar/route.ts` — markSynced + logCronRun
+- `src/app/api/cron/notion-tasks/route.ts` — markSynced + logCronRun
+- `src/app/api/utilities/integrations/route.ts` — descriptions, internal filter
+- `src/app/api/utilities/usage/route.ts` — free service filter, prev month, Railway usage-based
+- `src/app/utilities/page.tsx` — tooltips, prev month cost card
+
+### Gotchas for Next Session
+- The 3 fixed cron routes will show green on the health dashboard after their next cron-job.org trigger (not immediately).
+- Railway cost is now shown as usage-based ($5/mo base minimum). Actual billing may exceed $5 in heavy months.
