@@ -13,9 +13,55 @@ const FIXED_COSTS = {
   elevenlabs: 5,
 };
 
+// Free-tier services excluded from the usage table (no variable cost)
+const FREE_SERVICES = new Set(['garmin', 'google', 'microsoft', 'notion']);
+
+type ServiceAgg = {
+  calls: number;
+  tokens_input: number;
+  tokens_output: number;
+  characters: number;
+  estimated_cost_usd: number;
+};
+
+function aggregateUsage(rows: Record<string, unknown>[]): Record<string, ServiceAgg> {
+  const services: Record<string, ServiceAgg> = {};
+  for (const row of rows) {
+    const svc = row.service as string;
+    if (FREE_SERVICES.has(svc)) continue;
+    if (!services[svc]) {
+      services[svc] = { calls: 0, tokens_input: 0, tokens_output: 0, characters: 0, estimated_cost_usd: 0 };
+    }
+    services[svc].calls += (row.call_count as number) ?? 0;
+    services[svc].tokens_input += (row.tokens_input as number) ?? 0;
+    services[svc].tokens_output += (row.tokens_output as number) ?? 0;
+    services[svc].characters += (row.characters_used as number) ?? 0;
+  }
+  for (const [svc, data] of Object.entries(services)) {
+    if (svc === 'claude') {
+      data.estimated_cost_usd = (data.tokens_input / 1_000_000) * CLAUDE_INPUT_PRICE
+        + (data.tokens_output / 1_000_000) * CLAUDE_OUTPUT_PRICE;
+    } else if (svc === 'openai') {
+      data.estimated_cost_usd = (data.characters / 1_000_000) * OPENAI_TTS_PRICE_PER_M_CHARS;
+    }
+    data.estimated_cost_usd = Math.round(data.estimated_cost_usd * 100) / 100;
+  }
+  return services;
+}
+
+function buildCostSummary(services: Record<string, ServiceAgg>) {
+  const totalVariable = Object.values(services).reduce((sum, s) => sum + s.estimated_cost_usd, 0);
+  const totalFixed = Object.values(FIXED_COSTS).reduce((sum, c) => sum + c, 0);
+  return {
+    variable_usd: Math.round(totalVariable * 100) / 100,
+    fixed_usd: totalFixed,
+    fixed_breakdown: FIXED_COSTS,
+    total_estimated_usd: Math.round((totalVariable + totalFixed) * 100) / 100,
+  };
+}
+
 export const GET = withAuth(async () => {
   try {
-    // Get current month range
     const now = new Date();
     const wibOffset = 7 * 60 * 60 * 1000;
     const wibDate = new Date(now.getTime() + wibOffset);
@@ -23,51 +69,27 @@ export const GET = withAuth(async () => {
     const monthStart = `${monthStr}-01`;
     const today = wibDate.toISOString().split('T')[0];
 
-    // Fetch all api_usage_v2 rows for current month
-    const { data: usageRows } = await supabase
-      .from('api_usage_v2')
-      .select('*')
-      .gte('date', monthStart)
-      .lte('date', today);
+    // Previous month range
+    const prevDate = new Date(wibDate);
+    prevDate.setMonth(prevDate.getMonth() - 1);
+    const prevMonthStr = prevDate.toISOString().slice(0, 7);
+    const prevMonthStart = `${prevMonthStr}-01`;
+    // Last day of prev month = day before current month start
+    const prevMonthEnd = new Date(new Date(`${monthStart}T00:00:00Z`).getTime() - 86400000)
+      .toISOString().split('T')[0];
 
-    // Aggregate per service
-    const services: Record<string, {
-      calls: number;
-      tokens_input: number;
-      tokens_output: number;
-      characters: number;
-      estimated_cost_usd: number;
-    }> = {};
+    // Fetch current + previous month in parallel
+    const [{ data: currentRows }, { data: prevRows }] = await Promise.all([
+      supabase.from('api_usage_v2').select('*').gte('date', monthStart).lte('date', today),
+      supabase.from('api_usage_v2').select('*').gte('date', prevMonthStart).lte('date', prevMonthEnd),
+    ]);
 
-    for (const row of usageRows || []) {
-      const svc = row.service as string;
-      if (!services[svc]) {
-        services[svc] = { calls: 0, tokens_input: 0, tokens_output: 0, characters: 0, estimated_cost_usd: 0 };
-      }
-      services[svc].calls += row.call_count ?? 0;
-      services[svc].tokens_input += row.tokens_input ?? 0;
-      services[svc].tokens_output += row.tokens_output ?? 0;
-      services[svc].characters += row.characters_used ?? 0;
-    }
-
-    // Calculate estimated costs
-    for (const [svc, data] of Object.entries(services)) {
-      if (svc === 'claude') {
-        data.estimated_cost_usd = (data.tokens_input / 1_000_000) * CLAUDE_INPUT_PRICE
-          + (data.tokens_output / 1_000_000) * CLAUDE_OUTPUT_PRICE;
-      } else if (svc === 'openai') {
-        data.estimated_cost_usd = (data.characters / 1_000_000) * OPENAI_TTS_PRICE_PER_M_CHARS;
-      }
-      // ElevenLabs, Google, Microsoft, Garmin, Notion: $0 variable
-      data.estimated_cost_usd = Math.round(data.estimated_cost_usd * 100) / 100;
-    }
+    const services = aggregateUsage(currentRows || []);
+    const prevServices = aggregateUsage(prevRows || []);
 
     // ElevenLabs quota info
     const elevenLabsChars = services.elevenlabs?.characters ?? 0;
     const elevenLabsQuota = 30_000;
-
-    const totalVariable = Object.values(services).reduce((sum, s) => sum + s.estimated_cost_usd, 0);
-    const totalFixed = Object.values(FIXED_COSTS).reduce((sum, c) => sum + c, 0);
 
     return NextResponse.json({
       billing_month: monthStr,
@@ -78,11 +100,11 @@ export const GET = withAuth(async () => {
         remaining: Math.max(0, elevenLabsQuota - elevenLabsChars),
         pct_used: Math.round((elevenLabsChars / elevenLabsQuota) * 100),
       },
-      cost_summary: {
-        variable_usd: Math.round(totalVariable * 100) / 100,
-        fixed_usd: totalFixed,
-        fixed_breakdown: FIXED_COSTS,
-        total_estimated_usd: Math.round((totalVariable + totalFixed) * 100) / 100,
+      cost_summary: buildCostSummary(services),
+      prev_month: {
+        billing_month: prevMonthStr,
+        services: prevServices,
+        cost_summary: buildCostSummary(prevServices),
       },
       timestamp: new Date().toISOString(),
     });
