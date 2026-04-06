@@ -7,10 +7,12 @@ const CLAUDE_INPUT_PRICE = 3; // $3/M input tokens
 const CLAUDE_OUTPUT_PRICE = 15; // $15/M output tokens
 // OpenAI TTS pricing
 const OPENAI_TTS_PRICE_PER_M_CHARS = 15; // ~$15/M chars for tts-1-hd
-// Fixed monthly costs
-const FIXED_COSTS = {
-  railway: 5,
-  elevenlabs: 5,
+// Monthly base costs
+// Railway: usage-based Hobby plan, $5/mo minimum (actual may exceed)
+// ElevenLabs: fixed subscription
+const BASE_COSTS: Record<string, { amount: number; type: 'fixed' | 'usage-based' }> = {
+  railway: { amount: 5, type: 'usage-based' },
+  elevenlabs: { amount: 5, type: 'fixed' },
 };
 
 // Free-tier services excluded from the usage table (no variable cost)
@@ -51,12 +53,15 @@ function aggregateUsage(rows: Record<string, unknown>[]): Record<string, Service
 
 function buildCostSummary(services: Record<string, ServiceAgg>) {
   const totalVariable = Object.values(services).reduce((sum, s) => sum + s.estimated_cost_usd, 0);
-  const totalFixed = Object.values(FIXED_COSTS).reduce((sum, c) => sum + c, 0);
+  const totalBase = Object.values(BASE_COSTS).reduce((sum, c) => sum + c.amount, 0);
+  const breakdown: Record<string, number> = {};
+  for (const [k, v] of Object.entries(BASE_COSTS)) breakdown[k] = v.amount;
   return {
     variable_usd: Math.round(totalVariable * 100) / 100,
-    fixed_usd: totalFixed,
-    fixed_breakdown: FIXED_COSTS,
-    total_estimated_usd: Math.round((totalVariable + totalFixed) * 100) / 100,
+    fixed_usd: totalBase,
+    fixed_breakdown: breakdown,
+    base_costs: BASE_COSTS,
+    total_estimated_usd: Math.round((totalVariable + totalBase) * 100) / 100,
   };
 }
 

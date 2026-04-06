@@ -29,6 +29,7 @@ interface CostSummary {
   variable_usd: number;
   fixed_usd: number;
   fixed_breakdown: Record<string, number>;
+  base_costs?: Record<string, { amount: number; type: 'fixed' | 'usage-based' }>;
   total_estimated_usd: number;
 }
 
@@ -226,7 +227,7 @@ export default function UtilitiesPage() {
                     <p className="text-base font-mono font-semibold text-jarvis-text-primary">
                       ${usage.cost_summary.fixed_usd.toFixed(2)}
                     </p>
-                    <p className="text-[10px] text-jarvis-text-dim uppercase">Fixed</p>
+                    <p className="text-[10px] text-jarvis-text-dim uppercase">Base</p>
                   </div>
                   <div className="text-center">
                     <p className="text-base font-mono font-semibold text-jarvis-accent">
@@ -251,7 +252,7 @@ export default function UtilitiesPage() {
                       <p className="text-base font-mono font-semibold text-jarvis-text-dim">
                         ${usage.prev_month.cost_summary.fixed_usd.toFixed(2)}
                       </p>
-                      <p className="text-[10px] text-jarvis-text-dim uppercase">Fixed</p>
+                      <p className="text-[10px] text-jarvis-text-dim uppercase">Base</p>
                     </div>
                     <div className="text-center">
                       <p className="text-base font-mono font-semibold text-jarvis-text-dim">
@@ -264,7 +265,16 @@ export default function UtilitiesPage() {
               )}
             </div>
             <div className="mt-3 text-[11px] text-jarvis-text-dim">
-              Fixed: Railway ${usage.cost_summary.fixed_breakdown.railway}/mo + ElevenLabs ${usage.cost_summary.fixed_breakdown.elevenlabs}/mo
+              {usage.cost_summary.base_costs
+                ? Object.entries(usage.cost_summary.base_costs).map(([name, info], i) => (
+                    <span key={name}>
+                      {i > 0 && ' + '}
+                      {name.charAt(0).toUpperCase() + name.slice(1)} ${info.amount}/mo
+                      {info.type === 'usage-based' && <span className="text-jarvis-text-dim/60"> (usage-based)</span>}
+                    </span>
+                  ))
+                : `Railway $${usage.cost_summary.fixed_breakdown.railway}/mo + ElevenLabs $${usage.cost_summary.fixed_breakdown.elevenlabs}/mo`
+              }
             </div>
           </div>
         )}
