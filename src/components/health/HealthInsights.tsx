@@ -9,6 +9,18 @@ interface InsightsData {
   date: string;
 }
 
+const SECTION_ICONS: Record<string, string> = {
+  "WHAT'S WORKING": '✓',
+  'NEEDS ATTENTION': '⚠',
+  'FOCUS THIS WEEK': '→',
+};
+
+const SECTION_COLORS: Record<string, string> = {
+  "WHAT'S WORKING": 'text-jarvis-success',
+  'NEEDS ATTENTION': 'text-jarvis-warn',
+  'FOCUS THIS WEEK': 'text-jarvis-accent',
+};
+
 export default function HealthInsights() {
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +54,28 @@ export default function HealthInsights() {
 
   if (!data) return null;
 
-  const lines = data.insights.split('\n').filter((l) => l.trim());
+  // Parse sections from the structured output
+  const sections: Array<{ title: string; items: string[] }> = [];
+  let currentSection: { title: string; items: string[] } | null = null;
+
+  for (const line of data.insights.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if this is a section header
+    const upperLine = trimmed.toUpperCase();
+    if (upperLine === "WHAT'S WORKING" || upperLine === 'NEEDS ATTENTION' || upperLine === 'FOCUS THIS WEEK') {
+      currentSection = { title: trimmed.toUpperCase(), items: [] };
+      sections.push(currentSection);
+    } else if (currentSection) {
+      // Strip leading "- " bullet marker
+      const item = trimmed.startsWith('- ') ? trimmed.slice(2) : trimmed;
+      if (item) currentSection.items.push(item);
+    }
+  }
+
+  // Fallback: if no sections parsed, render as flat list
+  const hasSections = sections.length > 0;
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
@@ -52,13 +85,37 @@ export default function HealthInsights() {
           {data.cached ? 'Cached' : 'Fresh'} · {data.date}
         </span>
       </div>
-      <div className="space-y-1.5">
-        {lines.map((line, i) => (
-          <p key={i} className="text-sm text-jarvis-text-secondary leading-relaxed">
-            {line}
-          </p>
-        ))}
-      </div>
+
+      {hasSections ? (
+        <div className="space-y-4">
+          {sections.map((section) => {
+            const icon = SECTION_ICONS[section.title] || '•';
+            const color = SECTION_COLORS[section.title] || 'text-jarvis-text-secondary';
+            return (
+              <div key={section.title}>
+                <div className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${color}`}>
+                  {icon} {section.title}
+                </div>
+                <div className="space-y-1">
+                  {section.items.map((item, i) => (
+                    <p key={i} className="text-sm text-jarvis-text-secondary leading-relaxed pl-4">
+                      {item}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {data.insights.split('\n').filter(l => l.trim()).map((line, i) => (
+            <p key={i} className="text-sm text-jarvis-text-secondary leading-relaxed">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

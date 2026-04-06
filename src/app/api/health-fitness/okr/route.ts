@@ -86,8 +86,8 @@ export const GET = withAuth(async () => {
     if (completedDays.length > 0) {
       for (const col of AVERAGED_METRICS) {
         const values = completedDays
-          .map((r) => r[col] as number | null)
-          .filter((v): v is number => v != null);
+          .map((r) => r[col] != null ? Number(r[col]) : null)
+          .filter((v): v is number => v != null && !isNaN(v));
         garmin7dAvg[col] = values.length > 0
           ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
           : null;
@@ -108,8 +108,8 @@ export const GET = withAuth(async () => {
       const garminCols = [...AVERAGED_METRICS, 'vo2_max', 'fitness_age'];
       for (const col of garminCols) {
         const values = earliestGarminRows
-          .map((r) => r[col] as number | null)
-          .filter((v): v is number => v != null);
+          .map((r) => r[col] != null ? Number(r[col]) : null)
+          .filter((v): v is number => v != null && !isNaN(v));
         garminEarlyAvg[col] = values.length > 0
           ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
           : null;
@@ -208,13 +208,37 @@ export const GET = withAuth(async () => {
     let hrvCurrentWeekAvg: number | null = null;
 
     if (hrvWeekRows && hrvWeekRows.length > 0) {
-      const prevWeekVals = hrvWeekRows
+      let prevWeekVals = hrvWeekRows
         .filter((r) => r.date >= prevWeekMonStr && r.date <= prevWeekSunStr)
-        .map((r) => r.hrv_7d_avg as number);
+        .map((r) => Number(r.hrv_7d_avg));
       // Exclude today from current week
-      const currentWeekVals = hrvWeekRows
+      let currentWeekVals = hrvWeekRows
         .filter((r) => r.date >= currentWeekMonStr && r.date !== todayWib)
-        .map((r) => r.hrv_7d_avg as number);
+        .map((r) => Number(r.hrv_7d_avg));
+
+      // Edge case: if current week has no completed days (e.g., Monday/Sunday boundary),
+      // shift back one week: current = previous, previous = week before that
+      if (currentWeekVals.length === 0 && prevWeekVals.length > 0) {
+        currentWeekVals = prevWeekVals;
+        // Fetch the week before prevWeek
+        const prevPrevWeekMon = new Date(prevWeekMon);
+        prevPrevWeekMon.setUTCDate(prevPrevWeekMon.getUTCDate() - 7);
+        const prevPrevWeekMonStr = prevPrevWeekMon.toISOString().split('T')[0];
+        const prevPrevWeekSunStr = prevWeekMonStr; // previous week's Monday - 1 day = day before prevWeekMon
+        const prevPrevSun = new Date(prevWeekMon);
+        prevPrevSun.setUTCDate(prevPrevSun.getUTCDate() - 1);
+        const prevPrevSunStr = prevPrevSun.toISOString().split('T')[0];
+
+        // Need extra data — query the week before
+        const { data: extraRows } = await supabase
+          .from('garmin_daily')
+          .select('date, hrv_7d_avg')
+          .gte('date', prevPrevWeekMonStr)
+          .lte('date', prevPrevSunStr)
+          .not('hrv_7d_avg', 'is', null);
+
+        prevWeekVals = (extraRows ?? []).map((r) => Number(r.hrv_7d_avg));
+      }
 
       if (prevWeekVals.length > 0 && currentWeekVals.length > 0) {
         hrvPrevWeekAvg = Math.round((prevWeekVals.reduce((a, b) => a + b, 0) / prevWeekVals.length) * 10) / 10;
