@@ -36,7 +36,7 @@ interface CostSummary {
 interface UsageData {
   billing_month: string;
   services: Record<string, ServiceUsage>;
-  elevenlabs_quota: { used: number; limit: number; remaining: number; pct_used: number };
+  elevenlabs_quota: { used: number; limit: number; remaining: number; pct_used: number; reset_at?: string };
   cost_summary: CostSummary;
   prev_month?: {
     billing_month: string;
@@ -191,7 +191,14 @@ export default function UtilitiesPage() {
             {/* ElevenLabs quota bar */}
             <div className="mt-4 p-3 rounded-lg border border-jarvis-border/50">
               <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-jarvis-text-secondary">ElevenLabs Characters</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-jarvis-text-secondary">ElevenLabs Credits</span>
+                  {usage.elevenlabs_quota.reset_at && (
+                    <span className="text-[10px] text-jarvis-text-dim">
+                      resets {new Date(usage.elevenlabs_quota.reset_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
                 <span className={`font-mono ${usage.elevenlabs_quota.pct_used > 90 ? 'text-jarvis-danger' : usage.elevenlabs_quota.pct_used > 70 ? 'text-jarvis-warn' : 'text-jarvis-text-dim'}`}>
                   {usage.elevenlabs_quota.used.toLocaleString()} / {usage.elevenlabs_quota.limit.toLocaleString()}
                 </span>

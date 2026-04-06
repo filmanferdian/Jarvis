@@ -92,19 +92,36 @@ export const GET = withAuth(async () => {
     const services = aggregateUsage(currentRows || []);
     const prevServices = aggregateUsage(prevRows || []);
 
-    // ElevenLabs quota info
-    const elevenLabsChars = services.elevenlabs?.characters ?? 0;
-    const elevenLabsQuota = 40_000; // Starter plan: 40k credits/mo (renews Apr 18)
+    // ElevenLabs quota — pull live from their API
+    let elevenlabsQuota = { used: 0, limit: 40_000, remaining: 40_000, pct_used: 0, reset_at: '' };
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+    if (elevenLabsKey) {
+      try {
+        const elRes = await fetch('https://api.elevenlabs.io/v1/user/subscription', {
+          headers: { 'xi-api-key': elevenLabsKey },
+        });
+        if (elRes.ok) {
+          const sub = await elRes.json();
+          const used = sub.character_count ?? 0;
+          const limit = sub.character_limit ?? 40_000;
+          const resetUnix = sub.next_character_count_reset_unix ?? 0;
+          elevenlabsQuota = {
+            used,
+            limit,
+            remaining: Math.max(0, limit - used),
+            pct_used: limit > 0 ? Math.round((used / limit) * 100) : 0,
+            reset_at: resetUnix ? new Date(resetUnix * 1000).toISOString() : '',
+          };
+        }
+      } catch (e) {
+        console.error('ElevenLabs subscription fetch failed:', e);
+      }
+    }
 
     return NextResponse.json({
       billing_month: monthStr,
       services,
-      elevenlabs_quota: {
-        used: elevenLabsChars,
-        limit: elevenLabsQuota,
-        remaining: Math.max(0, elevenLabsQuota - elevenLabsChars),
-        pct_used: Math.round((elevenLabsChars / elevenLabsQuota) * 100),
-      },
+      elevenlabs_quota: elevenlabsQuota,
       cost_summary: buildCostSummary(services),
       prev_month: {
         billing_month: prevMonthStr,
