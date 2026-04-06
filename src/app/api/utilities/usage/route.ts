@@ -94,7 +94,7 @@ export const GET = withAuth(async () => {
 
     // ElevenLabs quota info
     const elevenLabsChars = services.elevenlabs?.characters ?? 0;
-    const elevenLabsQuota = 30_000;
+    const elevenLabsQuota = 40_000; // Starter plan: 40k credits/mo (renews Apr 18)
 
     return NextResponse.json({
       billing_month: monthStr,
