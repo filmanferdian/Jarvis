@@ -22,6 +22,7 @@ interface KrProgress {
   unit: string;
   baseline_value: number | null;
   current_value: number | null;
+  previous_value: number | null;
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
@@ -129,12 +130,14 @@ export const GET = withAuth(async () => {
         ) / 10
       : null;
 
-    const { data: latestWeight } = await supabase
+    const { data: recentWeights } = await supabase
       .from('weight_log')
       .select('weight_kg, date')
       .order('date', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(2);
+
+    const latestWeight = recentWeights?.[0] ?? null;
+    const previousWeight = recentWeights?.[1] ?? null;
 
     // Health measurements: get latest per type
     const { data: measurements } = await supabase
@@ -143,10 +146,14 @@ export const GET = withAuth(async () => {
       .order('date', { ascending: false });
 
     const latestMeasurement: Record<string, { value: number; date: string }> = {};
+    const previousMeasurement: Record<string, { value: number; date: string }> = {};
     if (measurements) {
       for (const m of measurements) {
+        const entry = { value: Number(m.value), date: m.date };
         if (!latestMeasurement[m.measurement_type]) {
-          latestMeasurement[m.measurement_type] = { value: Number(m.value), date: m.date };
+          latestMeasurement[m.measurement_type] = entry;
+        } else if (!previousMeasurement[m.measurement_type]) {
+          previousMeasurement[m.measurement_type] = entry;
         }
       }
     }
@@ -158,10 +165,14 @@ export const GET = withAuth(async () => {
       .order('test_date', { ascending: false });
 
     const latestBlood: Record<string, { value: number; date: string }> = {};
+    const previousBlood: Record<string, { value: number; date: string }> = {};
     if (bloodWork) {
       for (const b of bloodWork) {
+        const entry = { value: Number(b.value), date: b.test_date };
         if (!latestBlood[b.marker_name]) {
-          latestBlood[b.marker_name] = { value: Number(b.value), date: b.test_date };
+          latestBlood[b.marker_name] = entry;
+        } else if (!previousBlood[b.marker_name]) {
+          previousBlood[b.marker_name] = entry;
         }
       }
     }
@@ -316,6 +327,66 @@ export const GET = withAuth(async () => {
       return { value: null, date: null };
     }
 
+    // Resolve previous value for trend computation
+    function resolvePreviousValue(t: OkrTarget): number | null {
+      // Computed metrics — no meaningful "previous"
+      if (t.key_result === 'hrv_decline_pct' || t.key_result === 'training_completion') return null;
+
+      // Weight
+      if (t.key_result === 'weight' && previousWeight) {
+        return Number(previousWeight.weight_kg);
+      }
+
+      // Garmin daily metrics
+      if (t.source_table === 'garmin_daily' && t.source_column) {
+        const useAverage = AVERAGED_METRICS.includes(t.source_column);
+        if (useAverage && completedDays.length >= 2) {
+          // Use the oldest completed day's value as the "previous" reference
+          // (it's the value about to drop out of the 7d window)
+          const oldest = completedDays[completedDays.length - 1];
+          let val = oldest[t.source_column] != null ? Number(oldest[t.source_column]) : null;
+          if (t.key_result === 'sleep_hours' && val != null) {
+            val = Math.round((val / 3600) * 10) / 10;
+          }
+          return val;
+        } else {
+          // Stable metrics (vo2_max, fitness_age): find second most recent non-null
+          const rows = (garminRows ?? []).filter((r) => r[t.source_column!] != null);
+          return rows.length >= 2 ? Number(rows[1][t.source_column!]) : null;
+        }
+      }
+
+      // Health measurements
+      if (t.source_table === 'health_measurements') {
+        const typeMap: Record<string, string> = {
+          dead_hang_seconds: 'dead_hang',
+          overhead_squat_compensations: 'ohs_major_compensations',
+          waist_cm: 'waist_circumference',
+          bp_systolic: 'blood_pressure_systolic',
+          bp_diastolic: 'blood_pressure_diastolic',
+        };
+        const measurementKey = typeMap[t.key_result] || t.key_result;
+        const prev = previousMeasurement[measurementKey];
+        return prev ? prev.value : null;
+      }
+
+      // Blood work
+      if (t.source_table === 'blood_work') {
+        const bloodWorkNameMap: Record<string, string> = {
+          hba1c: 'HbA1c',
+          fasting_glucose: 'Glukosa Puasa',
+          triglycerides: 'Trigliserida',
+          hdl: 'HDL',
+          testosterone: 'Testosterone',
+        };
+        const markerName = bloodWorkNameMap[t.key_result] || t.key_result;
+        const prev = previousBlood[markerName];
+        return prev ? prev.value : null;
+      }
+
+      return null;
+    }
+
     // Resolve effective baseline: DB value OR dynamically computed from earliest data
     function resolveBaseline(t: OkrTarget): number | null {
       // HRV decline: baseline is always 0% (no decline), show prev week avg as context
@@ -411,6 +482,8 @@ export const GET = withAuth(async () => {
         }
       }
 
+      const previousValue = resolvePreviousValue(t);
+
       const kr: KrProgress = {
         key_result: t.key_result,
         target_value: t.target_value,
@@ -418,6 +491,7 @@ export const GET = withAuth(async () => {
         unit: t.unit,
         baseline_value: effectiveBaseline,
         current_value: value,
+        previous_value: previousValue,
         progress_pct: progress,
         last_updated: date,
         status,

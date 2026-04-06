@@ -7,6 +7,7 @@ interface KrProgress {
   unit: string;
   baseline_value: number | null;
   current_value: number | null;
+  previous_value: number | null;
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
@@ -31,7 +32,7 @@ const STATUS_TEXT_COLORS = {
   on_track: 'text-jarvis-success',
   behind: 'text-jarvis-warn',
   off_track: 'text-jarvis-danger',
-  no_data: 'text-jarvis-text-dim',
+  no_data: 'text-jarvis-text-muted',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -143,21 +144,66 @@ function getUnitLabel(keyResult: string, unit: string): string {
   return unitMap[unit] || unit;
 }
 
+/** Compute trend arrow, delta text, and color from current vs previous */
+function computeTrend(kr: KrProgress, unitLabel: string): { arrow: string; delta: string; color: string } | null {
+  if (kr.current_value == null || kr.previous_value == null) return null;
+
+  const diff = kr.current_value - kr.previous_value;
+  const absDiff = Math.abs(diff);
+
+  // Determine if change is meaningful (threshold varies by metric)
+  const threshold = kr.key_result === 'hba1c' ? 0.05
+    : kr.key_result === 'body_fat' ? 0.2
+    : kr.key_result === 'sleep_hours' ? 0.1
+    : ['weight', 'lean_body_mass'].includes(kr.key_result) ? 0.3
+    : ['daily_steps'].includes(kr.key_result) ? 200
+    : 1;
+
+  if (absDiff < threshold) {
+    return { arrow: '→', delta: 'stable', color: 'text-jarvis-text-muted' };
+  }
+
+  const isUp = diff > 0;
+  const arrow = isUp ? '↑' : '↓';
+
+  // Format the delta value
+  const formatted = formatMetricValue(kr.key_result, absDiff, kr.unit);
+  const sign = isUp ? '+' : '-';
+  const delta = `${sign}${formatted}${unitLabel ? ` ${unitLabel}` : ''}`;
+
+  // Color: green if moving toward target, red if away
+  let isGood: boolean;
+  if (kr.target_direction === 'lower_is_better') {
+    isGood = !isUp; // down is good
+  } else if (kr.target_direction === 'higher_is_better') {
+    isGood = isUp; // up is good
+  } else {
+    // range — green if moving toward the range
+    isGood = kr.current_value >= (kr.baseline_value ?? 0);
+  }
+
+  return {
+    arrow,
+    delta,
+    color: isGood ? 'text-jarvis-success' : 'text-jarvis-danger',
+  };
+}
+
 export default function OkrCard({ objective, label, keyResults, overallPct }: OkrCardProps) {
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <span className="text-xs font-mono text-jarvis-accent uppercase tracking-wider">{objective}</span>
-          <h3 className="text-base font-semibold text-jarvis-text-primary">{label}</h3>
+          <span className="text-sm font-mono text-jarvis-accent uppercase tracking-wider">{objective}</span>
+          <h3 className="text-lg font-semibold text-jarvis-text-primary">{label}</h3>
         </div>
         {overallPct != null ? (
           <div className="text-right">
-            <span className="text-lg font-mono font-semibold text-jarvis-text-primary">{overallPct}%</span>
+            <span className="text-xl font-mono font-semibold text-jarvis-text-primary">{overallPct}%</span>
           </div>
         ) : (
-          <span className="text-sm text-jarvis-text-dim">No data</span>
+          <span className="text-base text-jarvis-text-muted">No data</span>
         )}
       </div>
 
@@ -170,33 +216,34 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
           const baselineFormatted = formatMetricValue(kr.key_result, kr.baseline_value, kr.unit);
           const hasData = kr.current_value != null;
           const hasBaseline = kr.baseline_value != null;
+          const trend = computeTrend(kr, unitLabel);
 
           return (
             <div key={kr.key_result}>
               {/* Row 1: Label + Status + Values */}
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-jarvis-text-secondary">
+                  <span className="text-base font-medium text-jarvis-text-secondary">
                     {KR_LABELS[kr.key_result] || kr.key_result}
                   </span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_COLORS[kr.status]} bg-opacity-20 ${STATUS_TEXT_COLORS[kr.status]}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${STATUS_COLORS[kr.status]} bg-opacity-20 ${STATUS_TEXT_COLORS[kr.status]}`}>
                     {STATUS_LABELS[kr.status]}
                   </span>
                 </div>
-                <div className="flex items-baseline gap-1 text-sm font-mono">
+                <div className="flex items-baseline gap-1 text-base font-mono">
                   {hasData ? (
                     <>
                       <span className={STATUS_TEXT_COLORS[kr.status]}>
                         {currentFormatted}
                       </span>
-                      <span className="text-jarvis-text-dim">/</span>
-                      <span className="text-jarvis-text-dim">{targetFormatted}</span>
+                      <span className="text-jarvis-text-muted">/</span>
+                      <span className="text-jarvis-text-muted">{targetFormatted}</span>
                       {unitLabel && (
-                        <span className="text-[11px] text-jarvis-text-dim ml-0.5">{unitLabel}</span>
+                        <span className="text-xs text-jarvis-text-muted ml-0.5">{unitLabel}</span>
                       )}
                     </>
                   ) : (
-                    <span className="text-jarvis-text-dim">— / {targetFormatted}{unitLabel ? ` ${unitLabel}` : ''}</span>
+                    <span className="text-jarvis-text-muted">— / {targetFormatted}{unitLabel ? ` ${unitLabel}` : ''}</span>
                   )}
                 </div>
               </div>
@@ -211,19 +258,26 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
                 )}
               </div>
 
-              {/* Row 3: Context + baseline annotation */}
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[10px] text-jarvis-text-dim">
-                  {kr.context
-                    ? hasBaseline
-                      ? `${kr.context} · Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
-                      : kr.context
-                    : hasBaseline
-                      ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
-                      : 'No baseline'}
-                </span>
+              {/* Row 3: Context + trend + baseline */}
+              <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center gap-2 text-xs text-jarvis-text-muted">
+                  <span>
+                    {kr.context
+                      ? hasBaseline
+                        ? `${kr.context} · Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
+                        : kr.context
+                      : hasBaseline
+                        ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
+                        : 'No baseline'}
+                  </span>
+                  {trend && (
+                    <span className={`font-mono font-medium ${trend.color}`}>
+                      {trend.arrow} {trend.delta}
+                    </span>
+                  )}
+                </div>
                 {hasData && hasBaseline && kr.progress_pct != null && (
-                  <span className="text-[10px] text-jarvis-text-dim">
+                  <span className="text-xs text-jarvis-text-muted">
                     {kr.progress_pct}% of goal
                   </span>
                 )}

@@ -15,6 +15,7 @@ interface KrProgress {
   unit: string;
   baseline_value: number | null;
   current_value: number | null;
+  previous_value: number | null;
   progress_pct: number | null;
   last_updated: string | null;
   status: 'on_track' | 'behind' | 'off_track' | 'no_data';
