@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { syncFitness } from '@/lib/sync/fitness';
 
 // GET: Today's fitness context for dashboard + briefing
 export const GET = withAuth(async (_req: NextRequest) => {
@@ -9,16 +10,33 @@ export const GET = withAuth(async (_req: NextRequest) => {
     const now = new Date();
     const wibOffset = 7 * 60 * 60 * 1000;
     const wibDate = new Date(now.getTime() + wibOffset);
+    const today = wibDate.toISOString().split('T')[0];
     // Use raw Date (not manually offset) with timezone parameter to avoid double offset
     const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();
 
     // Fetch fitness context (single row)
-    const { data: ctx } = await supabase
+    let { data: ctx } = await supabase
       .from('fitness_context')
       .select('*')
       .order('synced_at', { ascending: false })
       .limit(1)
       .single();
+
+    // Auto-sync if cache is stale (synced on a previous day)
+    if (ctx?.synced_at) {
+      const syncedWib = new Date(new Date(ctx.synced_at).getTime() + wibOffset);
+      const syncedDate = syncedWib.toISOString().split('T')[0];
+      if (syncedDate !== today) {
+        await syncFitness(true);
+        const { data: fresh } = await supabase
+          .from('fitness_context')
+          .select('*')
+          .order('synced_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (fresh) ctx = fresh;
+      }
+    }
 
     if (!ctx) {
       return NextResponse.json({
@@ -40,8 +58,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
     // Calculate weeks until deload
     const weeksToDeload = ctx.next_deload_week ? ctx.next_deload_week - ctx.current_week : null;
     const isDeloadWeek = ctx.current_week === ctx.next_deload_week;
-
-    const today = wibDate.toISOString().split('T')[0];
 
     return NextResponse.json({
       available: true,
