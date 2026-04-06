@@ -218,3 +218,48 @@ The UI now shows both the date context and baseline in one line, separated by `�
 | `package.json` | Version bump 2.4.13 → 2.4.14 |
 
 ### No New Endpoints, Migrations, or Env Vars
+
+---
+
+## Ship: v2.4.15 — HRV Decline Fix + Health Insights Rewrite (2026-04-06)
+
+**Commit:** `e6e793c` on `claude/youthful-bardeen`, merged to `main`
+
+### What Changed
+
+**Bug Fix: HRV Decline showing "No data" despite data existing**
+
+Root cause: Supabase returns `numeric` columns as strings in JSON responses. Code did `r.hrv_7d_avg as number` which is still a string — `reduce((a, b) => a + b, 0)` then concatenated strings (`"047" + "46"` = `"04746"`) instead of adding numbers, producing NaN.
+
+Secondary issue: On Sundays (or when WIB offset shifts date to next day), the "current week" had 0 completed days. Added fallback that shifts comparison back one week when current week is empty.
+
+Fix applied to 3 locations:
+1. 7-day Garmin averages (resting HR, steps, sleep, stress, body battery, HRV)
+2. Earliest Garmin baseline computation
+3. HRV week-over-week decline values
+
+**Health Insights Rewrite**
+
+Old prompt produced generic 20-word bullets that were misleading (e.g., "weight loss accelerating" when weight was actually going UP). Rewrote with:
+- 3-section format: What's Working / Needs Attention / Focus This Week
+- 30-day weight window (was 7 days) with pre-computed trend direction
+- Explicit instruction to use recent trend, not just baseline comparison
+- Measurement dates included for staleness detection
+- Max tokens increased from 400 to 600
+
+HealthInsights component updated to parse sections with colored headers (green/yellow/blue).
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/app/api/health-fitness/okr/route.ts` | `Number()` conversion for all Supabase numeric values, HRV empty-week fallback |
+| `src/app/api/health-fitness/insights/route.ts` | Rewritten prompt, 30-day weight window, trend pre-computation, `fmtDate()` helper |
+| `src/components/health/HealthInsights.tsx` | Section parser with colored headers, fallback flat rendering |
+| `package.json` | Version bump 2.4.14 → 2.4.15 |
+
+### Gotchas for Next Session
+1. **Supabase numeric columns are strings** — Always use `Number()` when doing arithmetic on Supabase query results. This has now been fixed in the OKR route but may exist in other routes.
+2. **WIB double-offset on local dev** — The dev machine is in WIB timezone, so `Date.now() + wibOffset` double-shifts. The HRV fallback handles this, but other date-sensitive code may have similar issues.
+3. **Health insights cache** — Insights are cached once per day in `briefing_cache.baseline_snapshot.health_insights`. Clear with: `UPDATE briefing_cache SET baseline_snapshot = baseline_snapshot - 'health_insights' WHERE date = 'YYYY-MM-DD'`
+
+### No New Endpoints, Migrations, or Env Vars
