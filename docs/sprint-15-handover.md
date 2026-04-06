@@ -300,3 +300,32 @@ Prompt rewritten: leads with "so what" interpretation backed by data, includes B
 | `package.json` | Version bump 2.4.15 → 2.4.16 |
 
 ### No New Endpoints, Migrations, or Env Vars
+
+---
+
+## Ship: v2.4.17 — Auto-sync Stale Fitness Cache + Steps Target Fix (2026-04-06)
+
+**Commit:** `19558c5` on `claude/interesting-noyce`, merged to `main`
+
+### What Changed
+
+**Bug Fix: Fitness card showing wrong week number**
+
+Dashboard showed "Week 10" when it should have been "Week 11" (April 6). Root cause: GET /api/fitness reads the fitness_context cache table directly without checking staleness. If the daily cron hasn't fired yet, yesterday's cached week number is returned.
+
+Fix: The GET endpoint now compares the cached synced_at date (in WIB) against today. If stale, it calls syncFitness(true) inline before returning data. First request of the day may be slower but guarantees correct data.
+
+**Steps Target Update (Supabase direct)**
+
+Updated program_schedule.steps_target from 9,000 to 10,000 for all weeks >= 3. Weeks 1-2 remain at 9,000. Applied via direct SQL UPDATE, not migration.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/app/api/fitness/route.ts` | Added syncFitness import, staleness detection + auto-sync before returning cached data |
+| `package.json` | Version bump 2.4.16 → 2.4.17 |
+
+### Data Changes (Supabase, not via migration)
+- program_schedule: steps_target = 10000 WHERE week >= 3
+
+### No New Endpoints, Migrations, or Env Vars
