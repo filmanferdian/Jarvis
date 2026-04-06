@@ -263,3 +263,40 @@ HealthInsights component updated to parse sections with colored headers (green/y
 3. **Health insights cache** — Insights are cached once per day in `briefing_cache.baseline_snapshot.health_insights`. Clear with: `UPDATE briefing_cache SET baseline_snapshot = baseline_snapshot - 'health_insights' WHERE date = 'YYYY-MM-DD'`
 
 ### No New Endpoints, Migrations, or Env Vars
+
+---
+
+## Ship: v2.4.16 — OKR Trend Arrows + Font/Color Fixes + Narrative Insights (2026-04-06)
+
+**Commit:** `50ecd58` on `claude/youthful-bardeen`, merged to `main`
+
+### What Changed
+
+**OKR Trend Arrows**
+
+Each metric now shows a colored trend arrow comparing current vs previous value:
+- `↑ +1 kg` (red for lower_is_better going up)
+- `↓ -0.7%` (green for lower_is_better going down)
+- `→ stable` (when delta below threshold)
+
+Previous value sources: weight (2nd weigh-in), measurements/blood work (2nd entry per type), Garmin averages (oldest day in window), stable Garmin (2nd non-null row). HRV decline/training have no trend (already comparative). Per-metric thresholds prevent noise.
+
+**Font Size + Color Legibility**
+
+- Subtext: `text-[10px]`→`text-xs`, labels/values: `text-sm`→`text-base`, headers: `text-base`→`text-lg`
+- All `text-jarvis-text-dim` (#475569) → `text-jarvis-text-muted` (#64748b) for readability
+
+**Health Insights — Narrative Style**
+
+Prompt rewritten: leads with "so what" interpretation backed by data, includes BIA scale context (not DEXA), 30-day weight window, flags stale measurements. Max tokens 700.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/app/api/health-fitness/okr/route.ts` | `previous_value`, `resolvePreviousValue()`, weight limit(2), previous maps |
+| `src/components/health/OkrCard.tsx` | Font bumps, dim→muted, `computeTrend()`, trend arrows |
+| `src/app/api/health-fitness/insights/route.ts` | Narrative prompt, BIA context |
+| `src/app/health/page.tsx` | Added `previous_value` to KrProgress |
+| `package.json` | Version bump 2.4.15 → 2.4.16 |
+
+### No New Endpoints, Migrations, or Env Vars
