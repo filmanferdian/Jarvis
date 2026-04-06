@@ -43,6 +43,13 @@ const OBJECTIVE_LABELS: Record<string, string> = {
   O5: 'Recovery Quality',
 };
 
+/** Format a date string (YYYY-MM-DD) as "5 Apr" */
+function fmtDate(dateStr: string): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const [, m, d] = dateStr.split('-');
+  return `${parseInt(d)} ${months[parseInt(m) - 1]}`;
+}
+
 export const GET = withAuth(async () => {
   try {
     // Fetch all active targets
@@ -355,10 +362,29 @@ export const GET = withAuth(async () => {
       const progress = computeProgress(effectiveBaseline, t.target_value, t.target_direction, value, t.target_min, t.target_max);
       const status = determineStatus(progress, value);
 
-      // Build context string for metrics that need extra info
+      // Build context string showing data scope (date or date range)
       let context: string | undefined;
       if (t.key_result === 'hrv_decline_pct' && hrvPrevWeekAvg != null && hrvCurrentWeekAvg != null) {
         context = `Prev week: ${Math.round(hrvPrevWeekAvg)} ms → This week: ${Math.round(hrvCurrentWeekAvg)} ms`;
+      } else if (t.key_result === 'training_completion' && recentActivities) {
+        context = `Last 7 days: ${recentActivities.length}/4 sessions`;
+      } else if (value != null) {
+        const useAverage = t.source_table === 'garmin_daily' && t.source_column && AVERAGED_METRICS.includes(t.source_column);
+        if (useAverage && completedDays.length > 0) {
+          // 7-day averaged Garmin metrics — show date range
+          const oldest = completedDays[completedDays.length - 1].date;
+          const newest = completedDays[0].date;
+          context = `7d avg: ${fmtDate(oldest)} – ${fmtDate(newest)}`;
+        } else if (t.source_table === 'garmin_daily' && date) {
+          // Stable Garmin metrics (vo2_max, fitness_age)
+          context = `As of ${fmtDate(date)}`;
+        } else if (t.key_result === 'weight' && date) {
+          context = `Weighed ${fmtDate(date)}`;
+        } else if (t.source_table === 'health_measurements' && date) {
+          context = `Measured ${fmtDate(date)}`;
+        } else if (t.source_table === 'blood_work' && date) {
+          context = `Lab ${fmtDate(date)}`;
+        }
       }
 
       const kr: KrProgress = {

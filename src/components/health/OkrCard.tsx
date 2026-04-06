@@ -211,10 +211,16 @@ export default function OkrCard({ objective, label, keyResults, overallPct }: Ok
                 )}
               </div>
 
-              {/* Row 3: Context or baseline annotation */}
+              {/* Row 3: Context + baseline annotation */}
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-[10px] text-jarvis-text-dim">
-                  {kr.context ? kr.context : hasBaseline ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}` : 'No baseline'}
+                  {kr.context
+                    ? hasBaseline
+                      ? `${kr.context} · Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
+                      : kr.context
+                    : hasBaseline
+                      ? `Baseline: ${baselineFormatted}${unitLabel ? ` ${unitLabel}` : ''}`
+                      : 'No baseline'}
                 </span>
                 {hasData && hasBaseline && kr.progress_pct != null && (
                   <span className="text-[10px] text-jarvis-text-dim">
