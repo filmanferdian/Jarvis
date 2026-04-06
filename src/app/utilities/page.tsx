@@ -7,6 +7,7 @@ import AppShell from '@/components/AppShell';
 interface Integration {
   sync_type: string;
   label: string;
+  description: string;
   last_synced_at: string | null;
   last_result: string;
   last_error: string | null;
@@ -24,15 +25,22 @@ interface ServiceUsage {
   estimated_cost_usd: number;
 }
 
+interface CostSummary {
+  variable_usd: number;
+  fixed_usd: number;
+  fixed_breakdown: Record<string, number>;
+  total_estimated_usd: number;
+}
+
 interface UsageData {
   billing_month: string;
   services: Record<string, ServiceUsage>;
   elevenlabs_quota: { used: number; limit: number; remaining: number; pct_used: number };
-  cost_summary: {
-    variable_usd: number;
-    fixed_usd: number;
-    fixed_breakdown: Record<string, number>;
-    total_estimated_usd: number;
+  cost_summary: CostSummary;
+  prev_month?: {
+    billing_month: string;
+    services: Record<string, ServiceUsage>;
+    cost_summary: CostSummary;
   };
 }
 
@@ -108,7 +116,7 @@ export default function UtilitiesPage() {
               {integrations.map((int) => (
                 <div
                   key={int.sync_type}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-jarvis-border/50 hover:border-jarvis-border transition-colors"
+                  className="group relative flex items-center gap-3 p-3 rounded-lg border border-jarvis-border/50 hover:border-jarvis-border transition-colors"
                 >
                   <div className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[int.status]} shrink-0`} />
                   <div className="flex-1 min-w-0">
@@ -123,6 +131,11 @@ export default function UtilitiesPage() {
                       </p>
                     )}
                   </div>
+                  {int.description && (
+                    <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-2 py-1 whitespace-nowrap z-10 shadow-lg">
+                      {int.description}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,25 +211,57 @@ export default function UtilitiesPage() {
         {usage && (
           <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
             <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">Monthly Cost Estimate</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-lg font-mono font-semibold text-jarvis-text-primary">
-                  ${usage.cost_summary.variable_usd.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase">Variable</p>
+            <div className="grid grid-cols-2 gap-6">
+              {/* Current month */}
+              <div>
+                <p className="text-[11px] text-jarvis-text-muted uppercase mb-2 font-medium">{usage.billing_month} (current)</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <p className="text-base font-mono font-semibold text-jarvis-text-primary">
+                      ${usage.cost_summary.variable_usd.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-jarvis-text-dim uppercase">Variable</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-mono font-semibold text-jarvis-text-primary">
+                      ${usage.cost_summary.fixed_usd.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-jarvis-text-dim uppercase">Fixed</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-mono font-semibold text-jarvis-accent">
+                      ${usage.cost_summary.total_estimated_usd.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-jarvis-text-dim uppercase">Total</p>
+                  </div>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-lg font-mono font-semibold text-jarvis-text-primary">
-                  ${usage.cost_summary.fixed_usd.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase">Fixed</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-mono font-semibold text-jarvis-accent">
-                  ${usage.cost_summary.total_estimated_usd.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase">Total</p>
-              </div>
+              {/* Previous month */}
+              {usage.prev_month && (
+                <div className="border-l border-jarvis-border/50 pl-6">
+                  <p className="text-[11px] text-jarvis-text-muted uppercase mb-2 font-medium">{usage.prev_month.billing_month} (previous)</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center">
+                      <p className="text-base font-mono font-semibold text-jarvis-text-dim">
+                        ${usage.prev_month.cost_summary.variable_usd.toFixed(2)}
+                      </p>
+                      <p className="text-[10px] text-jarvis-text-dim uppercase">Variable</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-base font-mono font-semibold text-jarvis-text-dim">
+                        ${usage.prev_month.cost_summary.fixed_usd.toFixed(2)}
+                      </p>
+                      <p className="text-[10px] text-jarvis-text-dim uppercase">Fixed</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-base font-mono font-semibold text-jarvis-text-dim">
+                        ${usage.prev_month.cost_summary.total_estimated_usd.toFixed(2)}
+                      </p>
+                      <p className="text-[10px] text-jarvis-text-dim uppercase">Total</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-3 text-[11px] text-jarvis-text-dim">
               Fixed: Railway ${usage.cost_summary.fixed_breakdown.railway}/mo + ElevenLabs ${usage.cost_summary.fixed_breakdown.elevenlabs}/mo
