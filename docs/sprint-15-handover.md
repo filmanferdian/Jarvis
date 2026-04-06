@@ -184,3 +184,37 @@ ignored contacts skipped entirely during scan
 - Railway cost is now shown as usage-based ($5/mo base minimum). Actual billing may exceed $5 in heavy months.
 - ElevenLabs quota bar now pulls live data from their `/v1/user/subscription` API (credits used, limit, reset date). No longer relies on local character count which was inaccurate.
 - **Google OAuth expired** for `filmanferdian@gmail.com` and `filmanferdian21@gmail.com`. Re-auth via: `https://jarvis-production-9aea.up.railway.app/api/auth/google` (visit twice, pick each account).
+
+---
+
+## Ship: v2.4.14 — Health OKR Data Scope Dates (2026-04-06)
+
+**Commit:** `acd4063` on `claude/youthful-bardeen`, merged to `main`
+
+### What Changed
+
+**Problem:** Health OKR cards showed metric values (e.g., "Waist: 118 cm") with no indication of when the data was captured or what date range an average covers. Made it impossible to assess data freshness.
+
+**Solution:** Every OKR key result now displays a date-scoped context string below the progress bar:
+
+| Metric Type | Context Format | Example |
+|---|---|---|
+| 7-day averaged Garmin (HR, steps, sleep, stress, body battery) | `7d avg: DD Mon – DD Mon` | `7d avg: 30 Mar – 5 Apr` |
+| Single health measurements (waist, body fat, dead hang, OHS, BP) | `Measured DD Mon` | `Measured 29 Mar` |
+| Blood work (HbA1c, glucose, triglycerides, HDL) | `Lab DD Mon` | `Lab 1 Apr` |
+| Weight | `Weighed DD Mon` | `Weighed 6 Apr` |
+| Stable Garmin (VO2 max, fitness age) | `As of DD Mon` | `As of 6 Apr` |
+| Training completion | `Last 7 days: X/4 sessions` | `Last 7 days: 0/4 sessions` |
+| HRV decline | Unchanged (already had week-over-week context) | `Prev week: 45 ms → This week: 42 ms` |
+
+The UI now shows both the date context and baseline in one line, separated by `·` (e.g., `Measured 29 Mar · Baseline: 117 cm`).
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/app/api/health-fitness/okr/route.ts` | Added `fmtDate()` helper, populated `context` string for all metric types based on source table and averaging logic |
+| `src/components/health/OkrCard.tsx` | Updated Row 3 to show context + baseline combined with `·` separator |
+| `.claude/launch.json` | Fixed dev server PATH for homebrew node |
+| `package.json` | Version bump 2.4.13 → 2.4.14 |
+
+### No New Endpoints, Migrations, or Env Vars
