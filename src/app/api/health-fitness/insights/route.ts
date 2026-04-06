@@ -118,16 +118,20 @@ export const GET = withAuth(async () => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        max_tokens: 700,
         temperature: 0.3,
         messages: [{
           role: 'user',
           content: `${ctx.systemPrompt}
 
-You are generating a weekly health check-in for a body transformation program. Be direct and data-driven. No fluff. Short sentences. Front-load key information. Flag what's actually concerning vs what's fine.
+You are generating a weekly health check-in for a body transformation program. Write at the narrative level — lead with the "so what" interpretation, then back it with specific data. Don't just list numbers; explain what they mean for the program.
 
-CURRENT CONTEXT:
-${fitness ? `Week ${fitness.current_week}, ${fitness.current_phase}` : 'Unknown week/phase'}
+Be direct. Short sentences. Front-load the insight, not the data.
+
+CONTEXT:
+- ${fitness ? `Week ${fitness.current_week}, ${fitness.current_phase}` : 'Unknown week/phase'}
+- Body composition is measured with a digital body-comp scale (BIA), not DEXA. These readings have ±2-3% variance and are best used for trends, not absolute values.
+- Today's date: ${today}
 
 OKR TARGETS:
 ${okrSummary}
@@ -147,20 +151,19 @@ ${bloodSummary}
 Write exactly 3 sections. Use this format:
 
 WHAT'S WORKING
-- 2-3 bullets. Cite specific numbers and dates. Only include things actually trending in the right direction.
+- 2-3 bullets. Lead with the narrative insight ("Cardiovascular fitness is improving steadily"), then cite the supporting data ("VO2 max 37→39 over 2 weeks"). Only include things genuinely trending in the right direction.
 
 NEEDS ATTENTION
-- 2-3 bullets. Be honest about negative trends. Include the actual numbers showing the problem. Flag stale data (measurements older than 2 weeks).
+- 2-3 bullets. Lead with the implication ("Weight gain is undermining the calorie deficit"), then cite the evidence ("113kg, up 2.7kg in 3 weeks"). Be honest about what the trend means for the program goals. Flag stale data (measurements older than 14 days from today's date) as needing a fresh reading.
 
 FOCUS THIS WEEK
-- 1-2 concrete, actionable items based on what needs attention. Be specific (e.g., "get DEXA scan" not "track body composition").
+- 1-2 concrete, actionable items. Be specific about what to do and why it matters ("Weigh daily this week to confirm if the upward trend continues or if 113kg was a spike").
 
 Rules:
-- Each bullet should be 1 sentence, max 25 words.
-- Use actual numbers from the data. Don't round excessively.
-- If weight is trending UP, say so clearly — don't frame it as "down from baseline" if recent trend is upward.
-- Compare recent trend (last 2-3 data points) not just baseline vs current.
-- Flag any measurement older than 14 days as stale.
+- Each bullet: 1-2 sentences max. Lead with insight, back with data.
+- Always compare recent trend (last 2-3 data points), not just baseline vs current.
+- If weight is trending UP, say so clearly. Don't spin it as "down from baseline" when recent trajectory is upward.
+- For BIA body composition data, note that single readings are noisy — focus on multi-week trends.
 - Plain text only. No markdown, no bold, no headers beyond the 3 section names.`,
         }],
       }),
