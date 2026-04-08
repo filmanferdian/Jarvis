@@ -419,6 +419,25 @@ export async function patchRunPage(apiKey: string, pageId: string, run: RunActiv
   }
 }
 
+/** Patch only the Decoupling (%) property on an existing Runs DB page */
+export async function patchDecouplingOnly(apiKey: string, pageId: string, decouplingPct: number | null): Promise<void> {
+  const properties: Record<string, unknown> = {};
+  if (decouplingPct != null) {
+    properties['Decoupling (%)'] = { number: decouplingPct };
+  } else {
+    properties['Decoupling (%)'] = { number: null };
+  }
+  const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
+    method: 'PATCH',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify({ properties }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Notion patch decoupling failed: ${err}`);
+  }
+}
+
 /** Fetch all runs from the Runs DB for a date range, for analysis */
 export async function getRunsForPeriod(
   apiKey: string,

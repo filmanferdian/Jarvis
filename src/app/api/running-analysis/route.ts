@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { withCronAuth } from '@/lib/cronAuth';
-import { runRunningAnalysis } from '@/lib/running-analysis';
+import { runRunningAnalysis, reprocessDecoupling } from '@/lib/running-analysis';
 import { markSynced } from '@/lib/syncTracker';
 
 // Accept either browser auth (cookie/bearer) or cron auth (x-cron-secret)
@@ -16,24 +16,36 @@ function withEitherAuth(handler: (req: NextRequest) => Promise<NextResponse>) {
   };
 }
 
-// POST: Manually trigger running analysis
+// POST: Manually trigger running analysis or reprocess decoupling
 // Body params (all optional):
 //   date: string (YYYY-MM-DD) — analyze the week containing this date; defaults to previous week
 //   analysis_only: boolean — skip data ingestion, only run analysis
 //   force_resync: boolean — re-ingest even if Garmin ID already in Notion
+//   reprocess_decoupling: boolean — recalculate decoupling only for given garmin_ids
+//   garmin_ids: string[] — list of Garmin activity IDs to reprocess
 export const POST = withEitherAuth(async (req: NextRequest) => {
   try {
     let date: string | undefined;
     let analysisOnly = false;
     let forceResync = false;
+    let reprocessDecouplingFlag = false;
+    let garminIds: string[] = [];
 
     try {
       const body = await req.json();
       date = body.date;
       analysisOnly = !!body.analysis_only;
       forceResync = !!body.force_resync;
+      reprocessDecouplingFlag = !!body.reprocess_decoupling;
+      garminIds = Array.isArray(body.garmin_ids) ? body.garmin_ids : [];
     } catch {
       // No body or invalid JSON — use defaults
+    }
+
+    // Reprocess decoupling mode
+    if (reprocessDecouplingFlag && garminIds.length > 0) {
+      const result = await reprocessDecoupling(garminIds);
+      return NextResponse.json(result);
     }
 
     const result = await runRunningAnalysis({ date, analysisOnly, forceResync });

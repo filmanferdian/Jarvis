@@ -13,7 +13,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
-import { getExistingGarminIds, createRunPage, patchRunPage, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
+import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
 import { updateRunningLogDashboard } from './dashboard-update';
@@ -417,4 +417,48 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
     errors,
     timestamp: new Date().toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Reprocess decoupling for specific activities (warmup-exclusion fix)
+// ---------------------------------------------------------------------------
+
+export interface ReprocessDecouplingResult {
+  processed: number;
+  updated: number;
+  errors: string[];
+}
+
+export async function reprocessDecoupling(garminIds: string[]): Promise<ReprocessDecouplingResult> {
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey) throw new Error('NOTION_API_KEY not configured');
+
+  const errors: string[] = [];
+  let updated = 0;
+
+  for (const garminId of garminIds) {
+    try {
+      // Fetch activity details from Garmin and recalculate decoupling
+      console.log(`[reprocess-decoupling] Enriching ${garminId}`);
+      const enriched = await enrichActivity(garminId);
+
+      // Find existing Notion page
+      const pageId = await findRunPageByGarminId(notionApiKey, garminId);
+      if (!pageId) {
+        errors.push(`${garminId}: Notion page not found`);
+        continue;
+      }
+
+      // Patch only decoupling
+      await patchDecouplingOnly(notionApiKey, pageId, enriched.decouplingPct);
+      console.log(`[reprocess-decoupling] ${garminId}: decoupling=${enriched.decouplingPct}`);
+      updated++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${garminId}: ${msg}`);
+      console.error(`[reprocess-decoupling] Error for ${garminId}:`, msg);
+    }
+  }
+
+  return { processed: garminIds.length, updated, errors };
 }

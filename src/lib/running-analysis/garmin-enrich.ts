@@ -87,19 +87,32 @@ function calcDecoupling(
   }
 
   // Collect data points with valid HR and timestamp
-  const dataPoints = activityDetailMetrics
+  const allDataPoints = activityDetailMetrics
     .map((m) => ({
       ts: m.metrics[tsIdx],
       hr: m.metrics[hrIdx],
     }))
     .filter((p) => p.hr != null && p.hr > 0 && p.ts != null);
 
-  if (dataPoints.length < 10) {
-    console.warn(`[garmin-enrich] Decoupling: only ${dataPoints.length} valid data points`);
+  if (allDataPoints.length < 10) {
+    console.warn(`[garmin-enrich] Decoupling: only ${allDataPoints.length} valid data points`);
     return null;
   }
 
-  // Calculate total duration and 80% cutoff by timestamp
+  // Exclude warmup period — HR ramps from resting, inflating first-half avg
+  // For runs under 20 min, use 3 min warmup; otherwise 5 min
+  const rawStartTs = allDataPoints[0].ts;
+  const rawEndTs = allDataPoints[allDataPoints.length - 1].ts;
+  const totalActivityDurationMs = rawEndTs - rawStartTs;
+  const warmupMs = totalActivityDurationMs < 20 * 60 * 1000 ? 3 * 60 * 1000 : 5 * 60 * 1000;
+  const dataPoints = allDataPoints.filter((p) => (p.ts - rawStartTs) >= warmupMs);
+
+  if (dataPoints.length < 10) {
+    console.warn(`[garmin-enrich] Decoupling: only ${dataPoints.length} valid data points after warmup exclusion`);
+    return null;
+  }
+
+  // Calculate duration and 80% cutoff from post-warmup data
   const startTs = dataPoints[0].ts;
   const endTs = dataPoints[dataPoints.length - 1].ts;
   const totalDuration = endTs - startTs;
