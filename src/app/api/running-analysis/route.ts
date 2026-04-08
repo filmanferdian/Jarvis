@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth';
 import { withCronAuth } from '@/lib/cronAuth';
 import { runRunningAnalysis } from '@/lib/running-analysis';
 import { markSynced } from '@/lib/syncTracker';
@@ -37,7 +38,7 @@ export const POST = withCronAuth(async (req: NextRequest) => {
 });
 
 // GET: Status of last running analysis run
-export const GET = withCronAuth(async () => {
+export const GET = withAuth(async () => {
   try {
     const { supabase } = await import('@/lib/supabase');
 
