@@ -4,12 +4,24 @@ import { withCronAuth } from '@/lib/cronAuth';
 import { runRunningAnalysis } from '@/lib/running-analysis';
 import { markSynced } from '@/lib/syncTracker';
 
+// Accept either browser auth (cookie/bearer) or cron auth (x-cron-secret)
+function withEitherAuth(handler: (req: NextRequest) => Promise<NextResponse>) {
+  return async (req: NextRequest) => {
+    // Try cron auth first (has x-cron-secret header)
+    if (req.headers.get('x-cron-secret')) {
+      return withCronAuth(handler)(req);
+    }
+    // Fall back to browser auth (cookie or bearer token)
+    return withAuth(handler)(req);
+  };
+}
+
 // POST: Manually trigger running analysis
 // Body params (all optional):
 //   date: string (YYYY-MM-DD) — analyze the week containing this date; defaults to previous week
 //   analysis_only: boolean — skip data ingestion, only run analysis
 //   force_resync: boolean — re-ingest even if Garmin ID already in Notion
-export const POST = withCronAuth(async (req: NextRequest) => {
+export const POST = withEitherAuth(async (req: NextRequest) => {
   try {
     let date: string | undefined;
     let analysisOnly = false;
