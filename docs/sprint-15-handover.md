@@ -329,3 +329,47 @@ Updated program_schedule.steps_target from 9,000 to 10,000 for all weeks >= 3. W
 - program_schedule: steps_target = 10000 WHERE week >= 3
 
 ### No New Endpoints, Migrations, or Env Vars
+
+---
+
+### Dashboard UX Fixes (v2.4.21, 2026-04-09)
+
+Three interconnected fixes to dashboard quality.
+
+**1. Context-aware KPI topcard coloring**
+
+The KPI row treated all trend arrows as green=up, red=down regardless of metric semantics. Training Readiness "LOW" qualifier showed green (was in the "good" list because LOW stress is good). Weight progress showed 100% "On track" even when above target.
+
+Fix: Added `lowerIsBetter` flag from API, threaded through all color logic.
+
+- Qualifier colors are now context-dependent: "LOW" → red for Training Readiness, green for stress-type metrics
+- Trend arrows: Weight-down = green, Steps-up = green, RHR-down = green
+- Weight progress formula inverted: at 90kg with target 87kg → 97% (was 100%)
+- Progress bar colors aligned with text meaning thresholds
+- All hardcoded `text-emerald-400` replaced with `text-jarvis-success` theme tokens
+
+**2. Health insights timezone bug**
+
+`/api/health-fitness/insights` calculated `sevenDaysAgo` and `thirtyDaysAgo` in UTC, but weight entries are stored with WIB dates. Applied same WIB offset pattern used by `getWibToday()` in the same file.
+
+**3. Mobile UI — utilities page**
+
+Cost summary grid forced 2 columns on mobile with no responsive breakpoint. Fixed: `grid-cols-1 md:grid-cols-2`, tighter sub-grid gaps, border switches from left to top on mobile. Also reduced AppShell mobile padding from `p-5` to `p-3 sm:p-5`.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/app/api/kpis/route.ts` | Added `LOWER_IS_BETTER` set, inverted progress formula for weight/RHR, added `lowerIsBetter` to response |
+| `src/components/KpiRow.tsx` | Replaced static `TREND_ICONS` with `getTrendDisplay()`, context-aware `qualifierColor()`, aligned progress bar colors |
+| `src/components/HealthCard.tsx` | Fixed duplicate `qualifierColor` — LOW→red, HIGH→green, theme tokens |
+| `src/app/api/health-fitness/insights/route.ts` | Applied WIB offset to date range calculations |
+| `src/app/utilities/page.tsx` | Responsive cost summary grid, mobile-friendly borders/gaps |
+| `src/components/AppShell.tsx` | Reduced mobile padding: `p-3 sm:p-5 md:p-6` |
+| `package.json` | Version bump → 2.4.21 |
+
+### Key Gotchas
+1. **`LOWER_IS_BETTER` is a code-level set, not DB** — Currently `['Resting Heart Rate', 'Weight']`. If user switches to a bulk/gaining phase, Weight would need to be removed. Future enhancement: read from `fitness_context.current_phase`.
+2. **AppShell padding change is global** — The `p-3` mobile padding affects ALL pages, not just utilities. Monitor for any page looking too tight.
+3. **HealthCard has its own `qualifierColor` copy** — Not shared with KpiRow. HealthCard metrics (sleep, body battery, training readiness) are all higher-is-better, so LOW is always red there.
+
+### No New Endpoints, Migrations, or Env Vars for v2.4.21
