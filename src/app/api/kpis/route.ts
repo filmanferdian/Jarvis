@@ -23,8 +23,17 @@ export const GET = withAuth(async (_req: NextRequest) => {
       if (kpi.kpi_target && Number(kpi.kpi_target) > 0) {
         const val = Number(kpi.kpi_value);
         const tgt = Number(kpi.kpi_target);
-        if (lowerIsBetter) {
-          // For weight/RHR: at or below target = 100%, above = target/value ratio
+        if (kpi.kpi_name === 'Weight') {
+          // Weight: progress based on kg gap to target
+          // <5kg = good (green), 5-10kg = fair (orange), 10-20kg = bad (red), >20kg = concerning
+          const gap = val - tgt;
+          if (gap <= 0) progress = 100;
+          else if (gap < 5) progress = 95 - Math.round(gap * 3);    // 95→80, green zone
+          else if (gap < 10) progress = 80 - Math.round((gap - 5) * 6); // 80→50, orange zone
+          else if (gap < 20) progress = 50 - Math.round((gap - 10) * 3); // 50→20, red zone
+          else progress = Math.max(5, 20 - Math.round((gap - 20)));      // <20, deep red
+        } else if (lowerIsBetter) {
+          // For RHR: at or below target = 100%, above = target/value ratio
           progress = val <= tgt ? 100 : Math.round((tgt / val) * 100);
         } else {
           progress = Math.min(100, Math.round((val / tgt) * 100));
