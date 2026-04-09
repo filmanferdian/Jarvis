@@ -95,12 +95,15 @@ function hasDistance(act: Activity): boolean {
 
 function qualifierColor(q: string): string {
   const upper = q.toUpperCase();
-  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST', 'LOW'];
+  // Sleep, body battery, training readiness are all "higher is better"
+  if (upper === 'LOW') return 'text-jarvis-danger';
+  if (upper === 'HIGH') return 'text-jarvis-success';
+  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST'];
   const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL', 'MEDIUM'];
-  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
-  if (green.includes(upper)) return 'text-emerald-400';
+  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED'];
+  if (green.includes(upper)) return 'text-jarvis-success';
   if (orange.includes(upper)) return 'text-jarvis-warn';
-  if (red.includes(upper)) return 'text-red-400';
+  if (red.includes(upper)) return 'text-jarvis-danger';
   return 'text-jarvis-text-dim';
 }
 
@@ -322,7 +325,7 @@ export default function HealthCard() {
             <div className="flex items-baseline gap-2">
               {weightDelta && weightDelta !== '+0.0 kg' && weightDelta !== '-0.0 kg' && (
                 <span className={`text-xs font-medium ${
-                  weightDelta.startsWith('-') ? 'text-emerald-400' : 'text-jarvis-warn'
+                  weightDelta.startsWith('-') ? 'text-jarvis-success' : 'text-jarvis-warn'
                 }`}>
                   {weightDelta}
                 </span>

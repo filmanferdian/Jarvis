@@ -33,17 +33,23 @@ interface Kpi {
   progress: number | null;
   qualifier: string | null;
   lastUpdated: string | null;
+  lowerIsBetter: boolean;
 }
 
 interface KpisData {
   kpis: Kpi[];
 }
 
-const TREND_ICONS: Record<string, { symbol: string; color: string; label: string }> = {
-  up: { symbol: '\u2191', color: 'text-emerald-400', label: 'Trending up' },
-  down: { symbol: '\u2193', color: 'text-red-400', label: 'Trending down' },
-  flat: { symbol: '\u2192', color: 'text-jarvis-text-dim', label: 'Holding steady' },
-};
+function getTrendDisplay(trend: 'up' | 'down' | 'flat', lowerIsBetter: boolean): { symbol: string; color: string; label: string } {
+  if (trend === 'flat') return { symbol: '\u2192', color: 'text-jarvis-text-dim', label: 'Holding steady' };
+  const isUp = trend === 'up';
+  const isGood = lowerIsBetter ? !isUp : isUp;
+  return {
+    symbol: isUp ? '\u2191' : '\u2193',
+    color: isGood ? 'text-jarvis-success' : 'text-jarvis-danger',
+    label: isUp ? 'Trending up' : 'Trending down',
+  };
+}
 
 function deriveMeaning(kpi: Kpi): string {
   if (kpi.progress !== null) {
@@ -52,18 +58,22 @@ function deriveMeaning(kpi: Kpi): string {
     if (kpi.progress >= 50) return 'Needs attention';
     return 'Behind target';
   }
-  if (kpi.trend) return TREND_ICONS[kpi.trend].label;
+  if (kpi.trend) return getTrendDisplay(kpi.trend, kpi.lowerIsBetter).label;
   return '';
 }
 
-function qualifierColor(q: string): string {
+function qualifierColor(q: string, lowerIsBetter: boolean): string {
   const upper = q.toUpperCase();
-  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST', 'LOW'];
+  // Context-dependent: "LOW" training readiness is bad, but "LOW" stress is good
+  if (upper === 'LOW') return lowerIsBetter ? 'text-jarvis-success' : 'text-jarvis-danger';
+  if (upper === 'HIGH') return lowerIsBetter ? 'text-jarvis-danger' : 'text-jarvis-success';
+  // Universal qualifiers
+  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST'];
   const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL', 'MEDIUM'];
-  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED', 'HIGH'];
-  if (green.includes(upper)) return 'text-emerald-400';
+  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED'];
+  if (green.includes(upper)) return 'text-jarvis-success';
   if (orange.includes(upper)) return 'text-jarvis-warn';
-  if (red.includes(upper)) return 'text-red-400';
+  if (red.includes(upper)) return 'text-jarvis-danger';
   return 'text-jarvis-text-dim';
 }
 
@@ -94,8 +104,11 @@ function meaningColor(kpi: Kpi): string {
     if (kpi.progress >= 50) return 'text-jarvis-warn';
     return 'text-jarvis-danger';
   }
-  if (kpi.trend === 'up') return 'text-jarvis-success';
-  if (kpi.trend === 'down') return 'text-jarvis-danger';
+  if (kpi.trend) {
+    const isUp = kpi.trend === 'up';
+    const isGood = kpi.lowerIsBetter ? !isUp : isUp;
+    return isGood ? 'text-jarvis-success' : 'text-jarvis-danger';
+  }
   return 'text-jarvis-text-dim';
 }
 
@@ -179,7 +192,7 @@ export default function KpiRow() {
         </Link>
       )}
       {kpis.map((kpi) => {
-        const trend = kpi.trend ? TREND_ICONS[kpi.trend] : null;
+        const trend = kpi.trend ? getTrendDisplay(kpi.trend, kpi.lowerIsBetter) : null;
         const meaning = deriveMeaning(kpi);
         return (
           <div
@@ -212,7 +225,7 @@ export default function KpiRow() {
             </div>
             {/* Qualifier — contextual label for scored metrics */}
             {kpi.qualifier && (
-              <p className={`text-[11px] font-medium mb-1 ${qualifierColor(kpi.qualifier)}`}>
+              <p className={`text-[11px] font-medium mb-1 ${qualifierColor(kpi.qualifier, kpi.lowerIsBetter)}`}>
                 {toSentenceCase(kpi.qualifier)}
               </p>
             )}
@@ -229,8 +242,8 @@ export default function KpiRow() {
                     kpi.progress >= 80
                       ? 'bg-jarvis-success'
                       : kpi.progress >= 50
-                        ? 'bg-jarvis-accent'
-                        : 'bg-jarvis-warn'
+                        ? 'bg-jarvis-warn'
+                        : 'bg-jarvis-danger'
                   }`}
                   style={{ width: `${Math.min(kpi.progress, 100)}%` }}
                 />

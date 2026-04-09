@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
+const LOWER_IS_BETTER = new Set(['Resting Heart Rate', 'Weight']);
+
 // GET: Fetch top KPIs with domain info for dashboard display
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
@@ -15,10 +17,19 @@ export const GET = withAuth(async (_req: NextRequest) => {
 
     const kpis = (data ?? []).map((kpi) => {
       const domain = kpi.domains as { name: string; display_order: number } | null;
-      const progress =
-        kpi.kpi_target && kpi.kpi_target > 0
-          ? Math.min(100, Math.round((Number(kpi.kpi_value) / Number(kpi.kpi_target)) * 100))
-          : null;
+      const lowerIsBetter = LOWER_IS_BETTER.has(kpi.kpi_name);
+
+      let progress: number | null = null;
+      if (kpi.kpi_target && Number(kpi.kpi_target) > 0) {
+        const val = Number(kpi.kpi_value);
+        const tgt = Number(kpi.kpi_target);
+        if (lowerIsBetter) {
+          // For weight/RHR: at or below target = 100%, above = target/value ratio
+          progress = val <= tgt ? 100 : Math.round((tgt / val) * 100);
+        } else {
+          progress = Math.min(100, Math.round((val / tgt) * 100));
+        }
+      }
 
       const value = Number(kpi.kpi_value);
 
@@ -35,6 +46,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
         progress,
         qualifier: (kpi.qualifier as string) ?? null,
         lastUpdated: kpi.last_updated,
+        lowerIsBetter,
       };
     });
 

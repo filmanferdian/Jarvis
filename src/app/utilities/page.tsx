@@ -219,11 +219,11 @@ export default function UtilitiesPage() {
         {usage && (
           <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
             <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">Monthly Cost Estimate</h2>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Current month */}
               <div>
                 <p className="text-[11px] text-jarvis-text-muted uppercase mb-2 font-medium">{usage.billing_month} (current)</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                   <div className="text-center">
                     <p className="text-base font-mono font-semibold text-jarvis-text-primary">
                       ${usage.cost_summary.variable_usd.toFixed(2)}
@@ -246,9 +246,9 @@ export default function UtilitiesPage() {
               </div>
               {/* Previous month */}
               {usage.prev_month && (
-                <div className="border-l border-jarvis-border/50 pl-6">
+                <div className="border-t md:border-t-0 md:border-l border-jarvis-border/50 pt-4 md:pt-0 md:pl-6">
                   <p className="text-[11px] text-jarvis-text-muted uppercase mb-2 font-medium">{usage.prev_month.billing_month} (previous)</p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                     <div className="text-center">
                       <p className="text-base font-mono font-semibold text-jarvis-text-dim">
                         ${usage.prev_month.cost_summary.variable_usd.toFixed(2)}
