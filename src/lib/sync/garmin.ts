@@ -611,7 +611,7 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
   const fitnessDomain = domains.find((d) => d.name === 'Fitness');
   const now = new Date().toISOString();
 
-  interface KpiEntry { domain_id: string; kpi_name: string; kpi_value: number | null; kpi_unit: string; last_updated: string; qualifier?: string | null }
+  interface KpiEntry { domain_id: string; kpi_name: string; kpi_value: number | null; kpi_unit: string; last_updated: string; qualifier?: string | null; kpi_target?: string | null }
   const kpis: KpiEntry[] = [];
 
   // Extract Garmin qualifiers from raw_json
@@ -628,7 +628,7 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
   if (healthDomain) {
     if (daily.resting_hr != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Resting Heart Rate', kpi_value: daily.resting_hr as number, kpi_unit: 'bpm', last_updated: now });
     if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now, qualifier: sleepQualifier ?? null });
-    if (daily.hrv_7d_avg != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'HRV 7d Average', kpi_value: daily.hrv_7d_avg as number, kpi_unit: 'ms', last_updated: now });
+    if (daily.hrv_7d_avg != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'HRV 7d Average', kpi_value: daily.hrv_7d_avg as number, kpi_unit: 'ms', last_updated: now, qualifier: (daily.hrv_status as string) ?? null });
   }
 
   if (fitnessDomain) {
@@ -647,7 +647,9 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
       .not('steps', 'is', null);
     if (last7Days && last7Days.length > 0) {
       const avg = Math.round(last7Days.reduce((sum, r) => sum + (r.steps as number), 0) / last7Days.length);
-      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: avg, kpi_unit: 'steps', last_updated: now });
+      const stepsTarget = 10000;
+      const stepsQualifier = avg >= stepsTarget ? 'GOOD' : avg >= stepsTarget * 0.8 ? 'FAIR' : 'POOR';
+      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: avg, kpi_unit: 'steps', last_updated: now, qualifier: stepsQualifier, kpi_target: String(stepsTarget) });
     }
   }
 
@@ -662,15 +664,18 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
       .single();
 
     if (existing) {
+      const updates: Record<string, unknown> = { kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated, qualifier: kpi.qualifier ?? null };
+      if (kpi.kpi_target != null) updates.kpi_target = kpi.kpi_target;
       await supabase
         .from('domain_kpis')
-        .update({ kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated, qualifier: kpi.qualifier ?? null })
+        .update(updates)
         .eq('id', existing.id);
     } else {
       await supabase.from('domain_kpis').insert({
         domain_id: kpi.domain_id,
         kpi_name: kpi.kpi_name,
         kpi_value: String(kpi.kpi_value),
+        kpi_target: kpi.kpi_target ?? null,
         kpi_unit: kpi.kpi_unit,
         last_updated: kpi.last_updated,
         qualifier: kpi.qualifier ?? null,
