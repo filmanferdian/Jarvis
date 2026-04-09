@@ -373,3 +373,46 @@ Cost summary grid forced 2 columns on mobile with no responsive breakpoint. Fixe
 3. **HealthCard has its own `qualifierColor` copy** — Not shared with KpiRow. HealthCard metrics (sleep, body battery, training readiness) are all higher-is-better, so LOW is always red there.
 
 ### No New Endpoints, Migrations, or Env Vars for v2.4.21
+
+---
+
+### KPI Topcard Data Improvements (v2.4.22, 2026-04-09)
+
+Follow-up to v2.4.21 coloring fixes — adds missing qualifiers and refines weight progress logic.
+
+**1. HRV 7d Average qualifier**
+
+Garmin provides `hrv_status` (e.g., "BALANCED", "UNBALANCED") in garmin_daily but it was never passed to the KPI. Now included as qualifier, shown on the topcard with context-aware coloring.
+
+**2. Daily Steps target + qualifier**
+
+Steps KPI now has target of 10,000 and computed qualifier:
+- >= 10,000 → "Good" (green)
+- >= 8,000 → "Fair" (orange)
+- < 8,000 → "Poor" (red)
+
+Progress bar now shows for steps (e.g., 8,500 avg → 85%).
+
+**3. Weight progress: kg-gap-based**
+
+Replaced ratio-based weight progress with gap-to-target tiers:
+- < 5kg from target → green (progress 80-100%)
+- 5-10kg → orange (progress 50-80%)
+- 10-20kg → red (progress 20-50%)
+- > 20kg → deep red (progress < 20%)
+
+Target remains 87kg (hardcoded in weight POST route).
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/lib/sync/garmin.ts` | Pass hrv_status as HRV qualifier, add steps target/qualifier, write kpi_target on upsert |
+| `src/app/api/kpis/route.ts` | Weight-specific gap-based progress calculation |
+| `package.json` | Version bump → 2.4.22 |
+
+### Key Gotchas
+1. **Steps qualifier is computed, not from Garmin** — Uses thresholds (10k good, 8k fair, below poor). Garmin doesn't provide a step quality qualifier.
+2. **HRV/Steps changes require Garmin sync to take effect** — Existing KPI rows won't have the new qualifier/target until the next cron run (3x daily: 7am, 1pm, 7pm WIB).
+3. **Weight gap formula is continuous** — Bar width smoothly decreases as gap increases, but color band boundaries align exactly with the kg tiers.
+
+### No New Endpoints, Migrations, or Env Vars for v2.4.22
