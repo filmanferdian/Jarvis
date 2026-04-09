@@ -63,8 +63,9 @@ export const GET = withAuth(async () => {
     }
 
     // Gather recent data for analysis — 30-day window for weight, 7-day for Garmin
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const wibNow = Date.now() + 7 * 60 * 60 * 1000;
+    const sevenDaysAgo = new Date(wibNow - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(wibNow - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     const [garminRes, weightRes, measureRes, bloodRes, fitnessRes, okrRes] = await Promise.allSettled([
       supabase.from('garmin_daily').select('*').gte('date', sevenDaysAgo).order('date'),

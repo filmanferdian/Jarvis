@@ -28,7 +28,7 @@ export default function AppShell({ children }: AppShellProps) {
               />
             )}
             <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <main className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
+            <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-5">
               {children}
             </main>
           </div>
