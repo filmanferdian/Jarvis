@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { withCronAuth } from '@/lib/cronAuth';
 import { backfillGarmin, backfillDateRange } from '@/lib/sync/garmin';
+
+// Accept either browser auth (cookie/bearer) or cron auth (x-cron-secret)
+function withEitherAuth(handler: (req: NextRequest) => Promise<NextResponse>) {
+  return async (req: NextRequest) => {
+    if (req.headers.get('x-cron-secret')) {
+      return withCronAuth(handler)(req);
+    }
+    return withAuth(handler)(req);
+  };
+}
 
 // POST: Trigger Garmin backfill (auth-protected)
 // Query params:
 //   ?force=true — re-fetch all dates from API (56-day window)
 //   ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD — fetch specific date range
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withEitherAuth(async (req: NextRequest) => {
   try {
     const startDate = req.nextUrl.searchParams.get('startDate');
     const endDate = req.nextUrl.searchParams.get('endDate');
