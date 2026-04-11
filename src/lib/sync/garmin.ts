@@ -894,6 +894,62 @@ export async function backfillDateRange(startDate: string, endDate: string, comp
     }
   }
 
+  // Backfill activities — paginate until we cover the target date range
+  const postLoopBlock = await isGarminBlocked();
+  if (!postLoopBlock.blocked) {
+    try {
+      const targetStart = new Date(startDate + 'T00:00:00+07:00');
+      const PAGE_SIZE = 100;
+      let offset = 0;
+      let reachedTarget = false;
+
+      while (!reachedTarget && offset < 500) {
+        const activities = await client.getActivities(offset, PAGE_SIZE);
+        await trackGarminCalls(1);
+
+        if (!Array.isArray(activities) || activities.length === 0) break;
+
+        const actRecords = (activities as unknown as Record<string, unknown>[]).map((act) => ({
+          activity_id: String(act.activityId),
+          activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
+          distance_meters: (act.distance as number) ?? null,
+          duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
+          avg_pace: (act.averageSpeed as number)
+            ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
+            : null,
+          avg_hr: (act.averageHR as number) ?? null,
+          calories: (act.calories as number) ?? null,
+          started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
+          raw_json: act,
+          last_synced: new Date().toISOString(),
+        }));
+
+        for (const rec of actRecords) {
+          const { error } = await supabase
+            .from('garmin_activities')
+            .upsert(rec, { onConflict: 'activity_id' });
+          if (!error) result.activities_synced++;
+        }
+
+        // Check if oldest activity in this page is before our target start
+        const oldest = actRecords.reduce((min, r) => {
+          const t = r.started_at ? new Date(r.started_at).getTime() : Infinity;
+          return t < min ? t : min;
+        }, Infinity);
+
+        if (oldest <= targetStart.getTime()) {
+          reachedTarget = true;
+          console.log(`[garmin] Backfill activities: reached target date at offset ${offset}`);
+        }
+
+        offset += PAGE_SIZE;
+        await new Promise((r) => setTimeout(r, GARMIN_INTER_CALL_DELAY_MS));
+      }
+    } catch (err) {
+      console.error('Backfill activities pagination error:', err);
+    }
+  }
+
   return result;
 }
 
