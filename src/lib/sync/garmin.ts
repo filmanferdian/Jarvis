@@ -684,6 +684,42 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
   }
 }
 
+/** Lightweight activity-only sync: fetches last 20 activities from Garmin and upserts to Supabase.
+ *  Does NOT prune old records or sync daily metrics. Safe to call from running analysis pipeline. */
+export async function syncRecentActivities(): Promise<{ synced: number }> {
+  const client = await createGarminClient();
+  const activities = await client.getActivities(0, 20);
+  await trackGarminCalls(1);
+
+  let synced = 0;
+  if (Array.isArray(activities)) {
+    const actRecords = (activities as unknown as Record<string, unknown>[]).map((act) => ({
+      activity_id: String(act.activityId),
+      activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
+      distance_meters: (act.distance as number) ?? null,
+      duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
+      avg_pace: (act.averageSpeed as number)
+        ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
+        : null,
+      avg_hr: (act.averageHR as number) ?? null,
+      calories: (act.calories as number) ?? null,
+      started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
+      raw_json: act,
+      last_synced: new Date().toISOString(),
+    }));
+
+    for (const rec of actRecords) {
+      const { error } = await supabase
+        .from('garmin_activities')
+        .upsert(rec, { onConflict: 'activity_id' });
+      if (!error) synced++;
+    }
+  }
+
+  await saveCachedTokens(client);
+  return { synced };
+}
+
 const RETENTION_DAYS = 56;
 
 async function pruneOldRecords(): Promise<void> {

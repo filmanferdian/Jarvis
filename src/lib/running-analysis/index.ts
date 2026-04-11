@@ -12,7 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { syncGarmin, isGarminBlocked } from '@/lib/sync/garmin';
+import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext } from './analysis-engine';
@@ -274,9 +274,9 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
     if (blockStatus.blocked) {
       console.log(`[running-analysis] Garmin sync skipped: ${blockStatus.reason}`);
     } else {
-      console.log('[running-analysis] Syncing fresh Garmin data…');
-      const syncResult = await syncGarmin();
-      console.log(`[running-analysis] Garmin sync done: ${syncResult.activitiesSynced} activities synced`);
+      console.log('[running-analysis] Syncing recent Garmin activities…');
+      const syncResult = await syncRecentActivities();
+      console.log(`[running-analysis] Garmin activity sync done: ${syncResult.synced} activities upserted`);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
