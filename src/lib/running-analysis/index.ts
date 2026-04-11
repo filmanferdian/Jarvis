@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { syncGarmin, isGarminBlocked } from '@/lib/sync/garmin';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext } from './analysis-engine';
@@ -266,6 +267,21 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
   let analysisGenerated = false;
   let weeklyInsightUpdated = false;
   let dashboardUpdated = false;
+
+  // --- Step 0: Sync fresh Garmin data so today's activities are available ---
+  try {
+    const blockStatus = await isGarminBlocked();
+    if (blockStatus.blocked) {
+      console.log(`[running-analysis] Garmin sync skipped: ${blockStatus.reason}`);
+    } else {
+      console.log('[running-analysis] Syncing fresh Garmin data…');
+      const syncResult = await syncGarmin();
+      console.log(`[running-analysis] Garmin sync done: ${syncResult.activitiesSynced} activities synced`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[running-analysis] Garmin sync failed (continuing with existing data):', msg);
+  }
 
   // --- Step 1: Query Supabase for outdoor runs in this week ---
   // Include +/- 1 day buffer to catch UTC/WIB boundary edge cases
