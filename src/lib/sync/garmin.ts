@@ -729,7 +729,10 @@ async function pruneOldRecords(): Promise<void> {
 
   await Promise.allSettled([
     supabase.from('garmin_daily').delete().lt('date', cutoff),
-    supabase.from('garmin_activities').delete().lt('started_at', new Date(cutoff).toISOString()),
+    // Keep running activities for historical analysis — only prune non-running
+    supabase.from('garmin_activities').delete()
+      .lt('started_at', new Date(cutoff).toISOString())
+      .not('activity_type', 'ilike', '%run%'),
     supabase.from('weight_log').delete().lt('date', cutoff),
     supabase.from('health_measurements').delete().lt('date', cutoff),
   ]);
