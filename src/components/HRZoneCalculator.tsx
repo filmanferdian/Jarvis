@@ -143,10 +143,9 @@ export default function HRZoneCalculator() {
     [zones],
   );
 
-  // Consensus band: min floor from personalized methods (Karvonen, LTHR, Attia), max ceiling from all
-  const personalizedMethods = zones.filter((z) => ['Karvonen', 'LTHR-based', 'Attia'].includes(z.name));
-  const consensusMin = Math.min(...personalizedMethods.map((z) => z.low));
-  const consensusMax = Math.max(...personalizedMethods.map((z) => z.high));
+  // Consensus band: min = highest lower bound across ALL methods, max = highest upper bound across ALL
+  const consensusMin = Math.max(...zones.map((z) => z.low));
+  const consensusMax = Math.max(...zones.map((z) => z.high));
 
   if (!loaded) {
     return (
@@ -163,7 +162,7 @@ export default function HRZoneCalculator() {
           HR Zone 2 Calculator
         </h2>
         <p className="text-[12px] text-jarvis-text-dim mt-1">
-          Zone 2 ranges across expert methods. Consensus band derived from Karvonen, LTHR, and Attia.
+          Zone 2 ranges across expert methods. Min = highest lower bound, Max = highest upper bound.
         </p>
       </div>
 
@@ -180,7 +179,7 @@ export default function HRZoneCalculator() {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+            margin={{ top: 10, right: 60, left: 0, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
             <XAxis
@@ -211,13 +210,14 @@ export default function HRZoneCalculator() {
             <ReferenceLine
               y={consensusMin}
               stroke="#22c55e"
-              strokeDasharray="6 3"
-              strokeWidth={1.5}
+              strokeDasharray="8 4"
+              strokeWidth={2}
               label={{
-                value: `Min ${consensusMin}`,
+                value: `${consensusMin} bpm`,
                 position: 'right',
                 fill: '#22c55e',
-                fontSize: 10,
+                fontSize: 12,
+                fontWeight: 600,
               }}
             />
 
@@ -225,13 +225,14 @@ export default function HRZoneCalculator() {
             <ReferenceLine
               y={consensusMax}
               stroke="#ef4444"
-              strokeDasharray="6 3"
-              strokeWidth={1.5}
+              strokeDasharray="8 4"
+              strokeWidth={2}
               label={{
-                value: `Max ${consensusMax}`,
+                value: `${consensusMax} bpm`,
                 position: 'right',
                 fill: '#ef4444',
-                fontSize: 10,
+                fontSize: 12,
+                fontWeight: 600,
               }}
             />
 
@@ -264,10 +265,10 @@ export default function HRZoneCalculator() {
       {/* Consensus summary */}
       <div className="rounded-lg bg-jarvis-bg-main border border-jarvis-border px-4 py-3">
         <p className="text-[12px] text-jarvis-text-secondary">
-          <span className="font-medium text-jarvis-text-primary">Expert Consensus Zone 2:</span>{' '}
+          <span className="font-medium text-jarvis-text-primary">Target Zone 2:</span>{' '}
           <span className="font-mono">{consensusMin}–{consensusMax} bpm</span>{' '}
           <span className="text-jarvis-text-dim">
-            (derived from Karvonen, LTHR, and Attia methods)
+            (min = highest floor across all methods, max = highest ceiling)
           </span>
         </p>
       </div>
