@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
 import AppShell from '@/components/AppShell';
+import HRZoneCalculator from '@/components/HRZoneCalculator';
 
 interface AnalysisStatus {
   lastRun: string | null;
@@ -103,7 +104,7 @@ function AnalysisSection({ label, text }: { label: string; text: string }) {
   );
 }
 
-export default function RunningAnalysisPage() {
+export default function CardioAnalysisPage() {
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [insights, setInsights] = useState<WeeklyInsightEntry[]>([]);
@@ -181,17 +182,19 @@ export default function RunningAnalysisPage() {
         <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
           <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
           <span>/</span>
-          <span className="text-jarvis-text-primary">Running Analysis</span>
+          <span className="text-jarvis-text-primary">Cardio Analysis</span>
         </div>
 
         {/* Header */}
         <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
-          <h1 className="text-[17px] font-semibold text-jarvis-text-primary mb-1">Running Analysis</h1>
+          <h1 className="text-[17px] font-semibold text-jarvis-text-primary mb-1">Cardio Analysis</h1>
           <p className="text-[13px] text-jarvis-text-muted">
-            Weekly AI analysis of outdoor running data. Auto-runs every Saturday at 12pm WIB,
-            analyzing Mon–Sat of the current week. Pipeline: Garmin → Notion Runs DB → Claude → Weekly Insights.
+            HR zone calculator and weekly AI analysis of cardio training data. Auto-runs every Saturday at 12pm WIB.
           </p>
         </div>
+
+        {/* HR Zone Calculator */}
+        <HRZoneCalculator />
 
         {/* Weekly Insights */}
         <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5 space-y-3">
