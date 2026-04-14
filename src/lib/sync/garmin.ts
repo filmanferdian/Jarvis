@@ -653,7 +653,7 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
       const avg = Math.round(last7Days.reduce((sum, r) => sum + (r.steps as number), 0) / last7Days.length);
       const stepsTarget = 10000;
       const stepsQualifier = avg >= stepsTarget ? 'GOOD' : avg >= stepsTarget * 0.8 ? 'FAIR' : 'POOR';
-      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Avg Steps (7d)', kpi_value: avg, kpi_unit: 'steps', last_updated: now, qualifier: stepsQualifier, kpi_target: String(stepsTarget) });
+      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Steps 7d Average', kpi_value: avg, kpi_unit: 'steps', last_updated: now, qualifier: stepsQualifier, kpi_target: String(stepsTarget) });
     }
   }
 

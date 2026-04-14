@@ -129,7 +129,7 @@ export default function KpiRow() {
     'Sleep Score',
     'Resting Heart Rate',
     'HRV 7d Average',
-    'Avg Steps (7d)',
+    'Steps 7d Average',
     'Weight',
   ];
   const allKpis = data?.kpis ?? [];

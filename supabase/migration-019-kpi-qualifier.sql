@@ -3,4 +3,4 @@
 ALTER TABLE domain_kpis ADD COLUMN IF NOT EXISTS qualifier TEXT;
 
 -- Rename misleading KPI name
-UPDATE domain_kpis SET kpi_name = 'Avg Steps (7d)' WHERE kpi_name = 'Daily Steps';
+UPDATE domain_kpis SET kpi_name = 'Steps 7d Average' WHERE kpi_name = 'Daily Steps';
