@@ -64,6 +64,10 @@ export async function generateTtsAudio(text: string): Promise<Buffer> {
     throw new Error('No TTS API key configured (ElevenLabs or OpenAI)');
   }
 
+  const openaiVoice = process.env.JARVIS_OPENAI_VOICE || 'ash';
+  const openaiInstructions = process.env.JARVIS_OPENAI_TTS_INSTRUCTIONS ||
+    'Speak in the calm, composed, distinguished voice of a sophisticated British AI butler. Measured pace, warm but precise diction, subtle dry wit. Refined, intelligent, and unflappably polite — the voice of a trusted personal assistant.';
+
   const ttsRes = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: {
@@ -71,10 +75,11 @@ export async function generateTtsAudio(text: string): Promise<Buffer> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'tts-1-hd',
-      voice: 'fable',
+      model: 'gpt-4o-mini-tts',
+      voice: openaiVoice,
       speed: 0.95,
       input: text,
+      instructions: openaiInstructions,
       response_format: 'mp3',
     }),
   });
