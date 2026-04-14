@@ -626,13 +626,17 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
     ? (trArray[0].level as string | undefined) ?? null
     : null;
   if (healthDomain) {
-    if (daily.resting_hr != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Resting Heart Rate', kpi_value: daily.resting_hr as number, kpi_unit: 'bpm', last_updated: now });
-    if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now, qualifier: sleepQualifier ?? null });
+    if (daily.resting_hr != null) {
+      const rhr = daily.resting_hr as number;
+      const rhrQualifier = rhr < 55 ? 'ATHLETIC' : rhr <= 65 ? 'GOOD' : rhr <= 75 ? 'NORMAL' : 'ELEVATED';
+      kpis.push({ domain_id: healthDomain.id, kpi_name: 'Resting Heart Rate', kpi_value: rhr, kpi_unit: 'bpm', last_updated: now, qualifier: rhrQualifier, kpi_target: '60' });
+    }
+    if (daily.sleep_score != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'Sleep Score', kpi_value: daily.sleep_score as number, kpi_unit: '/100', last_updated: now, qualifier: sleepQualifier ?? null, kpi_target: '80' });
     if (daily.hrv_7d_avg != null) kpis.push({ domain_id: healthDomain.id, kpi_name: 'HRV 7d Average', kpi_value: daily.hrv_7d_avg as number, kpi_unit: 'ms', last_updated: now, qualifier: (daily.hrv_status as string) ?? null });
   }
 
   if (fitnessDomain) {
-    if (daily.training_readiness != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Training Readiness', kpi_value: daily.training_readiness as number, kpi_unit: '/100', last_updated: now, qualifier: trQualifier });
+    if (daily.training_readiness != null) kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Training Readiness', kpi_value: daily.training_readiness as number, kpi_unit: '/100', last_updated: now, qualifier: trQualifier, kpi_target: '80' });
 
     // Steps: 7-day average excluding today (use last 7 completed days)
     const wibOffset = 7 * 60 * 60 * 1000;
@@ -649,23 +653,35 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
       const avg = Math.round(last7Days.reduce((sum, r) => sum + (r.steps as number), 0) / last7Days.length);
       const stepsTarget = 10000;
       const stepsQualifier = avg >= stepsTarget ? 'GOOD' : avg >= stepsTarget * 0.8 ? 'FAIR' : 'POOR';
-      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Daily Steps', kpi_value: avg, kpi_unit: 'steps', last_updated: now, qualifier: stepsQualifier, kpi_target: String(stepsTarget) });
+      kpis.push({ domain_id: fitnessDomain.id, kpi_name: 'Avg Steps (7d)', kpi_value: avg, kpi_unit: 'steps', last_updated: now, qualifier: stepsQualifier, kpi_target: String(stepsTarget) });
     }
   }
 
   // Upsert KPIs — match on domain_id + kpi_name
   for (const kpi of kpis) {
-    // Check if KPI exists
+    // Check if KPI exists + fetch current value for trend computation
     const { data: existing } = await supabase
       .from('domain_kpis')
-      .select('id')
+      .select('id, kpi_value')
       .eq('domain_id', kpi.domain_id)
       .eq('kpi_name', kpi.kpi_name)
       .single();
 
+    // Compute trend from old vs new value
+    let trend: string | null = null;
+    if (existing?.kpi_value != null && kpi.kpi_value != null) {
+      const oldVal = parseFloat(existing.kpi_value as string);
+      if (!isNaN(oldVal)) {
+        if (kpi.kpi_value > oldVal) trend = 'up';
+        else if (kpi.kpi_value < oldVal) trend = 'down';
+        else trend = 'flat';
+      }
+    }
+
     if (existing) {
       const updates: Record<string, unknown> = { kpi_value: String(kpi.kpi_value), kpi_unit: kpi.kpi_unit, last_updated: kpi.last_updated, qualifier: kpi.qualifier ?? null };
       if (kpi.kpi_target != null) updates.kpi_target = kpi.kpi_target;
+      if (trend) updates.trend = trend;
       await supabase
         .from('domain_kpis')
         .update(updates)

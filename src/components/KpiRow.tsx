@@ -68,9 +68,9 @@ function qualifierColor(q: string, lowerIsBetter: boolean): string {
   if (upper === 'LOW') return lowerIsBetter ? 'text-jarvis-success' : 'text-jarvis-danger';
   if (upper === 'HIGH') return lowerIsBetter ? 'text-jarvis-danger' : 'text-jarvis-success';
   // Universal qualifiers
-  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST'];
+  const green = ['EXCELLENT', 'GOOD', 'SUPERIOR', 'BALANCED', 'PRODUCTIVE', 'CHARGED', 'ATHLETIC', 'RELAXED', 'REST', 'ON_TRACK'];
   const orange = ['FAIR', 'MODERATE', 'MAINTAINING', 'UNBALANCED', 'NORMAL', 'MEDIUM'];
-  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED'];
+  const red = ['POOR', 'DETRAINING', 'DRAINED', 'ELEVATED', 'NEEDS_ATTENTION'];
   if (green.includes(upper)) return 'text-jarvis-success';
   if (orange.includes(upper)) return 'text-jarvis-warn';
   if (red.includes(upper)) return 'text-jarvis-danger';
@@ -129,7 +129,7 @@ export default function KpiRow() {
     'Sleep Score',
     'Resting Heart Rate',
     'HRV 7d Average',
-    'Daily Steps',
+    'Avg Steps (7d)',
     'Weight',
   ];
   const allKpis = data?.kpis ?? [];

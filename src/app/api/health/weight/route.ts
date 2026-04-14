@@ -86,16 +86,34 @@ export const POST = withAuth(async (req: NextRequest) => {
     if (healthDomain) {
       const { data: existing } = await supabase
         .from('domain_kpis')
-        .select('id')
+        .select('id, kpi_value')
         .eq('domain_id', healthDomain.id)
         .eq('kpi_name', 'Weight')
         .single();
 
+      // Compute trend from old vs new value
+      let trend: string | null = null;
+      if (existing?.kpi_value != null) {
+        const oldVal = parseFloat(existing.kpi_value as string);
+        if (!isNaN(oldVal)) {
+          if (weight_kg > oldVal) trend = 'up';
+          else if (weight_kg < oldVal) trend = 'down';
+          else trend = 'flat';
+        }
+      }
+
+      // Compute qualifier from gap to target (87kg)
+      const weightTarget = 87;
+      const gap = weight_kg - weightTarget;
+      const weightQualifier = gap <= 0 ? 'ON_TRACK' : gap < 2 ? 'GOOD' : gap < 5 ? 'FAIR' : 'NEEDS_ATTENTION';
+
       const now = new Date().toISOString();
       if (existing) {
+        const updates: Record<string, unknown> = { kpi_value: String(weight_kg), kpi_unit: 'kg', last_updated: now, qualifier: weightQualifier };
+        if (trend) updates.trend = trend;
         await supabase
           .from('domain_kpis')
-          .update({ kpi_value: String(weight_kg), kpi_unit: 'kg', last_updated: now })
+          .update(updates)
           .eq('id', existing.id);
       } else {
         await supabase.from('domain_kpis').insert({
@@ -105,6 +123,7 @@ export const POST = withAuth(async (req: NextRequest) => {
           kpi_target: '87',
           kpi_unit: 'kg',
           last_updated: now,
+          qualifier: weightQualifier,
         });
       }
     }
