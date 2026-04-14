@@ -43,3 +43,6 @@ yarn-error.log*
 next-env.d.ts
 # Trigger redeploy
 tts-preview-*.mp3
+
+# claude code
+.claude/
