@@ -20,31 +20,28 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
   return true;
 }
 
-// M3: CSP retains 'self' allowlist + per-request nonce. 'unsafe-inline' is kept
-// alongside the nonce because Next.js 16 with the deprecated `middleware` file
-// convention does NOT reliably stamp the nonce on its auto-emitted inline
-// hydration scripts in production builds. Without 'unsafe-inline', those
-// scripts are blocked and the app can't hydrate.
+// M3: CSP uses 'self' + 'unsafe-inline' for scripts. No nonce — per CSP Level 3
+// spec section 6.6.2.1, when a nonce OR hash is present in script-src, modern
+// browsers IGNORE 'unsafe-inline'. Since Next.js 16 with the deprecated
+// `middleware` file convention does NOT stamp nonces on its inline hydration
+// scripts, having both meant every unnoced inline script got blocked and the
+// app couldn't hydrate.
 //
-// CSP Level 3 behavior: when a nonce is present, modern browsers IGNORE
-// 'unsafe-inline' for inline scripts (the nonce takes precedence). So if we
-// later migrate to the new `proxy` convention and Next.js starts stamping the
-// nonce properly, this CSP automatically tightens without code change.
-// Old browsers (pre-CSP-L3) keep working via the 'unsafe-inline' fallback.
+// Returning to 'self' + 'unsafe-inline' (same script-src posture as pre-ship
+// v2.4.32). We still enforce:
+//  - 'self' blocks external script injection from unknown domains
+//  - frame-ancestors 'none' blocks clickjacking
+//  - form-action 'self' blocks form hijacking
+//  - C3 renderMarkdown HTML-escapes all model/user content, so there's no
+//    reachable path for attacker-controlled HTML to reach an inline <script>
 //
-// What we still prevent:
-//  - External script injection from unknown domains (only 'self' is allowed)
-//  - frame-ancestors attacks
-//  - form-action hijacking
-// What we don't prevent (until Next.js fixes nonce stamping or we move to proxy):
-//  - Inline <script> XSS in modern browsers is tightened by the nonce, but
-//    only for inline scripts Next.js stamps. User-rendered inline scripts
-//    (which shouldn't exist given C3 renderMarkdown HTML-escapes) would
-//    still execute in older browsers.
-function buildCspHeader(nonce: string): string {
+// Future: migrate to the new `proxy` file convention and try nonce-based
+// again. Nonce is kept OFF for now rather than stamped because modern browser
+// precedence rules make partial-nonce deployments worse than no nonce at all.
+function buildCspHeader(): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
+    "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.openai.com https://api.elevenlabs.io",
@@ -108,19 +105,11 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // Generate a CSP nonce for HTML responses. Next.js reads `x-nonce` from the
-  // inbound request and stamps its own inline scripts with that value.
-  const nonce = crypto.randomUUID().replace(/-/g, '');
-  const cspHeader = buildCspHeader(nonce);
-
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('Content-Security-Policy', cspHeader);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const cspHeader = buildCspHeader();
+  const response = NextResponse.next();
 
   // Attach CSP only to non-API responses (HTML). API responses don't execute
-  // scripts in the browser, so the nonce has no meaning there.
+  // scripts in the browser.
   if (!isApi) {
     response.headers.set('Content-Security-Policy', cspHeader);
   }
