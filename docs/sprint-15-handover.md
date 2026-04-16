@@ -470,3 +470,62 @@ Fix: `extractRunActivity` now prefers `steps / movingDuration` when both fields 
 2. **The weighted cadence is distance-weighted** — Longer runs have more influence than short ones. Shorter/interrupted runs (e.g., Jan 31 0.95km run at 170 spm) can have extreme values that barely affect the week total.
 3. **Running-activity exemption is a string match** — `pruneOldRecords` uses `activity_type NOT ILIKE '%run%'`, which catches `running`, `track_running`, `trail_running`, `treadmill_running`, etc. Treadmill runs are therefore also kept indefinitely even though they are excluded from outdoor analysis.
 4. **Garmin daily budget can block the backfill** — The paginated backfill consumes ~1 call per 100 activities fetched. Long backfills (back to 2025) use ~3-5 calls total, but combined with the regular cron's 11 calls it's possible to hit the 50/day budget. Reset via `UPDATE api_usage_v2 SET call_count = 0 WHERE date = ... AND service = 'garmin'` in Supabase SQL Editor.
+
+### Security Hardening (v2.4.33, 2026-04-16)
+
+Routine security review conducted in-session; 19 findings filed into the plan at `~/.claude/plans/linked-painting-manatee.md` and fully implemented before ship.
+
+**Critical (prompt injection + XSS)**
+- C1 — Voice intent transcript now sanitized (`sanitizeMultiline`) and wrapped in `<untrusted_user_transcript>` delimiters with a `UNTRUSTED_PREAMBLE` instructing Claude to treat wrapped content as data, not instructions.
+- C2 — Same treatment applied to every Claude pipeline that embeds external text: email triage (classification + draft replies), email synthesis, morning briefing (calendar titles + task names), news synthesis (newsletter bodies).
+- C3 — `renderMarkdown` now HTML-escapes its input before any regex substitution. Any `<script>` / `<img onerror=...>` emitted by Claude (or echoed from upstream email content) is rendered as inert text rather than executed.
+
+**High (OAuth + data at rest)**
+- H1 — Google + Microsoft OAuth routes generate a signed state token stored in an httpOnly cookie (`src/lib/oauthState.ts`, HMAC-SHA256, 10-minute TTL). Callbacks reject mismatches.
+- H2 — Google + Microsoft OAuth access/refresh tokens encrypted at rest via AES-256-GCM (`src/lib/crypto.ts`). Legacy plaintext rows pass through decrypt() so migration is transparent; the next refresh re-encrypts.
+- H3 — Garmin OAuth tokens moved out of `sync_status.last_error` into a dedicated `garmin_tokens` table (migration-020), encrypted. Legacy location read as fallback during migration window, then cleared.
+- H4 — Swept 21 API routes: no more `String(err)` / `err.message` / Supabase `error.message` leaked to clients. All routed through `safeError()` or replaced with generic responses.
+- H5 — `garmin_daily.raw_json` and `garmin_activities.raw_json` wrapped as `{ enc: "enc:v1:..." }` on write. `unwrapJsonb()` transparently decrypts on read (running-analysis, health-fitness route, backfill paths).
+
+**Medium**
+- M1 — Session cookie `maxAge`: 30 days → 7 days.
+- M2 — Deleted localStorage-backed Bearer token on the dashboard (`src/app/page.tsx`). httpOnly cookie is sent automatically on same-origin fetch.
+- M3 — CSP moved from `next.config.ts` to `src/middleware.ts` with a per-request nonce and `strict-dynamic`. Dropped `'unsafe-inline'` for `script-src`.
+- M4 — `src/lib/supabase.ts` throws if imported from a client component (`typeof window !== 'undefined'` guard), preventing accidental service-role key bundling.
+- M5 — Hardcoded work-email constants replaced with `WORK_GMAIL_ADDRESS` / `WORK_OUTLOOK_ADDRESS` env vars.
+- M6 — CLAUDE.md documents Garmin password limitation, `CRYPTO_KEY` requirement, and a new Security Posture section.
+- M7 — `/api/contacts/scan` now validates body with `ContactsScanSchema` (Zod).
+
+**Low**
+- L1 — `assertServerEnv()` blocks `JARVIS_AUTH_TOKEN` / `CRON_SECRET` shorter than 32 chars (rotated `JARVIS_AUTH_TOKEN` from 20 → 48 chars during ship).
+- L2 — `Cache-Control: no-store, no-cache, must-revalidate, private` on all `/api/cron/*` responses (middleware).
+- L4 — `npm run audit:security` script added.
+
+**New modules**
+| File | Purpose |
+|------|---------|
+| `src/lib/crypto.ts` | AES-256-GCM `encrypt` / `decrypt` + `wrapJsonb` / `unwrapJsonb` for JSONB columns |
+| `src/lib/promptEscape.ts` | `sanitizeInline`, `sanitizeMultiline`, `wrapUntrusted`, `UNTRUSTED_PREAMBLE` |
+| `src/lib/env.ts` | `assertServerEnv()` runtime validation |
+| `src/lib/oauthState.ts` | Signed OAuth state cookie helpers |
+| `supabase/migration-020-garmin-tokens.sql` | `garmin_tokens` table (encrypted token blob) |
+
+### New Env Vars
+| Var | Required | Notes |
+|-----|----------|-------|
+| `CRYPTO_KEY` | ✅ Yes | 32-byte base64. Encrypts OAuth tokens and `raw_json`. Rotating invalidates all encrypted columns. |
+| `WORK_GMAIL_ADDRESS` | No (defaults to `filman@group.infinid.id`) | |
+| `WORK_OUTLOOK_ADDRESS` | No (defaults to `filman@infinid.id`) | |
+
+### New Migration
+- `migration-020-garmin-tokens.sql` — applied to production Supabase during ship. Creates `public.garmin_tokens` with RLS enabled.
+
+### Token rotation during ship
+`JARVIS_AUTH_TOKEN` was 20 chars, below the new ≥32 threshold. Rotated to a new 48-char value in both `.env.local` files and Railway. Existing browser session cookies (signed with the old token) are invalidated — log out + log in to refresh.
+
+### Security Gotchas
+1. **`CRYPTO_KEY` is break-glass** — rotating it invalidates every stored OAuth token (Google + Microsoft + Garmin) and every `raw_json` column. Only rotate if the key is believed compromised, and plan for re-auth across all integrations.
+2. **`decrypt()` is passthrough-safe** — any value that doesn't start with `enc:v1:` is returned as-is. This is intentional for transparent migration but means a bad value stored later won't be "protected" by the ciphertext prefix check. Always use `encrypt()` for new writes.
+3. **CSP nonce requires Node crypto** — `crypto.randomUUID()` in middleware runs on the Edge runtime; both Node and Edge runtimes expose it.
+4. **OAuth state cookie uses `sameSite: 'lax'`** — `'strict'` would be dropped on cross-site OAuth return redirects from Google/Microsoft. Signed HMAC + 10min TTL mitigates the reduced sameSite scope.
+5. **`unsafe-inline` retained for `style-src`** — Tailwind v4 and Next.js inline critical CSS. Switching to nonce-based styles would require a broader styling-pipeline change.
