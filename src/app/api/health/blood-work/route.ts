@@ -68,7 +68,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   } catch (err) {
     console.error('Blood work save error:', err);
     return NextResponse.json(
-      { error: 'Failed to save blood work', details: String(err) },
+      { error: 'Failed to save blood work' },
       { status: 500 },
     );
   }

@@ -18,16 +18,14 @@ export const POST = withAuth(async (req: NextRequest) => {
       .eq('status', 'new');
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[contacts/ignore] DB error:', error);
+      return NextResponse.json({ error: 'Operation failed' }, { status: 500 });
     }
 
     return NextResponse.json({ ignored: emails.length });
   } catch (err) {
     console.error('[contacts/ignore] Error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Ignore failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Ignore failed' }, { status: 500 });
   }
 });
 
@@ -47,15 +45,13 @@ export const DELETE = withAuth(async (req: NextRequest) => {
       .eq('status', 'ignored');
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[contacts/ignore] DB error:', error);
+      return NextResponse.json({ error: 'Operation failed' }, { status: 500 });
     }
 
     return NextResponse.json({ restored: true, email });
   } catch (err) {
     console.error('[contacts/ignore] Restore error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Restore failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Restore failed' }, { status: 500 });
   }
 });

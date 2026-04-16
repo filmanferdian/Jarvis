@@ -92,7 +92,7 @@ export const GET = withAuth(async (req: NextRequest) => {
   } catch (err) {
     console.error('Trends error:', err);
     return NextResponse.json(
-      { error: 'Failed to fetch trends', details: String(err) },
+      { error: 'Failed to fetch trends' },
       { status: 500 },
     );
   }

@@ -9,7 +9,7 @@ export const GET = withCronAuth(async (_req: NextRequest) => {
   } catch (err) {
     console.error('Cron: Notion context sync error:', err);
     return NextResponse.json(
-      { error: 'Notion context sync failed', details: String(err) },
+      { error: 'Notion context sync failed' },
       { status: 500 },
     );
   }

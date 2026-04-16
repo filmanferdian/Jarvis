@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { unwrapJsonb } from '@/lib/crypto';
 import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
@@ -94,7 +95,8 @@ function extractLocationFromName(name: string): string | null {
 }
 
 function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityData): RunActivity {
-  const raw = row.raw_json ?? {};
+  // H5: raw_json may be `{ enc: "enc:v1:..." }` (encrypted) or legacy plaintext.
+  const raw = unwrapJsonb<Record<string, unknown>>(row.raw_json) ?? {};
 
   // Parse date in WIB
   const startedAt = row.started_at ? new Date(row.started_at) : null;

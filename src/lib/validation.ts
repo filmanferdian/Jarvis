@@ -36,3 +36,17 @@ export const WeightSchema = z.object({
   weight_kg: z.number().min(20).max(300),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
+
+export const ContactsScanSchema = z.object({
+  mode: z.enum(['backfill', 'weekly']).default('weekly'),
+});
+
+export const ContactUpsertSchema = z.object({
+  email: z.string().email().max(320),
+  name: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const ContactIgnoreSchema = z.object({
+  email: z.string().email().max(320),
+});

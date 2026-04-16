@@ -211,7 +211,7 @@ Write a concise update (under 150 words) that:
   } catch (err) {
     console.error('Delta briefing error:', err);
     return NextResponse.json(
-      { error: 'Failed to generate delta', details: String(err) },
+      { error: 'Failed to generate delta' },
       { status: 500 },
     );
   }

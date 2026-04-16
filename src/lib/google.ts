@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { EmailSummary } from './microsoft';
+import { encrypt, decrypt } from './crypto';
 
 // OAuth endpoints
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -43,7 +44,7 @@ export function getRedirectUri(): string {
 
 // --- OAuth ---
 
-export function buildAuthUrl(): string {
+export function buildAuthUrl(state?: string): string {
   const params = new URLSearchParams({
     client_id: getClientId(),
     response_type: 'code',
@@ -52,6 +53,7 @@ export function buildAuthUrl(): string {
     access_type: 'offline',
     prompt: 'consent',
   });
+  if (state) params.set('state', state);
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
@@ -121,22 +123,26 @@ export async function getValidAccessToken(accountId: string): Promise<string> {
     throw new Error(`NO_GOOGLE_TOKENS:${accountId}`);
   }
 
+  // H2: tokens are encrypted at rest; decrypt() passes through legacy plaintext rows.
+  const storedAccess = decrypt(data.access_token);
+  const storedRefresh = decrypt(data.refresh_token);
+
   // If token expires in more than 5 minutes, use it
   const expiresAt = new Date(data.expires_at).getTime();
   const bufferMs = 5 * 60 * 1000;
   if (Date.now() + bufferMs < expiresAt) {
-    return data.access_token;
+    return storedAccess;
   }
 
   // Refresh
-  const tokens = await refreshAccessToken(data.refresh_token);
+  const tokens = await refreshAccessToken(storedRefresh);
   const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
   await supabase.from('google_tokens').upsert({
     id: accountId,
     email: data.email,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token || data.refresh_token,
+    access_token: encrypt(tokens.access_token),
+    refresh_token: encrypt(tokens.refresh_token || storedRefresh),
     expires_at: newExpiresAt,
     scope: tokens.scope || data.scope,
     updated_at: new Date().toISOString(),

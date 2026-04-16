@@ -195,7 +195,7 @@ Rules:
   } catch (err) {
     console.error('Health insights error:', err);
     return NextResponse.json(
-      { error: 'Failed to generate insights', details: String(err) },
+      { error: 'Failed to generate insights' },
       { status: 500 },
     );
   }

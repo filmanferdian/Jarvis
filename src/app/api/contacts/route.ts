@@ -19,7 +19,8 @@ export const GET = withAuth(async (req: NextRequest) => {
   const { data, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[contacts/GET] DB error:', error);
+    return NextResponse.json({ error: 'Failed to load contacts' }, { status: 500 });
   }
 
   // Compute summary counts

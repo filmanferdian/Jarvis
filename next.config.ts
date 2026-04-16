@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+// Non-CSP security headers stay here (they're the same on every response).
+// CSP itself is emitted from src/middleware.ts so we can include a per-request
+// nonce for inline scripts (M3).
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -17,18 +20,6 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(self), geolocation=()',
-          },
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https:",
-              "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.openai.com https://api.elevenlabs.io",
-              "media-src 'self' blob:",
-              "font-src 'self'",
-            ].join('; '),
           },
         ],
       },

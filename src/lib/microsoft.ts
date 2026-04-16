@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { encrypt, decrypt } from './crypto';
 
 // OAuth endpoints — use /common/ so both work and personal accounts are accepted
 const MICROSOFT_AUTH_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
@@ -63,7 +64,7 @@ export function getRedirectUri(): string {
 
 // --- OAuth ---
 
-export function buildAuthUrl(): string {
+export function buildAuthUrl(state?: string): string {
   const params = new URLSearchParams({
     client_id: getClientId(),
     response_type: 'code',
@@ -72,6 +73,7 @@ export function buildAuthUrl(): string {
     response_mode: 'query',
     prompt: 'consent',
   });
+  if (state) params.set('state', state);
   return `${MICROSOFT_AUTH_URL}?${params.toString()}`;
 }
 
@@ -133,21 +135,25 @@ export async function getValidAccessToken(): Promise<string> {
     throw new Error('NO_TOKENS');
   }
 
+  // H2: tokens encrypted at rest; decrypt() passes through legacy plaintext rows.
+  const storedAccess = decrypt(data.access_token);
+  const storedRefresh = decrypt(data.refresh_token);
+
   // If token expires in more than 5 minutes, use it
   const expiresAt = new Date(data.expires_at).getTime();
   const bufferMs = 5 * 60 * 1000;
   if (Date.now() + bufferMs < expiresAt) {
-    return data.access_token;
+    return storedAccess;
   }
 
   // Refresh the token
-  const tokens = await refreshAccessToken(data.refresh_token);
+  const tokens = await refreshAccessToken(storedRefresh);
   const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
   await supabase.from('microsoft_tokens').upsert({
     id: 'default',
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token || data.refresh_token, // keep old if not returned
+    access_token: encrypt(tokens.access_token),
+    refresh_token: encrypt(tokens.refresh_token || storedRefresh), // keep old if not returned
     expires_at: newExpiresAt,
     scope: tokens.scope,
     updated_at: new Date().toISOString(),

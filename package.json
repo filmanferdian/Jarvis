@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "2.4.32",
+  "version": "2.4.33",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0"
+    "start": "next start -H 0.0.0.0",
+    "audit:security": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

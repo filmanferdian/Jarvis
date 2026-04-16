@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { safeError } from '@/lib/errors';
+import { unwrapJsonb } from '@/lib/crypto';
 
 // GET: Today's health & fitness snapshot for the dashboard
 export const GET = withAuth(async (_req: NextRequest) => {
@@ -45,10 +47,13 @@ export const GET = withAuth(async (_req: NextRequest) => {
       .limit(1)
       .single();
 
-    // Extract qualifier labels from raw_json
+    // Extract qualifier labels from raw_json. H5: raw_json may be encrypted
+    // (`{ enc: "enc:v1:..." }`); unwrapJsonb transparently handles both shapes.
     let garminWithQualifiers = garminDaily || null;
-    if (garminDaily?.raw_json) {
-      const raw = garminDaily.raw_json as Record<string, unknown>;
+    const raw = garminDaily?.raw_json
+      ? unwrapJsonb<Record<string, unknown>>(garminDaily.raw_json)
+      : null;
+    if (raw) {
 
       // Sleep qualifier: raw_json.sleep.dailySleepDTO.sleepScores.overall.qualifierKey
       const sleepQualifier =
@@ -112,10 +117,6 @@ export const GET = withAuth(async (_req: NextRequest) => {
       timestamp: now.toISOString(),
     });
   } catch (err) {
-    console.error('Health fitness error:', err);
-    return NextResponse.json(
-      { error: 'Failed to fetch health data', details: String(err) },
-      { status: 500 },
-    );
+    return safeError('Failed to fetch health data', err);
   }
 });

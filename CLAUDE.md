@@ -43,8 +43,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Delete-then-insert** — Single-row-per-day tables use delete + insert pattern
 4. **Google OAuth** — Always use `prompt: 'consent'`
 5. **Railway port** — App listens on `$PORT` (8080)
-6. **Garmin raw_json** — Always store raw API responses
+6. **Garmin raw_json** — Always store raw API responses (now AES-GCM encrypted at rest via `src/lib/crypto.ts`; unwrap with `unwrapJsonb()`)
 7. **Cookie auth** — Browser uses httpOnly cookie, external callers use `x-cron-secret` header
+8. **`CRYPTO_KEY` required** — Sensitive columns (`google_tokens`, `microsoft_tokens`, `garmin_tokens.tokens_encrypted`, `garmin_*.raw_json`) are encrypted with this key. Generate once with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and keep in Railway + .env.local. Rotating it invalidates all stored OAuth tokens and raw_json — treat as break-glass.
+9. **Garmin uses username/password, not OAuth** — Garmin Connect has no public OAuth. `GARMIN_EMAIL` / `GARMIN_PASSWORD` are top-tier secrets: never log them, never echo from Railway build logs, never print error details that might include the request payload.
+
+## Security posture
+- **Prompt injection defense**: all externally-sourced text (emails, calendar events, tasks, transcripts, newsletters) must go through `sanitizeInline`/`sanitizeMultiline` from `src/lib/promptEscape.ts` and be wrapped with `wrapUntrusted(tag, content)` before embedding in Claude prompts. Include the `UNTRUSTED_PREAMBLE` near the top of the system prompt.
+- **XSS defense**: Claude-generated markdown is HTML-escaped before any regex substitutions in `src/lib/renderMarkdown.ts`. Do NOT add regex substitutions that produce HTML tags from user-controlled capture groups without re-escaping.
+- **OAuth state**: `/api/auth/google` and `/api/auth/microsoft` generate signed state tokens via `src/lib/oauthState.ts`; callbacks reject mismatched state. Always use `buildAuthUrl(state)` (never the no-arg form) when adding new OAuth integrations.
+- **API error responses**: route every non-trivial catch through `safeError()` from `src/lib/errors.ts`. Never return `err.message` / `String(err)` / Supabase `error.message` to the client — log server-side, return a generic message.
 
 ## Versioning Discipline
 - Version lives in `package.json` (single source of truth). `src/lib/version.ts` reads from it automatically.
