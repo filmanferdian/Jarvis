@@ -21,15 +21,13 @@ export const PATCH = withAuth(async (req: NextRequest) => {
       .eq('email', email);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[contacts/update] DB error:', error);
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
     return NextResponse.json({ updated: true, email });
   } catch (err) {
     console.error('[contacts/update] Error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Update failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
   }
 });

@@ -70,6 +70,6 @@ export const GET = withAuth(async () => {
     });
   } catch (err) {
     console.error('Integrations API error:', err);
-    return NextResponse.json({ error: 'Failed to fetch integrations', details: String(err) }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch integrations' }, { status: 500 });
   }
 });

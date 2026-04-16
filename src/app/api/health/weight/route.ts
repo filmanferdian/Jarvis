@@ -137,7 +137,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   } catch (err) {
     console.error('Weight save error:', err);
     return NextResponse.json(
-      { error: 'Failed to save weight', details: String(err) },
+      { error: 'Failed to save weight' },
       { status: 500 },
     );
   }

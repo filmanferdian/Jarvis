@@ -22,7 +22,8 @@ export const POST = withAuth(async (_req: NextRequest) => {
       results['google-calendar'] = `synced ${r.synced} events`;
     } catch (err) {
       await markSynced('google-calendar', 'error', 0, String(err));
-      results['google-calendar'] = `error: ${String(err).slice(0, 100)}`;
+      console.error('[sync] google-calendar error:', err);
+      results['google-calendar'] = 'error';
     }
   } else {
     results['google-calendar'] = 'skipped (recent)';
@@ -36,7 +37,8 @@ export const POST = withAuth(async (_req: NextRequest) => {
       results['outlook-calendar'] = `synced ${r.synced} events`;
     } catch (err) {
       await markSynced('outlook-calendar', 'error', 0, String(err));
-      results['outlook-calendar'] = `error: ${String(err).slice(0, 100)}`;
+      console.error('[sync] outlook-calendar error:', err);
+      results['outlook-calendar'] = 'error';
     }
   } else {
     results['outlook-calendar'] = 'skipped (recent)';
@@ -50,7 +52,8 @@ export const POST = withAuth(async (_req: NextRequest) => {
       results['notion-tasks'] = `synced ${r.synced} tasks`;
     } catch (err) {
       await markSynced('notion-tasks', 'error', 0, String(err));
-      results['notion-tasks'] = `error: ${String(err).slice(0, 100)}`;
+      console.error('[sync] notion-tasks error:', err);
+      results['notion-tasks'] = 'error';
     }
   } else {
     results['notion-tasks'] = 'skipped (recent)';
@@ -64,7 +67,8 @@ export const POST = withAuth(async (_req: NextRequest) => {
       results['fitness'] = r.skipped ? 'skipped (no changes)' : `synced week ${r.current_week}`;
     } catch (err) {
       await markSynced('fitness', 'error', 0, String(err));
-      results['fitness'] = `error: ${String(err).slice(0, 100)}`;
+      console.error('[sync] fitness error:', err);
+      results['fitness'] = 'error';
     }
   } else {
     results['fitness'] = 'skipped (recent)';

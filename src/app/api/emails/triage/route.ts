@@ -19,7 +19,8 @@ export const GET = withAuth(async (_req: NextRequest) => {
     .order('received_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[emails/triage] DB error:', error);
+    return NextResponse.json({ error: 'Failed to load email triage' }, { status: 500 });
   }
 
   const rows = data || [];

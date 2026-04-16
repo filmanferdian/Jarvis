@@ -5,6 +5,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { VoiceIntentSchema } from '@/lib/validation';
 import { safeError } from '@/lib/errors';
 import { buildJarvisContext, allPages } from '@/lib/context';
+import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 async function getFitnessContext(): Promise<string> {
   try {
@@ -83,7 +84,11 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     const ctx = await buildJarvisContext({ pages: allPages() });
 
+    const safeTranscript = sanitizeMultiline(transcript, 5000);
+
     const prompt = `${ctx.systemPrompt}
+
+${UNTRUSTED_PREAMBLE}
 
 The user just spoke to you. Parse their intent and respond.
 
@@ -105,7 +110,7 @@ Intent descriptions:
 
 ${fitnessContext ? `--- FITNESS CONTEXT ---\n${fitnessContext}` : ''}
 
-User said: "${transcript}"`;
+${wrapUntrusted('untrusted_user_transcript', safeTranscript)}`;
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

@@ -12,7 +12,7 @@ export const GET = withCronAuth(async (_req: NextRequest) => {
     console.error('Cron: Morning briefing error:', err);
     await markSynced('morning-briefing', 'error', 0, String(err).slice(0, 500));
     return NextResponse.json(
-      { error: 'Morning briefing failed', details: String(err) },
+      { error: 'Morning briefing failed' },
       { status: 500 },
     );
   }

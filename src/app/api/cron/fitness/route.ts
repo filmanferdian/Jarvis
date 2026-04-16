@@ -12,7 +12,7 @@ export const GET = withCronAuth(async (_req: NextRequest) => {
     console.error('Cron: Fitness sync error:', err);
     await markSynced('fitness', 'error', 0, String(err));
     return NextResponse.json(
-      { error: 'Fitness sync failed', details: String(err) },
+      { error: 'Fitness sync failed' },
       { status: 500 },
     );
   }

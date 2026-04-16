@@ -58,9 +58,6 @@ export const POST = withAuth(async (req: NextRequest) => {
     return NextResponse.json({ synced, total: contacts.length, results });
   } catch (err) {
     console.error('[contacts/store] Error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Store failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Store failed' }, { status: 500 });
   }
 });

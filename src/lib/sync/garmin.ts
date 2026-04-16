@@ -1,5 +1,6 @@
 import { GarminConnect } from 'garmin-connect';
 import { supabase } from '@/lib/supabase';
+import { decrypt, encryptJson, wrapJsonb, unwrapJsonb } from '@/lib/crypto';
 
 // --- Rate limiting constants ---
 const GARMIN_DAILY_CALL_BUDGET = 50;
@@ -38,21 +39,41 @@ interface GarminTokens {
   oauth2: Record<string, unknown>;
 }
 
+// H3: Garmin tokens are stored in a dedicated `garmin_tokens` table, encrypted at
+// rest via AES-256-GCM. We still read the legacy location (sync_status.last_error)
+// as a fallback during the migration window, then re-write to the new table on
+// the next successful session.
+
 async function loadCachedTokens(): Promise<GarminTokens | null> {
+  // Primary: encrypted dedicated table
   const { data } = await supabase
+    .from('garmin_tokens')
+    .select('tokens_encrypted')
+    .eq('id', 'default')
+    .single();
+
+  if (data?.tokens_encrypted) {
+    try {
+      const plain = decrypt(data.tokens_encrypted);
+      return JSON.parse(plain) as GarminTokens;
+    } catch {
+      /* fall through to legacy */
+    }
+  }
+
+  // Legacy fallback: sync_status.last_error (pre-migration-020)
+  const { data: legacy } = await supabase
     .from('sync_status')
     .select('last_error')
     .eq('sync_type', 'garmin-tokens')
     .single();
 
-  if (!data?.last_error) return null;
+  if (!legacy?.last_error) return null;
 
   try {
-    const tokens = JSON.parse(data.last_error) as GarminTokens;
-    // Check if OAuth2 token is expired (with 5 min buffer)
-    // Token may be expired, but garmin-connect auto-refreshes using oauth1 + refresh_token
-    // So we always return cached tokens and let the library handle refresh
-    return tokens;
+    // Legacy rows were stored as raw JSON; decrypt() passes through non-ciphertext.
+    const raw = decrypt(legacy.last_error);
+    return JSON.parse(raw) as GarminTokens;
   } catch {
     return null;
   }
@@ -61,16 +82,20 @@ async function loadCachedTokens(): Promise<GarminTokens | null> {
 async function saveCachedTokens(client: GarminConnect): Promise<void> {
   try {
     const tokens = client.exportToken();
-    // Store tokens in sync_status.last_error field (reusing existing table, no migration needed)
-    await supabase.from('sync_status').upsert(
+    // Write to the new encrypted table.
+    await supabase.from('garmin_tokens').upsert(
       {
-        sync_type: 'garmin-tokens',
-        last_synced_at: new Date().toISOString(),
-        last_result: 'success',
-        last_error: JSON.stringify(tokens),
+        id: 'default',
+        tokens_encrypted: encryptJson(tokens),
+        updated_at: new Date().toISOString(),
       },
-      { onConflict: 'sync_type' },
+      { onConflict: 'id' },
     );
+    // Clear the legacy location so a future breach of sync_status yields no secrets.
+    await supabase
+      .from('sync_status')
+      .update({ last_error: null })
+      .eq('sync_type', 'garmin-tokens');
   } catch (err) {
     console.error('Failed to cache Garmin tokens:', err);
   }
@@ -417,9 +442,16 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
     (dailyRecord.raw_json as unknown as Record<string, unknown>).fitnessAge = fitnessAge;
   }
 
+  // H5: encrypt raw_json before persisting. Schema is JSONB, so we store the
+  // ciphertext inside `{ enc: "enc:v1:..." }`; unwrapJsonb() decrypts on read.
+  const dailyRecordForInsert = {
+    ...dailyRecord,
+    raw_json: wrapJsonb(dailyRecord.raw_json),
+  };
+
   // Upsert daily record (delete-then-insert for date-unique tables)
   await supabase.from('garmin_daily').delete().eq('date', today);
-  const { error: dailyErr } = await supabase.from('garmin_daily').insert(dailyRecord);
+  const { error: dailyErr } = await supabase.from('garmin_daily').insert(dailyRecordForInsert);
   if (dailyErr) throw dailyErr;
 
   // Sync recent activities
@@ -436,7 +468,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
       avg_hr: (act.averageHR as number) ?? null,
       calories: (act.calories as number) ?? null,
       started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-      raw_json: act,
+      raw_json: wrapJsonb(act),
       last_synced: new Date().toISOString(),
     }));
 
@@ -503,7 +535,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
 
       const histMap = new Map<string, Record<string, unknown>>();
       for (const row of existingRecords ?? []) {
-        histMap.set(row.date, row.raw_json as Record<string, unknown>);
+        // H5: unwrap encrypted raw_json (legacy plaintext JSONB passes through)
+        const unwrapped = unwrapJsonb<Record<string, unknown>>(row.raw_json);
+        if (unwrapped) histMap.set(row.date, unwrapped);
       }
 
       const datesToFill: { dateStr: string; existingRaw: Record<string, unknown> | null }[] = [];
@@ -555,14 +589,16 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
               }
             }
             const record = buildDailyRecord(dateStr, rawData);
+            const recordForInsert = { ...record, raw_json: wrapJsonb(record.raw_json) };
             await supabase.from('garmin_daily').delete().eq('date', dateStr);
-            const { error } = await supabase.from('garmin_daily').insert(record);
+            const { error } = await supabase.from('garmin_daily').insert(recordForInsert);
             if (!error) historicalSynced++;
           } else {
             const rawData = await fetchAllEndpoints(client, dateStr, histDateObj);
             const record = buildDailyRecord(dateStr, rawData);
+            const recordForInsert = { ...record, raw_json: wrapJsonb(record.raw_json) };
             await supabase.from('garmin_daily').delete().eq('date', dateStr);
-            const { error } = await supabase.from('garmin_daily').insert(record);
+            const { error } = await supabase.from('garmin_daily').insert(recordForInsert);
             if (!error) historicalSynced++;
           }
 
@@ -720,7 +756,7 @@ export async function syncRecentActivities(): Promise<{ synced: number }> {
       avg_hr: (act.averageHR as number) ?? null,
       calories: (act.calories as number) ?? null,
       started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-      raw_json: act,
+      raw_json: wrapJsonb(act),
       last_synced: new Date().toISOString(),
     }));
 
@@ -975,7 +1011,7 @@ export async function backfillDateRange(startDate: string, endDate: string, comp
           avg_hr: (act.averageHR as number) ?? null,
           calories: (act.calories as number) ?? null,
           started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-          raw_json: act,
+          raw_json: wrapJsonb(act),
           last_synced: new Date().toISOString(),
         }));
 
@@ -1037,7 +1073,9 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
 
   const existingMap = new Map<string, Record<string, unknown>>();
   for (const row of existingRows ?? []) {
-    existingMap.set(row.date, row.raw_json as Record<string, unknown>);
+    // H5: unwrap encrypted raw_json (legacy plaintext JSONB passes through)
+    const unwrapped = unwrapJsonb<Record<string, unknown>>(row.raw_json);
+    if (unwrapped) existingMap.set(row.date, unwrapped);
   }
 
   for (let i = RETENTION_DAYS; i >= 1; i--) {
@@ -1093,8 +1131,9 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
         }
 
         const record = buildDailyRecord(dateStr, rawData);
+        const recordForInsert = { ...record, raw_json: wrapJsonb(record.raw_json) };
         await supabase.from('garmin_daily').delete().eq('date', dateStr);
-        const { error } = await supabase.from('garmin_daily').insert(record);
+        const { error } = await supabase.from('garmin_daily').insert(recordForInsert);
         if (!error) result.days_enriched++;
         consecutiveFailures = 0;
       } catch (err) {
@@ -1117,9 +1156,10 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
     try {
       const rawData = await fetchAllEndpoints(client, dateStr, date);
       const record = buildDailyRecord(dateStr, rawData);
+      const recordForInsert = { ...record, raw_json: wrapJsonb(record.raw_json) };
 
       await supabase.from('garmin_daily').delete().eq('date', dateStr);
-      const { error } = await supabase.from('garmin_daily').insert(record);
+      const { error } = await supabase.from('garmin_daily').insert(recordForInsert);
       if (!error) result.days_synced++;
       consecutiveFailures = 0;
 
@@ -1157,7 +1197,7 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
           avg_hr: (act.averageHR as number) ?? null,
           calories: (act.calories as number) ?? null,
           started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-          raw_json: act,
+          raw_json: wrapJsonb(act),
           last_synced: new Date().toISOString(),
         }));
 

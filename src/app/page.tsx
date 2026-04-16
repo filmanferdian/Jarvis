@@ -35,13 +35,15 @@ import VoiceMic from '@/components/VoiceMic';
 export default function Dashboard() {
   const greeting = useTimeGreeting();
 
-  // Auto-sync on dashboard load (fire-and-forget, debounced server-side)
+  // Auto-sync on dashboard load (fire-and-forget, debounced server-side).
+  // M2: httpOnly session cookie is sent automatically on same-origin fetch — no
+  // need (and no safe way) to read a Bearer token from localStorage.
   useEffect(() => {
-    const token = localStorage.getItem('jarvis_token');
-    if (!token) return;
     fetch('/api/sync', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: '{}',
     }).catch(() => {}); // silently ignore errors
   }, []);
 

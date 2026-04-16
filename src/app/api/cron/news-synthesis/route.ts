@@ -12,7 +12,7 @@ export const GET = withCronAuth(async (_req: NextRequest) => {
     console.error('Cron: News synthesis error:', err);
     await markSynced('news-synthesis', 'error', 0, String(err).slice(0, 500));
     return NextResponse.json(
-      { error: 'News synthesis failed', details: String(err) },
+      { error: 'News synthesis failed' },
       { status: 500 },
     );
   }

@@ -544,7 +544,7 @@ export const GET = withAuth(async () => {
   } catch (err) {
     console.error('OKR progress error:', err);
     return NextResponse.json(
-      { error: 'Failed to compute OKR progress', details: String(err) },
+      { error: 'Failed to compute OKR progress' },
       { status: 500 },
     );
   }

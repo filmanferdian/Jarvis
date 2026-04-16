@@ -125,7 +125,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   } catch (err) {
     console.error('Health measurement save error:', err);
     return NextResponse.json(
-      { error: 'Failed to save measurement', details: String(err) },
+      { error: 'Failed to save measurement' },
       { status: 500 },
     );
   }

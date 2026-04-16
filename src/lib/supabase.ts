@@ -3,9 +3,20 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Lazy-init to avoid crashing at build time when env vars aren't available.
 // Next.js "Collecting page data" phase executes route modules during build,
 // so we must not call createClient() until an actual request hits at runtime.
+//
+// M4: This module uses SUPABASE_SERVICE_ROLE_KEY and MUST NEVER be imported from
+// a client component. If `typeof window !== 'undefined'` when getSupabase() is
+// called, we throw — this catches accidental imports (bundling would expose the
+// service-role key to the browser). Server routes are unaffected.
 let _supabase: SupabaseClient | null = null;
 
 function getSupabase(): SupabaseClient {
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      '[security] @/lib/supabase uses the service-role key and must not be imported from client components. ' +
+        'Call it from API routes (src/app/api/**) or server-only modules (src/lib/**) instead.',
+    );
+  }
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

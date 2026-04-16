@@ -22,7 +22,7 @@ export const GET = withAuth(async () => {
   } catch (err) {
     console.error('Blood work fetch error:', err);
     return NextResponse.json(
-      { error: 'Failed to fetch blood work', details: String(err) },
+      { error: 'Failed to fetch blood work' },
       { status: 500 },
     );
   }

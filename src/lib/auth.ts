@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
+import { assertServerEnv } from './env';
 
 const COOKIE_NAME = 'jarvis_session';
 
@@ -10,6 +11,9 @@ function safeCompare(a: string, b: string): boolean {
 
 export function withAuth(handler: (req: NextRequest) => Promise<NextResponse>) {
   return async (req: NextRequest) => {
+    // L1: assert JARVIS_AUTH_TOKEN >= 32 chars at first invocation.
+    assertServerEnv();
+
     const expected = process.env.JARVIS_AUTH_TOKEN;
     if (!expected) {
       return NextResponse.json({ error: 'Auth not configured' }, { status: 500 });
