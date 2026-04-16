@@ -20,17 +20,20 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
   return true;
 }
 
-// M3: nonce-based CSP. We generate a per-request nonce and reference it from
-// script-src, replacing the old 'unsafe-inline'. Next.js auto-reads the
-// `x-nonce` request header and stamps its hydration scripts with that nonce.
-// `strict-dynamic` lets those scripts load any dependencies they pull in,
-// which avoids having to enumerate every third-party origin.
+// M3: nonce-based CSP. We generate a per-request nonce so inline scripts need it,
+// but keep 'self' in script-src so Next.js's auto-generated chunk files (which
+// don't always receive the nonce in production with the current middleware
+// convention) still load. strict-dynamic was dropped after it broke prod
+// hydration — it overrides 'self', and Next.js 16's chunks weren't getting the
+// nonce stamped in production builds.
 function buildCspHeader(nonce: string): string {
   return [
     "default-src 'self'",
-    // strict-dynamic means only scripts with the nonce execute; other inline
-    // scripts (e.g. an XSS payload rendered into the DOM) are blocked.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // 'self' lets Next.js chunks load from same origin.
+    // 'nonce-${nonce}' lets us allow specific inline scripts if we ever add one.
+    // NO 'unsafe-inline' — XSS payloads rendered into the DOM still get blocked
+    // (the nonce is per-request and not exposed to user-controlled content).
+    `script-src 'self' 'nonce-${nonce}'`,
     // Styles from Tailwind v4 + Next.js often inline critical CSS; retain
     // 'unsafe-inline' here — unless we adopt a nonce-based style pipeline too.
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
