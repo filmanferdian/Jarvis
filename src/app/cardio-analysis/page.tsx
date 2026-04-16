@@ -34,6 +34,7 @@ interface WeeklyInsightEntry {
   totalDurationMins: number;
   avgPacePerKm: string;
   avgHr: number | null;
+  avgCadenceSpm: number | null;
   totalTrainingLoad: number;
   howWasThisWeek: string;
   whatsGood: string;
@@ -49,6 +50,7 @@ interface RunSummary {
   durationFormatted: string;
   avgPacePerKm: string;
   avgHr: number | null;
+  cadenceSpm: number | null;
   trainingLoad: number | null;
   tempC: number | null;
   weather: string | null;
@@ -253,6 +255,11 @@ export default function CardioAnalysisPage() {
                               {insight.avgHr} bpm avg HR
                             </span>
                           )}
+                          {insight.avgCadenceSpm && (
+                            <span className="text-[12px] text-jarvis-text-muted font-mono">
+                              {insight.avgCadenceSpm} spm avg cadence
+                            </span>
+                          )}
                           {insight.totalDurationMins > 0 && (
                             <span className="text-[12px] text-jarvis-text-muted font-mono">
                               {formatDuration(insight.totalDurationMins)}
@@ -320,6 +327,7 @@ export default function CardioAnalysisPage() {
                     <th className="text-right pb-2 pr-4 font-medium">Dist</th>
                     <th className="text-right pb-2 pr-4 font-medium">Pace</th>
                     <th className="text-right pb-2 pr-4 font-medium">Avg HR</th>
+                    <th className="text-right pb-2 pr-4 font-medium">Cadence</th>
                     <th className="text-right pb-2 pr-4 font-medium">Load</th>
                     <th className="text-left pb-2 font-medium">Weather</th>
                   </tr>
@@ -331,6 +339,7 @@ export default function CardioAnalysisPage() {
                       <td className="py-2 pr-4 text-right font-mono">{run.distanceKm}km</td>
                       <td className="py-2 pr-4 text-right font-mono">{run.avgPacePerKm || '—'}</td>
                       <td className="py-2 pr-4 text-right font-mono">{run.avgHr ?? '—'}</td>
+                      <td className="py-2 pr-4 text-right font-mono">{run.cadenceSpm ?? '—'}</td>
                       <td className="py-2 pr-4 text-right font-mono">{run.trainingLoad ?? '—'}</td>
                       <td className="py-2 text-jarvis-text-muted">
                         {run.weather

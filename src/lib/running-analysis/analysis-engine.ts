@@ -42,12 +42,23 @@ export interface WeeklyAnalysis {
   totalDurationMins: number;
   avgPacePerKm: string;
   avgHr: number | null;
+  avgCadenceSpm: number | null;
   totalTrainingLoad: number;
   howWasThisWeek: string;
   whatsGood: string;
   whatNeedsWork: string;
   focusNextWeek: string;
   generatedAt: string;
+}
+
+/** Distance-weighted average cadence across runs. Returns null if no cadence data. */
+export function weightedAvgCadence(runs: WeeklyRunSummary[]): number | null {
+  const eligible = runs.filter((r) => r.cadenceSpm != null && r.distanceKm > 0);
+  if (eligible.length === 0) return null;
+  const totalDist = eligible.reduce((s, r) => s + r.distanceKm, 0);
+  if (totalDist === 0) return null;
+  const weighted = eligible.reduce((s, r) => s + (r.cadenceSpm as number) * r.distanceKm, 0);
+  return Math.round(weighted / totalDist);
 }
 
 function extractPropText(page: Record<string, unknown>, prop: string): string | null {
@@ -139,6 +150,7 @@ export async function generateWeeklyAnalysis(
   const totalDurationMins = secondsToMins(totalDurationSec);
   const weekAvgPace = avgPace(thisWeekRuns);
   const weekAvgHr = avgNumber(thisWeekRuns.map((r) => r.avgHr));
+  const weekAvgCadence = weightedAvgCadence(thisWeekRuns);
   const totalLoad = Math.round(thisWeekRuns.reduce((s, r) => s + (r.trainingLoad ?? 0), 0) * 10) / 10;
 
   // Format date range for label
@@ -157,6 +169,7 @@ export async function generateWeeklyAnalysis(
       totalDurationMins: 0,
       avgPacePerKm: '--:--',
       avgHr: null,
+      avgCadenceSpm: null,
       totalTrainingLoad: 0,
       howWasThisWeek: 'No outdoor runs recorded this week.',
       whatsGood: 'N/A',
@@ -279,6 +292,7 @@ Respond in this exact JSON format:
     totalDurationMins,
     avgPacePerKm: weekAvgPace,
     avgHr: weekAvgHr,
+    avgCadenceSpm: weekAvgCadence,
     totalTrainingLoad: totalLoad,
     howWasThisWeek: analysis.howWasThisWeek || 'Analysis unavailable.',
     whatsGood: analysis.whatsGood || 'N/A',

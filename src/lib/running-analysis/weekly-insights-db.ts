@@ -16,6 +16,7 @@ export interface WeeklyInsightEntry {
   totalDurationMins: number;
   avgPacePerKm: string;
   avgHr: number | null;
+  avgCadenceSpm: number | null;
   totalTrainingLoad: number;
   howWasThisWeek: string;
   whatsGood: string;
@@ -76,6 +77,7 @@ async function createWeeklyInsightsDb(apiKey: string): Promise<string> {
       'Total Time (min)': { number: { format: 'number' } },
       'Avg Pace': { rich_text: {} },
       'Avg HR': { number: { format: 'number' } },
+      'Avg Cadence (spm)': { number: { format: 'number' } },
       'Total Training Load': { number: { format: 'number' } },
       'How Was This Week': { rich_text: {} },
       "What's Good": { rich_text: {} },
@@ -108,12 +110,42 @@ async function verifyDbExists(apiKey: string, dbId: string): Promise<boolean> {
   return res.ok;
 }
 
+/** Ensure the DB has all expected properties. Adds any missing ones (idempotent). */
+async function ensureDbSchema(apiKey: string, dbId: string): Promise<void> {
+  const res = await fetch(`${NOTION_API}/databases/${dbId}`, {
+    headers: notionHeaders(apiKey),
+  });
+  if (!res.ok) return;
+  const db = await res.json();
+  const existing = new Set(Object.keys(db.properties ?? {}));
+
+  const required: Record<string, unknown> = {
+    'Avg Cadence (spm)': { number: { format: 'number' } },
+  };
+
+  const missing: Record<string, unknown> = {};
+  for (const [name, def] of Object.entries(required)) {
+    if (!existing.has(name)) missing[name] = def;
+  }
+
+  if (Object.keys(missing).length > 0) {
+    await fetch(`${NOTION_API}/databases/${dbId}`, {
+      method: 'PATCH',
+      headers: notionHeaders(apiKey),
+      body: JSON.stringify({ properties: missing }),
+    });
+  }
+}
+
 /** Get or create the Weekly Insights DB, returning its ID */
 export async function getOrCreateWeeklyInsightsDb(apiKey: string): Promise<string> {
   const cached = await getCachedDbId();
   if (cached) {
     const exists = await verifyDbExists(apiKey, cached);
-    if (exists) return cached;
+    if (exists) {
+      await ensureDbSchema(apiKey, cached);
+      return cached;
+    }
   }
 
   const dbId = await createWeeklyInsightsDb(apiKey);
@@ -165,6 +197,7 @@ function parseInsightPage(page: Record<string, unknown>): WeeklyInsightEntry {
     totalDurationMins: getNum('Total Time (min)'),
     avgPacePerKm: getText('Avg Pace'),
     avgHr: ((props['Avg HR'] as { number?: number })?.number) ?? null,
+    avgCadenceSpm: ((props['Avg Cadence (spm)'] as { number?: number })?.number) ?? null,
     totalTrainingLoad: getNum('Total Training Load'),
     howWasThisWeek: getText('How Was This Week'),
     whatsGood: getText("What's Good"),
@@ -214,6 +247,9 @@ export async function upsertWeeklyInsight(apiKey: string, analysis: WeeklyAnalys
 
   if (analysis.avgHr != null) {
     properties['Avg HR'] = { number: analysis.avgHr };
+  }
+  if (analysis.avgCadenceSpm != null) {
+    properties['Avg Cadence (spm)'] = { number: analysis.avgCadenceSpm };
   }
 
   const existingId = await findExistingInsight(apiKey, dbId, analysis.weekStart);
