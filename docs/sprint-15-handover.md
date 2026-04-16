@@ -416,3 +416,57 @@ Target remains 87kg (hardcoded in weight POST route).
 3. **Weight gap formula is continuous** — Bar width smoothly decreases as gap increases, but color band boundaries align exactly with the kg tiers.
 
 ### No New Endpoints, Migrations, or Env Vars for v2.4.22
+
+---
+
+### Cardio Analysis Pipeline Fixes + Cadence Display (v2.4.23 – v2.4.32, 2026-04-11 to 2026-04-16)
+
+A series of linked fixes to make the Cardio Analysis pipeline pick up new runs reliably, backfill historical data, and correct the cadence metric to match the Garmin Connect app.
+
+**1. Morning-run visibility (v2.4.23)**
+
+The pipeline only read `garmin_activities` from Supabase. The Garmin cron runs at 07:00 WIB, so runs done later in the morning were invisible to manual analysis triggers.
+
+Fix: Added Step 0 to the pipeline that calls a new lightweight `syncRecentActivities()` before querying. Safe to call (no daily-metric fetches, no pruning), uses ~1 API call, graceful fallback if blocked.
+
+**2. Historical backfill support (v2.4.24 – v2.4.27)**
+
+- `backfillDateRange` now paginates through `getActivities()` in batches of 100 until it reaches the target start date (up to 500 activities deep). The old single-page fetch could only reach ~2 months back.
+- Garmin backfill endpoint now accepts `x-cron-secret` in addition to browser auth (allows CLI-triggered backfills).
+- `pruneOldRecords()` exempts running activities from the 56-day retention cutoff. Running data is kept indefinitely for long-term analysis; walks/strength sessions still prune after 56 days.
+
+**3. Cadence metric fix (v2.4.31)**
+
+Problem: Cardio Analysis showed Apr 14 cadence as 157 spm; Garmin Connect app showed 160+. Root cause: pipeline used `averageRunningCadenceInStepsPerMinute` which averages over total elapsed time (including auto-pauses). Garmin Connect displays moving cadence: `steps / movingDuration`.
+
+Fix: `extractRunActivity` now prefers `steps / movingDuration` when both fields are present, falls back to the overall average otherwise.
+
+**4. Cadence in UI (v2.4.32)**
+
+- New "Cadence" column in the All Runs table on the Cardio Analysis page.
+- Weekly Insights sub-header now shows distance-weighted average cadence (via new `weightedAvgCadence()` helper).
+- New `Avg Cadence (spm)` number property on the Weekly Insights Notion DB.
+- `ensureDbSchema()` auto-adds missing properties on existing DBs so future schema additions don't require manual migration.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/lib/running-analysis/index.ts` | Step 0 `syncRecentActivities()` call, moving cadence formula in extractRunActivity |
+| `src/lib/running-analysis/analysis-engine.ts` | `weightedAvgCadence()`, `avgCadenceSpm` in WeeklyAnalysis, wired through empty-week and final return |
+| `src/lib/running-analysis/weekly-insights-db.ts` | `avgCadenceSpm` in WeeklyInsightEntry, DB schema property, `ensureDbSchema()` migration helper, upsert + parse wired |
+| `src/lib/sync/garmin.ts` | `syncRecentActivities()` export, paginated backfill in `backfillDateRange`, running-activity exemption in `pruneOldRecords()` |
+| `src/app/api/sync/garmin/backfill/route.ts` | `withEitherAuth` — cookie OR cron secret |
+| `src/app/cardio-analysis/page.tsx` | Cadence column in runs table, avg cadence in week sub-header |
+| `package.json` | Version bumps 2.4.22 → 2.4.32 |
+
+### Data Changes (production, not via migration)
+- Backfilled `garmin_activities` with runs from Sep 2025 – Mar 2026 (~200 rows)
+- Updated `Cadence (spm)` on 13 Notion Run pages with corrected moving-cadence values
+- Added `Avg Cadence (spm)` column to Weekly Insights Notion DB
+- Backfilled `Avg Cadence (spm)` on 9 Weekly Insights pages (Jan 26 – Apr 16)
+
+### Key Gotchas
+1. **Cadence corrections only apply going forward in the UI** — Existing Weekly Insights commentary (`How Was This Week`, etc.) still references old cadence numbers in text. Re-run a week's analysis if updated commentary is needed.
+2. **The weighted cadence is distance-weighted** — Longer runs have more influence than short ones. Shorter/interrupted runs (e.g., Jan 31 0.95km run at 170 spm) can have extreme values that barely affect the week total.
+3. **Running-activity exemption is a string match** — `pruneOldRecords` uses `activity_type NOT ILIKE '%run%'`, which catches `running`, `track_running`, `trail_running`, `treadmill_running`, etc. Treadmill runs are therefore also kept indefinitely even though they are excluded from outdoor analysis.
+4. **Garmin daily budget can block the backfill** — The paginated backfill consumes ~1 call per 100 activities fetched. Long backfills (back to 2025) use ~3-5 calls total, but combined with the regular cron's 11 calls it's possible to hit the 50/day budget. Reset via `UPDATE api_usage_v2 SET call_count = 0 WHERE date = ... AND service = 'garmin'` in Supabase SQL Editor.
