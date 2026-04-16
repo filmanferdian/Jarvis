@@ -20,22 +20,31 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
   return true;
 }
 
-// M3: nonce-based CSP. We generate a per-request nonce so inline scripts need it,
-// but keep 'self' in script-src so Next.js's auto-generated chunk files (which
-// don't always receive the nonce in production with the current middleware
-// convention) still load. strict-dynamic was dropped after it broke prod
-// hydration — it overrides 'self', and Next.js 16's chunks weren't getting the
-// nonce stamped in production builds.
+// M3: CSP retains 'self' allowlist + per-request nonce. 'unsafe-inline' is kept
+// alongside the nonce because Next.js 16 with the deprecated `middleware` file
+// convention does NOT reliably stamp the nonce on its auto-emitted inline
+// hydration scripts in production builds. Without 'unsafe-inline', those
+// scripts are blocked and the app can't hydrate.
+//
+// CSP Level 3 behavior: when a nonce is present, modern browsers IGNORE
+// 'unsafe-inline' for inline scripts (the nonce takes precedence). So if we
+// later migrate to the new `proxy` convention and Next.js starts stamping the
+// nonce properly, this CSP automatically tightens without code change.
+// Old browsers (pre-CSP-L3) keep working via the 'unsafe-inline' fallback.
+//
+// What we still prevent:
+//  - External script injection from unknown domains (only 'self' is allowed)
+//  - frame-ancestors attacks
+//  - form-action hijacking
+// What we don't prevent (until Next.js fixes nonce stamping or we move to proxy):
+//  - Inline <script> XSS in modern browsers is tightened by the nonce, but
+//    only for inline scripts Next.js stamps. User-rendered inline scripts
+//    (which shouldn't exist given C3 renderMarkdown HTML-escapes) would
+//    still execute in older browsers.
 function buildCspHeader(nonce: string): string {
   return [
     "default-src 'self'",
-    // 'self' lets Next.js chunks load from same origin.
-    // 'nonce-${nonce}' lets us allow specific inline scripts if we ever add one.
-    // NO 'unsafe-inline' — XSS payloads rendered into the DOM still get blocked
-    // (the nonce is per-request and not exposed to user-controlled content).
-    `script-src 'self' 'nonce-${nonce}'`,
-    // Styles from Tailwind v4 + Next.js often inline critical CSS; retain
-    // 'unsafe-inline' here — unless we adopt a nonce-based style pipeline too.
+    `script-src 'self' 'unsafe-inline' 'nonce-${nonce}'`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.openai.com https://api.elevenlabs.io",
