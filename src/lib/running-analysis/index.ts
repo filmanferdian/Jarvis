@@ -124,8 +124,14 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
     avgPacePerKm = `${pm}:${ps.toString().padStart(2, '0')}`;
   }
 
-  // Cadence (steps/min)
-  const avgRunCadence = raw.averageRunningCadenceInStepsPerMinute as number | null;
+  // Cadence (steps/min) — prefer moving cadence (steps / moving time, excludes pauses)
+  // which matches what the Garmin Connect app displays. Falls back to overall avg.
+  const totalSteps = raw.steps as number | null;
+  const movingDurationS = raw.movingDuration as number | null;
+  const avgRunCadence =
+    totalSteps != null && movingDurationS != null && movingDurationS > 0
+      ? (totalSteps / (movingDurationS / 60))
+      : (raw.averageRunningCadenceInStepsPerMinute as number | null);
 
   // Stride length
   const avgStrideLength = raw.avgStrideLength as number | null;
