@@ -529,3 +529,13 @@ Routine security review conducted in-session; 19 findings filed into the plan at
 3. **CSP nonce requires Node crypto** — `crypto.randomUUID()` in middleware runs on the Edge runtime; both Node and Edge runtimes expose it.
 4. **OAuth state cookie uses `sameSite: 'lax'`** — `'strict'` would be dropped on cross-site OAuth return redirects from Google/Microsoft. Signed HMAC + 10min TTL mitigates the reduced sameSite scope.
 5. **`unsafe-inline` retained for `style-src`** — Tailwind v4 and Next.js inline critical CSS. Switching to nonce-based styles would require a broader styling-pipeline change.
+
+---
+
+## v2.4.38 — Apple Health Sync Fix (2026-04-18)
+
+**Commit:** `ed94af0` — fix: exempt /api/health/* from Content-Type enforcement
+
+The v2.4.33 security hardening added Content-Type: application/json enforcement on all API POST/PUT/PATCH requests. This inadvertently blocked iOS Shortcuts from pushing Apple Health data (weight, body measurements) to /api/health/weight and /api/health/measurements, since Shortcuts may not include that header.
+
+**Fix:** Whitelisted /api/health/* from Content-Type enforcement in middleware, alongside the existing /api/auth/google and /api/auth/microsoft exemptions. These endpoints already require Bearer token auth, which inherently prevents CSRF (browsers cannot add custom Authorization headers in cross-origin requests), so the Content-Type check was redundant.
