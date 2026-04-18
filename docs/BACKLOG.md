@@ -4,6 +4,21 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-18 — Speed up slow cron endpoints (Email Synthesis, Running Analysis)
+
+**Context:** Raised during v2.4.42 cron-log-coverage work. Email Synthesis and Running Analysis routinely take 30-60s server-side because they do sequential Claude + Gmail/Garmin/Notion calls. v2.4.42 masked this by returning 202 early and running work via `after()`, but the underlying latency is unchanged.
+
+**Scope:**
+- Split `running-analysis` into two cron pairs: (1) ingest-only (pull activities, enrich from Garmin, save to Supabase — fast) and (2) analyze (Claude multi-run insight — slow, runs once weekly after ingest settles).
+- For `email-synthesis` + `email-triage`, consider batching Claude calls or moving per-email triage to a queue worker so cron just enqueues.
+- Success criteria: both endpoints finish server-side in <10s.
+
+**Why defer:** The `after()` pattern already fixes the monitoring problem; users see no wall-clock difference. Only worth doing if we add real SLOs or start paying cron-job.org Pro for longer HTTP timeouts.
+
+**Effort estimate:** ~1 session for running-analysis split; email side is larger (queue infra).
+
+---
+
 ## 2026-04-18 — Attachment-aware email triage
 
 **Context:** Raised during v2.4.39 email-blocklist work. Jarvis currently does not open email attachments at all — only subject + body text + snippet are read. If an HR email says "see attached contract," Jarvis drafts based on the body alone.
