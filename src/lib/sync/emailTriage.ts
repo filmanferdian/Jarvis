@@ -381,12 +381,34 @@ async function createDrafts(
   return { created, errors };
 }
 
+// --- Blocklist helpers ---
+
+async function loadBlocklist(): Promise<{ pattern: string; reason: string | null }[]> {
+  const { data, error } = await supabase
+    .from('email_draft_blocklist')
+    .select('pattern, reason');
+  if (error) {
+    console.error('[Triage] Blocklist load error:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+function matchBlocklist(
+  fromAddress: string,
+  blocklist: { pattern: string; reason: string | null }[],
+): { pattern: string; reason: string | null } | null {
+  const lower = (fromAddress || '').toLowerCase();
+  return blocklist.find((b) => lower.includes(b.pattern.toLowerCase())) || null;
+}
+
 // --- Step 6: Store results ---
 
 async function storeTriageResults(
   emails: ClassifiedEmail[],
   draftTexts: Map<string, string>,
   draftIds: Map<string, string>,
+  draftSkippedReasons: Map<string, string>,
   triageDate: string,
 ): Promise<void> {
   const rows = emails.map((e) => ({
@@ -403,6 +425,7 @@ async function storeTriageResults(
     draft_created: draftIds.has(e.messageId),
     draft_id: draftIds.get(e.messageId) || null,
     draft_snippet: (draftTexts.get(e.messageId) || '').slice(0, 300) || null,
+    draft_skipped_reason: draftSkippedReasons.get(e.messageId) || null,
     triage_date: triageDate,
   }));
 
@@ -446,16 +469,31 @@ export async function triageWorkEmails(): Promise<TriageResult> {
   // 3. Classify
   const classified = await classifyEmails(newEmails);
 
-  // 4. Generate drafts for need_response emails
+  // 4. Split need_response into draftable vs blocked (skip drafts for blocklisted senders)
   const needResponseEmails = classified.filter((e) => e.category === 'need_response');
-  const draftTexts = await generateDraftReplies(needResponseEmails);
+  const blocklist = await loadBlocklist();
+  const draftSkippedReasons = new Map<string, string>();
+  const draftableEmails: ClassifiedEmail[] = [];
+  for (const email of needResponseEmails) {
+    const match = matchBlocklist(email.from, blocklist);
+    if (match) {
+      draftSkippedReasons.set(
+        email.messageId,
+        match.reason || `Blocked sender: ${match.pattern}`,
+      );
+    } else {
+      draftableEmails.push(email);
+    }
+  }
 
-  // 5. Create drafts via email APIs
-  const { created: draftIds, errors: draftErrors } = await createDrafts(needResponseEmails, draftTexts);
+  const draftTexts = await generateDraftReplies(draftableEmails);
+
+  // 5. Create drafts via email APIs (only for non-blocked emails)
+  const { created: draftIds, errors: draftErrors } = await createDrafts(draftableEmails, draftTexts);
   errors.push(...draftErrors);
 
   // 6. Store all results
-  await storeTriageResults(classified, draftTexts, draftIds, triageDate);
+  await storeTriageResults(classified, draftTexts, draftIds, draftSkippedReasons, triageDate);
 
   return {
     totalEmails: allEmails.length,
