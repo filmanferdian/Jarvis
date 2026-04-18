@@ -2,17 +2,31 @@
 // Strips control chars and delimits content so the model treats it as data, not instructions.
 
 const CONTROL_CHARS = /[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
+// A slice at maxLen can split a UTF-16 surrogate pair (emojis outside the BMP
+// use two code units). JSON.stringify emits the dangling high surrogate, which
+// Anthropic's API rejects with "no low surrogate in string". Strip trailing
+// lone high surrogates to keep the body valid JSON.
+const TRAILING_LONE_HIGH_SURROGATE = /[\uD800-\uDBFF]$/;
 
 /** Light sanitization: strip control chars, trim. Use for short fields (names, subjects). */
 export function sanitizeInline(text: string | null | undefined, maxLen = 1000): string {
   if (!text) return '';
-  return String(text).replace(CONTROL_CHARS, '').replace(/\r/g, '').slice(0, maxLen).trim();
+  return String(text)
+    .replace(CONTROL_CHARS, '')
+    .replace(/\r/g, '')
+    .slice(0, maxLen)
+    .replace(TRAILING_LONE_HIGH_SURROGATE, '')
+    .trim();
 }
 
 /** Sanitize multi-line text (email body, event description, etc). Preserves newlines. */
 export function sanitizeMultiline(text: string | null | undefined, maxLen = 5000): string {
   if (!text) return '';
-  return String(text).replace(CONTROL_CHARS, '').replace(/\r\n/g, '\n').slice(0, maxLen);
+  return String(text)
+    .replace(CONTROL_CHARS, '')
+    .replace(/\r\n/g, '\n')
+    .slice(0, maxLen)
+    .replace(TRAILING_LONE_HIGH_SURROGATE, '');
 }
 
 /**
