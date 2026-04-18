@@ -86,7 +86,7 @@ INSERT INTO okr_targets (objective, key_result, target_value, target_direction, 
   ('O5', 'sleep_hours', 7, 'higher_is_better', NULL, NULL, 'hours', NULL, 'garmin_daily', 'sleep_duration_seconds'),
   ('O5', 'hrv_decline_pct', 15, 'lower_is_better', NULL, NULL, '%', NULL, 'garmin_daily', 'hrv_7d_avg'),
   ('O5', 'body_battery_wake', 50, 'higher_is_better', NULL, NULL, 'level', NULL, 'garmin_daily', 'body_battery'),
-  ('O5', 'stress_avg', 40, 'lower_is_better', NULL, NULL, '/100', NULL, 'garmin_daily', 'stress_level')
+  ('O5', 'stress_avg', 50, 'lower_is_better', NULL, NULL, '/100', NULL, 'garmin_daily', 'stress_level')
 ON CONFLICT (objective, key_result) DO NOTHING;
 
 -- 4. API usage v2 (per-service daily tracking)
