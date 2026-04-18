@@ -22,15 +22,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/components/` — React components (dashboard cards, AppShell, Sidebar, TopBar, VoiceMic)
 - `src/contexts/` — React contexts (SpeakingContext for TTS state)
 - `supabase/` — Migration files (`migration-NNN-*.sql`), applied to production Supabase
-- `n8n-workflows/` — Exported n8n workflow JSON files (cron orchestration)
+- `n8n-workflows/` — **Legacy, unused.** Cron orchestration runs on cron-job.org (Asia/Jakarta), not n8n. Files kept for reference only; do not add new workflows here.
 - `scripts/` — One-off utility scripts (backfill, seed)
 
 ### Key Patterns
-- **Auth wrappers**: `withAuth()` (cookie/bearer for browser) and `withCronAuth()` (x-cron-secret for n8n/external)
+- **Auth wrappers**: `withAuth()` (cookie/bearer for browser) and `withCronAuth()` (x-cron-secret for cron-job.org/external)
 - **Supabase client**: Lazy-initialized singleton via Proxy in `src/lib/supabase.ts` (build-safe; no env vars needed at build time)
 - **Jarvis context**: `src/lib/context.ts` builds AI system prompts from Notion-synced context pages stored in `notion_context` table
 - **Sync tracker**: `src/lib/syncTracker.ts` — `shouldSync(type, interval)` / `markSynced()` prevents duplicate syncs
 - **Cron logging**: `src/lib/cronLog.ts` — all cron jobs log to `cron_run_log` table
+- **Scheduler**: cron-job.org (Asia/Jakarta timezone) hits `GET /api/cron/*` endpoints with `x-cron-secret` header. To add a new scheduled job: (1) create the route under `src/app/api/cron/<name>/route.ts` wrapped with `withCronAuth`, (2) add the job in cron-job.org UI pointing to the deployed Railway URL. No workflow file is checked into the repo.
 - **Middleware**: `src/middleware.ts` — rate limiting (login, weight, voice) + Content-Type enforcement on API mutations
 
 ### Migrations
@@ -56,10 +57,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Versioning Discipline
 - Version lives in `package.json` (single source of truth). `src/lib/version.ts` reads from it automatically.
-- **Every push to main that triggers a Railway deploy MUST bump the version in `package.json`.**
-- Use semver: `major.sprint.patch` (e.g., `1.8.3`). Bump patch for every deploy within a sprint.
+- **Every push to main that changes runtime behavior MUST bump the version in `package.json`.**
+- **Docs-only exception:** pushes that touch only `.md` files skip the bump. Version should track runtime behavior, not push count.
+- Use semver: `major.minor.patch` (e.g., `2.4.39`). Bump patch for every runtime-affecting deploy.
 - Include the version bump in the same commit or as a separate `chore: bump version to vX.Y.Z` commit.
-- Never push to main without updating the version — the dashboard header shows it.
+- Never push runtime changes to main without updating the version — the dashboard header shows it.
 
 ## Branch Discipline
 - Railway deploys from `main`. Never point it at a worktree branch.
@@ -68,14 +70,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - After merging, push to origin/main immediately so Railway deploys.
 - Clean up old worktree branches periodically.
 
-## Sprint Definition of Done
-Before closing any sprint, ALL of the following must be complete:
-1. **Code Integration** — All feature branches merged to `main`. No dangling branches.
+## Ship Definition of Done
+Sprints are no longer used for this project — ships happen continuously. Every ship must satisfy:
+1. **Code Integration** — Worktree branch merged to `main`. No dangling branches.
 2. **Working Product** — Deployed to Railway, verified on desktop + mobile.
-3. **Retrospective** — Written in `docs/sprint-X-retrospective.md`
-4. **Handover** — Written in `docs/sprint-X+1-handover.md`
-5. **Notion Updated** — Sprint logs, Retrospective log, Project Jarvis, Delivery pages
-6. **Migration Applied** — Production Supabase schema in sync
+3. **Docs Updated** — Append an entry to the relevant evergreen file(s):
+   - `CHANGELOG.md` — runtime-affecting ships (version + date + what shipped)
+   - `docs/RETROSPECTIVE.md` — short "well / wrong / next" reflection
+   - `docs/BACKLOG.md` — any follow-ups or scope-later items flagged during the ship
+4. **Notion Mirrored** — Corresponding Notion pages reflect the same content:
+   - Delivery ← CHANGELOG.md
+   - Retrospective log ← docs/RETROSPECTIVE.md
+   - Product backlog ← docs/BACKLOG.md
+   - Project Jarvis "Latest ship" / "Current version" updated for runtime ships
+5. **Migration Applied** — Production Supabase schema in sync (Claude applies directly via Supabase MCP; flag before executing).
 
 ## Ghostwriting Style Guide
 Filman's email communication style, derived from analysis of 129 sent emails. Full guide is in Notion (`32dc674aecec817198f2ead59e09873c`) and synced to Jarvis context as the `ghostwriting` page key.
