@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [2.4.39] — 2026-04-18 (Sprint 14)
+
+### Added
+- Email draft blocklist (DB-backed): classified need_response emails whose senders match a blocklist pattern are still shown in the "Needs Response" section but skip draft generation. Prevents wasted Claude tokens on action-button emails (Kantorku HRIS approvals, reimbursement notifications).
+- `/emails` page: collapsible "Draft Blocklist" section with add/remove and amber "skipped — pattern" indicator on blocked rows.
+- `/api/emails/blocklist`: GET/POST/DELETE CRUD.
+- `scripts/seed-kantorku-blocklist.mjs`: audits last 7 days for Kantorku senders and seeds the initial pattern.
+- Migration 021: `email_draft_blocklist` table + `draft_skipped_reason` column on `email_triage`.
+
 ## [2.4.7] — 2026-03-29 (Sprint 14)
 
 ### Changed
