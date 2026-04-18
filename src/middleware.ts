@@ -64,7 +64,8 @@ export function middleware(req: NextRequest) {
     isApi &&
     ['POST', 'PUT', 'PATCH'].includes(req.method) &&
     !pathname.startsWith('/api/auth/google') &&
-    !pathname.startsWith('/api/auth/microsoft')
+    !pathname.startsWith('/api/auth/microsoft') &&
+    !pathname.startsWith('/api/health/')
   ) {
     const contentType = req.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
