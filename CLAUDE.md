@@ -65,6 +65,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Branch Discipline
 - Railway deploys from `main`. Never point it at a worktree branch.
+- **Every new Claude Code session MUST start by creating a worktree branch off `main` before making any code changes.** Never edit files directly on the `main` working tree — that's reserved for merges and docs-only changes. If you find yourself on `main` with uncommitted code changes, stop and move them to a worktree first.
 - Every Claude Code session MUST merge its worktree branch to `main` and push before ending.
 - Never leave working code on a side branch. If the session is interrupted, the next session's first task is to merge pending worktree work into main.
 - After merging, push to origin/main immediately so Railway deploys.
