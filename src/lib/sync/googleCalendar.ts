@@ -5,6 +5,9 @@ import {
   fetchCalendarEvents,
   transformGoogleEvent,
 } from '@/lib/google';
+import { markAccountSynced } from '@/lib/syncTracker';
+
+const SYNC_TYPE = 'google-calendar';
 
 export interface SyncResult {
   synced: number;
@@ -39,6 +42,7 @@ export async function syncGoogleCalendar(): Promise<SyncResult> {
   const errors: string[] = [];
 
   for (const account of accounts) {
+    const accountKey = `google:${account.email}`;
     try {
       const accessToken = await getValidAccessToken(account.id);
       const calEvents = await fetchCalendarEvents(accessToken, dayStart, dayEnd);
@@ -61,8 +65,11 @@ export async function syncGoogleCalendar(): Promise<SyncResult> {
       }
 
       totalSynced += events.length;
+      await markAccountSynced(SYNC_TYPE, accountKey, 'success', events.length);
     } catch (err) {
-      errors.push(`${account.email}: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${account.email}: ${msg}`);
+      await markAccountSynced(SYNC_TYPE, accountKey, 'error', 0, msg);
     }
   }
 

@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
 import AppShell from '@/components/AppShell';
 
+interface AccountHealth {
+  account_key: string;
+  last_synced_at: string | null;
+  last_result: string | null;
+  last_error: string | null;
+  elapsed_minutes: number;
+  status: 'ok' | 'warning' | 'error';
+}
+
 interface Integration {
   sync_type: string;
   label: string;
@@ -15,6 +24,7 @@ interface Integration {
   status: 'ok' | 'warning' | 'error';
   elapsed_minutes: number;
   expected_interval_minutes: number;
+  accounts?: AccountHealth[];
 }
 
 interface ServiceUsage {
@@ -67,6 +77,68 @@ function formatElapsed(minutes: number): string {
   return `${Math.round(minutes / 1440)}d ago`;
 }
 
+function IntegrationCard({ int }: { int: Integration }) {
+  const accounts = int.accounts ?? [];
+  const hasUnhealthy = accounts.some((a) => a.status !== 'ok');
+  const [expanded, setExpanded] = useState(hasUnhealthy);
+  const expandable = accounts.length > 0;
+
+  return (
+    <div className="group relative rounded-lg border border-jarvis-border/50 hover:border-jarvis-border transition-colors">
+      <button
+        type="button"
+        onClick={() => expandable && setExpanded((v) => !v)}
+        disabled={!expandable}
+        className="w-full flex items-center gap-3 p-3 text-left disabled:cursor-default"
+      >
+        <div className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[int.status]} shrink-0`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-medium text-jarvis-text-primary truncate">{int.label}</p>
+          <p className="text-[11px] text-jarvis-text-dim">
+            {int.last_synced_at ? formatElapsed(int.elapsed_minutes) : 'Never synced'}
+            {int.events_synced != null && int.events_synced > 0 && ` · ${int.events_synced} items`}
+          </p>
+          {int.last_error && int.status !== 'ok' && (
+            <p className="text-[11px] text-jarvis-danger truncate" title={int.last_error}>
+              {int.last_error.slice(0, 60)}
+            </p>
+          )}
+        </div>
+        {expandable && (
+          <span className="text-[11px] text-jarvis-text-dim shrink-0">
+            {accounts.length} {expanded ? '▾' : '▸'}
+          </span>
+        )}
+      </button>
+      {expandable && expanded && (
+        <div className="border-t border-jarvis-border/50 px-3 py-2 space-y-1.5">
+          {accounts.map((a) => (
+            <div key={a.account_key} className="flex items-start gap-2">
+              <div className={`w-2 h-2 rounded-full ${STATUS_DOT[a.status]} shrink-0 mt-1`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-jarvis-text-secondary truncate">{a.account_key}</p>
+                <p className="text-[10px] text-jarvis-text-dim">
+                  {a.last_synced_at ? formatElapsed(a.elapsed_minutes) : 'Never synced'}
+                </p>
+                {a.last_error && a.status !== 'ok' && (
+                  <p className="text-[10px] text-jarvis-danger truncate" title={a.last_error}>
+                    {a.last_error.slice(0, 80)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {int.description && (
+        <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-2 py-1 whitespace-nowrap z-10 shadow-lg">
+          {int.description}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function UtilitiesPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -115,29 +187,7 @@ export default function UtilitiesPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {integrations.map((int) => (
-                <div
-                  key={int.sync_type}
-                  className="group relative flex items-center gap-3 p-3 rounded-lg border border-jarvis-border/50 hover:border-jarvis-border transition-colors"
-                >
-                  <div className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[int.status]} shrink-0`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-jarvis-text-primary truncate">{int.label}</p>
-                    <p className="text-[11px] text-jarvis-text-dim">
-                      {int.last_synced_at ? formatElapsed(int.elapsed_minutes) : 'Never synced'}
-                      {int.events_synced != null && int.events_synced > 0 && ` · ${int.events_synced} items`}
-                    </p>
-                    {int.last_error && int.status !== 'ok' && (
-                      <p className="text-[11px] text-jarvis-danger truncate" title={int.last_error}>
-                        {int.last_error.slice(0, 60)}
-                      </p>
-                    )}
-                  </div>
-                  {int.description && (
-                    <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 hidden group-hover:inline-block text-[10px] text-jarvis-text-dim bg-jarvis-bg border border-jarvis-border rounded px-2 py-1 whitespace-nowrap z-10 shadow-lg">
-                      {int.description}
-                    </span>
-                  )}
-                </div>
+                <IntegrationCard key={int.sync_type} int={int} />
               ))}
             </div>
           )}

@@ -30,3 +30,28 @@ export async function markSynced(
     { onConflict: 'sync_type' },
   );
 }
+
+export async function markAccountSynced(
+  syncType: string,
+  accountKey: string,
+  result: 'success' | 'error',
+  eventsSynced?: number,
+  errorMsg?: string | null,
+): Promise<void> {
+  try {
+    await supabase.from('sync_account_status').upsert(
+      {
+        sync_type: syncType,
+        account_key: accountKey,
+        last_synced_at: new Date().toISOString(),
+        last_result: result,
+        last_error: errorMsg ? errorMsg.slice(0, 500) : null,
+        events_synced: eventsSynced || 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'sync_type,account_key' },
+    );
+  } catch (err) {
+    console.error(`[syncTracker] markAccountSynced failed for ${syncType}/${accountKey}:`, err);
+  }
+}

@@ -18,18 +18,63 @@ const EXPECTED_INTERVALS: Record<string, { label: string; description: string; i
   'running-analysis': { label: 'Running Analysis',  description: 'Analyzes weekly outdoor runs with pace, form, and progress insights',    interval_ms: 7 * 24 * 60 * 60 * 1000 },
 };
 
+interface AccountHealth {
+  account_key: string;
+  last_synced_at: string | null;
+  last_result: string | null;
+  last_error: string | null;
+  elapsed_minutes: number;
+  status: 'ok' | 'warning' | 'error';
+}
+
 export const GET = withAuth(async () => {
   try {
-    const { data: syncRows } = await supabase
-      .from('sync_status')
-      .select('*')
-      .order('sync_type');
+    const [syncRes, accountRes] = await Promise.all([
+      supabase.from('sync_status').select('*').order('sync_type'),
+      supabase.from('sync_account_status').select('*'),
+    ]);
+
+    const syncRows = syncRes.data || [];
+    const accountRows = accountRes.data || [];
+
+    const accountsBySyncType = new Map<string, AccountHealth[]>();
+    const now = Date.now();
+
+    for (const row of accountRows) {
+      const config = EXPECTED_INTERVALS[row.sync_type];
+      const intervalMs = config?.interval_ms ?? 24 * 60 * 60 * 1000;
+      const lastSyncTime = row.last_synced_at ? new Date(row.last_synced_at).getTime() : 0;
+      const elapsed = now - lastSyncTime;
+      const isError = row.last_result === 'error';
+
+      let status: 'ok' | 'warning' | 'error';
+      if (lastSyncTime === 0 || elapsed > intervalMs * 4) {
+        status = 'error';
+      } else if (isError || elapsed > intervalMs * 2) {
+        status = 'warning';
+      } else {
+        status = 'ok';
+      }
+
+      const entry: AccountHealth = {
+        account_key: row.account_key,
+        last_synced_at: row.last_synced_at,
+        last_result: row.last_result,
+        last_error: row.last_error,
+        elapsed_minutes: Math.round(elapsed / 60_000),
+        status,
+      };
+
+      if (!accountsBySyncType.has(row.sync_type)) {
+        accountsBySyncType.set(row.sync_type, []);
+      }
+      accountsBySyncType.get(row.sync_type)!.push(entry);
+    }
 
     // Filter out internal-only sync types (not real integrations)
     const INTERNAL_SYNC_TYPES = ['garmin-tokens', 'garmin-circuit-breaker', 'running-weekly-insights-db-id'];
-    const visibleRows = (syncRows || []).filter((row) => !INTERNAL_SYNC_TYPES.includes(row.sync_type));
+    const visibleRows = syncRows.filter((row) => !INTERNAL_SYNC_TYPES.includes(row.sync_type));
 
-    const now = Date.now();
     const integrations = visibleRows.map((row) => {
       const config = EXPECTED_INTERVALS[row.sync_type] || {
         label: row.sync_type,
@@ -50,6 +95,16 @@ export const GET = withAuth(async () => {
         status = 'ok';
       }
 
+      const accounts = accountsBySyncType.get(row.sync_type) || [];
+
+      // Rollup: if any account errored and job itself looks green/warning, bump to warning.
+      // Job-level error wins over per-account warning.
+      if (status === 'ok' && accounts.some((a) => a.status !== 'ok')) {
+        status = 'warning';
+      }
+
+      accounts.sort((a, b) => a.account_key.localeCompare(b.account_key));
+
       return {
         sync_type: row.sync_type,
         label: config.label,
@@ -61,6 +116,7 @@ export const GET = withAuth(async () => {
         status,
         elapsed_minutes: Math.round(elapsed / 60_000),
         expected_interval_minutes: Math.round(config.interval_ms / 60_000),
+        accounts: accounts.length > 0 ? accounts : undefined,
       };
     });
 

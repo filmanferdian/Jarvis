@@ -13,6 +13,10 @@ import {
 import type { FullEmail as GmailFullEmail } from '@/lib/google';
 import { buildJarvisContext } from '@/lib/context';
 import { sanitizeInline, sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import { markAccountSynced } from '@/lib/syncTracker';
+
+const SYNC_TYPE = 'news-synthesis';
+const OUTLOOK_ACCOUNT_KEY = `outlook:${process.env.WORK_OUTLOOK_ADDRESS || 'filman@infinid.id'}`;
 
 // --- Newsletter source whitelist ---
 
@@ -108,19 +112,26 @@ export async function syncNews(): Promise<NewsSyncResult> {
     const msToken = await getMicrosoftToken();
     const outlookEmails = await fetchOutlookEmails(msToken, sinceHours);
     allEmails.push(...outlookEmails);
+    await markAccountSynced(SYNC_TYPE, OUTLOOK_ACCOUNT_KEY, 'success', outlookEmails.length);
   } catch (err) {
-    errors.push(`Outlook: ${err instanceof Error ? err.message : String(err)}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`Outlook: ${msg}`);
+    await markAccountSynced(SYNC_TYPE, OUTLOOK_ACCOUNT_KEY, 'error', 0, msg);
   }
 
   // 2. Fetch from all connected Google accounts
   const googleAccounts = await getAllConnectedAccounts();
   for (const account of googleAccounts) {
+    const accountKey = `google:${account.email}`;
     try {
       const gToken = await getGoogleToken(account.id);
       const gmailEmails = await fetchGmailEmails(gToken, account.email, sinceHours);
       allEmails.push(...gmailEmails);
+      await markAccountSynced(SYNC_TYPE, accountKey, 'success', gmailEmails.length);
     } catch (err) {
-      errors.push(`Gmail(${account.email}): ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Gmail(${account.email}): ${msg}`);
+      await markAccountSynced(SYNC_TYPE, accountKey, 'error', 0, msg);
     }
   }
 

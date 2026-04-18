@@ -14,9 +14,12 @@ import {
   mergeContacts,
   type ScannedContact,
 } from '@/lib/contacts';
+import { markAccountSynced } from '@/lib/syncTracker';
 
 // filmanferdian21@gmail.com is email-only (no calendar)
 const CALENDAR_SKIP_ACCOUNTS = ['filmanferdian21@gmail.com'];
+const SYNC_TYPE = 'contact-scan';
+const OUTLOOK_ACCOUNT_KEY = `outlook:${process.env.WORK_OUTLOOK_ADDRESS || 'filman@infinid.id'}`;
 
 const NOTION_API_URL = 'https://api.notion.com/v1';
 
@@ -148,6 +151,7 @@ export async function scanCalendarContacts(
   const calAccounts = googleAccounts.filter((a) => !CALENDAR_SKIP_ACCOUNTS.includes(a.email));
 
   for (const account of calAccounts) {
+    const accountKey = `google:${account.email}`;
     try {
       const accessToken = await getGoogleToken(account.id);
       const events = await fetchCalendarEventsPaginated(accessToken, timeMin, timeMax);
@@ -155,10 +159,13 @@ export async function scanCalendarContacts(
       const contacts = extractContactsFromGoogleEvents(events, `google:${account.email}`);
       allContacts = mergeContacts(allContacts, contacts);
       console.log(`[contact-scan] Google ${account.email}: ${events.length} events, ${contacts.length} contacts`);
+      await markAccountSynced(SYNC_TYPE, accountKey, 'success', contacts.length);
     } catch (err) {
-      const msg = `Google ${account.email}: ${err instanceof Error ? err.message : String(err)}`;
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      const msg = `Google ${account.email}: ${rawMsg}`;
       errors.push(msg);
       console.error(`[contact-scan] ${msg}`);
+      await markAccountSynced(SYNC_TYPE, accountKey, 'error', 0, rawMsg);
     }
   }
 
@@ -170,13 +177,16 @@ export async function scanCalendarContacts(
     const contacts = extractContactsFromOutlookEvents(events);
     allContacts = mergeContacts(allContacts, contacts);
     console.log(`[contact-scan] Outlook: ${events.length} events, ${contacts.length} contacts`);
+    await markAccountSynced(SYNC_TYPE, OUTLOOK_ACCOUNT_KEY, 'success', contacts.length);
   } catch (err) {
     if (err instanceof Error && err.message === 'NO_TOKENS') {
       console.log('[contact-scan] Outlook not connected, skipping');
     } else {
-      const msg = `Outlook: ${err instanceof Error ? err.message : String(err)}`;
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      const msg = `Outlook: ${rawMsg}`;
       errors.push(msg);
       console.error(`[contact-scan] ${msg}`);
+      await markAccountSynced(SYNC_TYPE, OUTLOOK_ACCOUNT_KEY, 'error', 0, rawMsg);
     }
   }
 

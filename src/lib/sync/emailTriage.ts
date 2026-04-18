@@ -14,6 +14,9 @@ import {
 import type { FullEmail as GmailFullEmail } from '@/lib/google';
 import { buildJarvisContext } from '@/lib/context';
 import { sanitizeInline, sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import { markAccountSynced } from '@/lib/syncTracker';
+
+const SYNC_TYPE = 'email-triage';
 
 // Work email accounts to triage — configurable via env for secret hygiene (M5)
 const WORK_GMAIL_ADDRESS = process.env.WORK_GMAIL_ADDRESS || 'filman@group.infinid.id';
@@ -66,6 +69,7 @@ async function fetchWorkEmails(): Promise<{ emails: UnifiedEmail[]; errors: stri
   const errors: string[] = [];
 
   // Outlook
+  const outlookAccountKey = `outlook:${WORK_OUTLOOK.email}`;
   try {
     const msToken = await getMicrosoftToken();
     const outlookEmails: OutlookFullEmail[] = await fetchOutlookFull(msToken, 24, 30);
@@ -84,11 +88,15 @@ async function fetchWorkEmails(): Promise<{ emails: UnifiedEmail[]; errors: stri
         snippet: e.snippet,
       });
     }
+    await markAccountSynced(SYNC_TYPE, outlookAccountKey, 'success', outlookEmails.length);
   } catch (err) {
-    errors.push(`Outlook: ${err instanceof Error ? err.message : String(err)}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`Outlook: ${msg}`);
+    await markAccountSynced(SYNC_TYPE, outlookAccountKey, 'error', 0, msg);
   }
 
   // Gmail (work account only)
+  const gmailAccountKey = `google:${WORK_GMAIL.email}`;
   try {
     const gToken = await getGoogleToken(WORK_GMAIL.accountId);
     const gmailEmails: GmailFullEmail[] = await fetchGmailFull(gToken, WORK_GMAIL.email, 24, 30);
@@ -107,8 +115,11 @@ async function fetchWorkEmails(): Promise<{ emails: UnifiedEmail[]; errors: stri
         snippet: e.snippet,
       });
     }
+    await markAccountSynced(SYNC_TYPE, gmailAccountKey, 'success', gmailEmails.length);
   } catch (err) {
-    errors.push(`Gmail(${WORK_GMAIL.email}): ${err instanceof Error ? err.message : String(err)}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`Gmail(${WORK_GMAIL.email}): ${msg}`);
+    await markAccountSynced(SYNC_TYPE, gmailAccountKey, 'error', 0, msg);
   }
 
   return { emails, errors };
