@@ -13,7 +13,7 @@ const EXPECTED_INTERVALS: Record<string, { label: string; description: string; i
   'email-triage':     { label: 'Email Triage',      description: 'Auto-triages work emails and drafts contextual replies',                 interval_ms: 6 * 60 * 60 * 1000 },
   'fitness':          { label: 'Fitness Context',   description: 'Generates weekly fitness summary for the morning briefing',              interval_ms: 7 * 24 * 60 * 60 * 1000 },
   'morning-briefing': { label: 'Morning Briefing',  description: 'Compiles daily briefing with calendar, tasks, and news',                 interval_ms: 24 * 60 * 60 * 1000 },
-  'contact-scan':     { label: 'Contact Scanner',   description: 'Discovers and enriches professional contacts from emails',               interval_ms: 24 * 60 * 60 * 1000 },
+  'contact-scan':     { label: 'Contact Scanner',   description: 'Discovers and enriches professional contacts from emails',               interval_ms: 7 * 24 * 60 * 60 * 1000 },
   'news-synthesis':   { label: 'News Synthesis',    description: 'Curates personalized news digest from RSS and web sources',              interval_ms: 6 * 60 * 60 * 1000 },
   'running-analysis': { label: 'Running Analysis',  description: 'Analyzes weekly outdoor runs with pace, form, and progress insights',    interval_ms: 7 * 24 * 60 * 60 * 1000 },
 };
