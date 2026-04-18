@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withCronAuth } from '@/lib/cronAuth';
 import { syncFitness } from '@/lib/sync/fitness';
-import { markSynced } from '@/lib/syncTracker';
+import { runCronJob } from '@/lib/cronLog';
 
 export const GET = withCronAuth(async (_req: NextRequest) => {
-  try {
-    const result = await syncFitness(true);
-    await markSynced('fitness', 'success', result.synced ? 1 : 0);
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error('Cron: Fitness sync error:', err);
-    await markSynced('fitness', 'error', 0, String(err));
-    return NextResponse.json(
-      { error: 'Fitness sync failed' },
-      { status: 500 },
-    );
-  }
+  const r = await runCronJob('fitness', () => syncFitness(true), {
+    itemsCount: (d) => (d.synced ? 1 : 0),
+  });
+  return r.ok
+    ? NextResponse.json(r.data)
+    : NextResponse.json({ error: 'Fitness sync failed' }, { status: 500 });
 });

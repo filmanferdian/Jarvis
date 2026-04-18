@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withCronAuth } from '@/lib/cronAuth';
 import { syncNews } from '@/lib/sync/newsSynthesis';
-import { markSynced } from '@/lib/syncTracker';
+import { runCronJob } from '@/lib/cronLog';
 
 export const GET = withCronAuth(async (_req: NextRequest) => {
-  try {
-    const result = await syncNews();
-    await markSynced('news-synthesis', 'success', result.emailCount);
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error('Cron: News synthesis error:', err);
-    await markSynced('news-synthesis', 'error', 0, String(err).slice(0, 500));
-    return NextResponse.json(
-      { error: 'News synthesis failed' },
-      { status: 500 },
-    );
-  }
+  const r = await runCronJob('news-synthesis', () => syncNews(), {
+    itemsCount: (d) => d.emailCount,
+  });
+  return r.ok
+    ? NextResponse.json(r.data)
+    : NextResponse.json({ error: 'News synthesis failed' }, { status: 500 });
 });
