@@ -16,9 +16,14 @@ import { unwrapJsonb } from '@/lib/crypto';
 import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
 import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
-import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext } from './analysis-engine';
+import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext, PlanContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
 import { updateRunningLogDashboard } from './dashboard-update';
+import { loadWeekSchedule, loadCardioProtocol, loadPreviousWeekInsight } from './plan-loader';
+
+// Date the runner began strict adherence to the structured cardio plan.
+// Pre-adherence data is a weak baseline for pace/HR comparisons.
+const PLAN_ADHERENCE_START = '2026-04-13';
 
 // Outdoor running activity types to include (excludes treadmill, indoor, walking)
 const OUTDOOR_RUNNING_TYPES = new Set([
@@ -396,7 +401,41 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
       console.warn('[running-analysis] Could not build historical context:', err);
     }
 
-    const analysis = await generateWeeklyAnalysis(weekStart, weekEnd, thisWeekRuns, historicalContext);
+    // Fetch plan-awareness inputs in parallel. Each failure is non-fatal —
+    // fall back to null so the synthesis still runs if a dependency is down.
+    const [previousWeekInsight, weekSchedule, cardioProtocolMd] = await Promise.all([
+      loadPreviousWeekInsight(notionApiKey, weekStart).catch((err) => {
+        console.warn('[running-analysis] loadPreviousWeekInsight failed:', err);
+        return null;
+      }),
+      loadWeekSchedule(weekStart, weekEnd).catch((err) => {
+        console.warn('[running-analysis] loadWeekSchedule failed:', err);
+        return { thisWeek: [], nextWeek: [] };
+      }),
+      loadCardioProtocol(notionApiKey).catch((err) => {
+        console.warn('[running-analysis] loadCardioProtocol failed:', err);
+        return '';
+      }),
+    ]);
+
+    const planContext: PlanContext | null =
+      weekSchedule.thisWeek.length > 0 || cardioProtocolMd.length > 0
+        ? {
+            thisWeek: weekSchedule.thisWeek,
+            nextWeek: weekSchedule.nextWeek,
+            cardioProtocolMd,
+            planAdherenceStartDate: PLAN_ADHERENCE_START,
+          }
+        : null;
+
+    const analysis = await generateWeeklyAnalysis(
+      weekStart,
+      weekEnd,
+      thisWeekRuns,
+      historicalContext,
+      previousWeekInsight,
+      planContext,
+    );
     analysisGenerated = true;
 
     // --- Step 4: Upsert to Weekly Insights DB ---

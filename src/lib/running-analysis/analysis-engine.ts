@@ -2,7 +2,23 @@
  * Weekly running analysis engine.
  * Uses Claude API to generate 4-section analysis: how was this week,
  * what's good, what needs work, and what to focus on next.
+ *
+ * Plan-aware: the prompt judges each run on three lenses —
+ * (a) plan adherence vs Supabase program_schedule, (b) continuity with
+ * last week's Focus Next Week, (c) progression-in-context (form/efficiency
+ * + like-for-like pace), rather than raw pace vs historical average.
  */
+
+import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import type { PlannedDay } from './plan-loader';
+import type { WeeklyInsightEntry } from './weekly-insights-db';
+
+export interface PlanContext {
+  thisWeek: PlannedDay[];
+  nextWeek: PlannedDay[];
+  cardioProtocolMd: string;
+  planAdherenceStartDate: string;
+}
 
 export interface WeeklyRunSummary {
   date: string;
@@ -140,7 +156,9 @@ export async function generateWeeklyAnalysis(
   weekStart: string,
   weekEnd: string,
   thisWeekRuns: WeeklyRunSummary[],
-  historicalContext: HistoricalContext | null
+  historicalContext: HistoricalContext | null,
+  previousWeekInsight: WeeklyInsightEntry | null = null,
+  planContext: PlanContext | null = null,
 ): Promise<WeeklyAnalysis> {
   const apiKey = (process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY)!;
   if (!apiKey) throw new Error('JARVIS_ANTHROPIC_KEY not configured');
@@ -179,10 +197,17 @@ export async function generateWeeklyAnalysis(
     };
   }
 
-  // Build runs detail for Claude
+  // Build runs detail for Claude, matching each actual run to its planned session by date.
+  const planByDate = new Map<string, PlannedDay>();
+  if (planContext) {
+    for (const day of planContext.thisWeek) planByDate.set(day.date, day);
+  }
+
   const runsDetail = thisWeekRuns.map((r, i) => {
+    const planned = planByDate.get(r.date);
+    const plannedLine = planned ? ` | planned: ${planned.cardio}` : '';
     const lines = [
-      `Run ${i + 1} (${r.date}): ${r.distanceKm}km in ${r.durationFormatted} @ ${r.avgPacePerKm}/km`,
+      `Run ${i + 1} (${r.date}${plannedLine}): ${r.distanceKm}km in ${r.durationFormatted} @ ${r.avgPacePerKm}/km`,
       r.avgHr != null ? `  HR: avg ${r.avgHr} / max ${r.maxHr}` : null,
       r.trainingLoad != null ? `  Training load: ${r.trainingLoad}` : null,
       r.trainingEffect ? `  Training effect: ${r.trainingEffect}` : null,
@@ -203,14 +228,54 @@ export async function generateWeeklyAnalysis(
 - Avg distance: ${historicalContext.avgDistanceKm}km per run`
     : 'No historical data available for comparison.';
 
-  const prompt = `You are a running coach analyzing outdoor running sessions for a recreational runner in Jakarta, Indonesia.
+  // --- Optional plan-awareness blocks ---
 
-Context: This runner follows a structured weekly program that includes strength training and daily walks alongside running. The running data below represents their 2 dedicated outdoor running sessions per week — that is the full intended schedule, not a sign of low volume. Do not comment on run frequency or suggest running more often.
+  function formatPlannedDays(days: PlannedDay[]): string {
+    return days
+      .map((d) => {
+        const deload = d.deload ? ' (DELOAD)' : '';
+        const train = d.training ? `, training='${d.training}'` : '';
+        return `${d.dayOfWeek} ${d.date}${deload}: cardio='${d.cardio}'${train}`;
+      })
+      .join('\n');
+  }
 
-Your job is to assess running performance quality and identify how the runner can run better within their 2-session-per-week structure.
+  const planBlock = planContext && planContext.thisWeek.length > 0
+    ? `
+THIS WEEK'S PLAN (authoritative — source of truth for what each session was supposed to be). Week ${planContext.thisWeek[0].week}, ${planContext.thisWeek[0].phase}:
+${wrapUntrusted('untrusted_week_plan', sanitizeMultiline(formatPlannedDays(planContext.thisWeek), 3000))}
 
-Week: ${weekLabel}
-Sessions: ${thisWeekRuns.length}
+NEXT WEEK'S PLAN (reference this in FOCUS NEXT WEEK so the runner sees what's coming — e.g. VO2 max starting, tempo duration bump, Sat long-run distance change):
+${wrapUntrusted('untrusted_next_week_plan', sanitizeMultiline(formatPlannedDays(planContext.nextWeek), 3000))}
+
+INTENSITY PROTOCOL (used to interpret zone names in the plan — Z2 HR target, tempo = Z3/Z4, VO2 max format, deload rules):
+${wrapUntrusted('untrusted_protocol', sanitizeMultiline(planContext.cardioProtocolMd, 6000))}
+
+The runner began strict plan adherence on ${planContext.planAdherenceStartDate}. Before that date they were running loosely (mixed zones, not plan-adherent). Treat pre-adherence data as a weak baseline.`
+    : '';
+
+  const continuityBlock = previousWeekInsight
+    ? `
+LAST WEEK'S SYNTHESIS (${previousWeekInsight.weekLabel}):
+- Focus that was set for this week: ${wrapUntrusted('untrusted_prior_focus', sanitizeMultiline(previousWeekInsight.focusNextWeek, 1500))}
+- Weaknesses flagged: ${wrapUntrusted('untrusted_prior_gaps', sanitizeMultiline(previousWeekInsight.whatNeedsWork, 1500))}
+Evaluate whether this week's sessions actually followed those cues.`
+    : '';
+
+  const prompt = `${UNTRUSTED_PREAMBLE}
+
+You are a running coach analyzing outdoor running sessions for a recreational runner in Jakarta, Indonesia.
+
+The runner follows a structured program that ramps up over time — starting with a few runs per week and building toward ~5 Z2 runs plus VO2 max intervals at steady state. Different sessions target different intensities; Z2 runs are intentionally slow (target HR is in the protocol). Do NOT treat a slower pace on a Z2 day as regression.
+
+Your job: judge this week on THREE lenses simultaneously —
+1. PLAN ADHERENCE — did each session match its planned type, duration, and intended zone for that date?
+2. CONTINUITY — did the week follow through on last week's Focus Next Week?
+3. PROGRESSION IN CONTEXT — form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
+${planBlock}${continuityBlock}
+
+Week analyzed: ${weekLabel}
+Sessions completed: ${thisWeekRuns.length}
 Total distance: ${totalDistanceKm}km
 Total time: ${totalDurationMins} mins
 Average pace: ${weekAvgPace}/km
@@ -221,16 +286,17 @@ Individual runs:
 ${runsDetail}
 
 ${historicalNote}
+Note: historical averages span both loose and plan-adherent periods. Use history to judge form/efficiency trends and like-for-like pace trends by session type — never raw average pace vs history.
 
-Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points). Be specific and data-driven. Reference the actual numbers. Acknowledge Jakarta heat/humidity when it's a relevant factor.
+Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points). Be specific and data-driven. Reference actual numbers. Acknowledge Jakarta heat/humidity when it's a relevant factor.
 
-Section 1 — HOW WAS THIS WEEK (2-3 sentences): Quality of the running sessions — pace, effort, how the body responded. Not about how many runs were done.
+Section 1 — HOW WAS THIS WEEK (2-3 sentences): For each run, name its planned session type and state whether it hit the intended zone/duration and how the body responded. Note planned-but-missed sessions and done-but-not-planned sessions.
 
-Section 2 — WHAT'S GOOD (2-3 sentences): Specific performance positives from the data — pace trend, HR efficiency, form metrics, training effect.
+Section 2 — WHAT'S GOOD (2-3 sentences): Wins across the three lenses: plan adherence (sessions at right intensity and duration), progression signals (form/efficiency trending well AND like-for-like pace improvements), and execution of last week's focus.
 
-Section 3 — WHAT NEEDS WORK (2-3 sentences): Running-specific weaknesses in the data — decoupling, cadence, pace consistency, HR drift, or similar.
+Section 3 — WHAT NEEDS WORK (2-3 sentences): Gaps in any lens: ran Z2 too hot, skipped a planned session, cadence below target, high decoupling, poor tempo execution, inconsistent VO2 intervals. Do NOT flag slower raw average pace as a weakness when the weekly mix shifted toward Z2. If pace-at-same-HR on Z2 is worse than a prior Z2 day, call that out explicitly.
 
-Section 4 — FOCUS NEXT WEEK (2-3 sentences): Concrete cues or targets for the next 2 running sessions to improve performance. Be specific (e.g. target pace range, cadence target, effort level).
+Section 4 — FOCUS NEXT WEEK (2-3 sentences): Concrete cues for next week's planned sessions. Reference plan targets (HR range, duration, session types from NEXT WEEK'S PLAN if provided) AND one or two form/efficiency/pace-at-HR targets carried over from the gaps above.
 
 Respond in this exact JSON format:
 {
