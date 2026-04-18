@@ -44,6 +44,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
       source: r.source,
       draft_created: r.draft_created,
       draft_snippet: r.draft_snippet,
+      draft_skipped_reason: r.draft_skipped_reason,
       category_reason: r.category_reason,
       received_at: r.received_at,
       body_snippet: r.body_snippet,

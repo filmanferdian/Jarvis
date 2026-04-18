@@ -11,9 +11,17 @@ interface TriageEmail {
   source: string;
   draft_created: boolean;
   draft_snippet: string | null;
+  draft_skipped_reason: string | null;
   category_reason: string | null;
   received_at: string;
   body_snippet: string | null;
+}
+
+interface BlocklistEntry {
+  id: string;
+  pattern: string;
+  reason: string | null;
+  created_at: string;
 }
 
 interface OtherEmail {
@@ -68,6 +76,11 @@ export default function EmailTriagePage() {
   const [loading, setLoading] = useState(true);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [showOther, setShowOther] = useState(false);
+  const [showBlocklist, setShowBlocklist] = useState(false);
+  const [blocklist, setBlocklist] = useState<BlocklistEntry[]>([]);
+  const [newPattern, setNewPattern] = useState('');
+  const [newReason, setNewReason] = useState('');
+  const [blocklistBusy, setBlocklistBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -80,12 +93,53 @@ export default function EmailTriagePage() {
     }
   }, []);
 
+  const loadBlocklist = useCallback(async () => {
+    try {
+      const result = await fetchAuth<{ entries: BlocklistEntry[] }>('/api/emails/blocklist');
+      setBlocklist(result.entries);
+    } catch {
+      // Silent
+    }
+  }, []);
+
+  const addBlocklistEntry = async () => {
+    if (!newPattern.trim()) return;
+    setBlocklistBusy(true);
+    try {
+      await fetchAuth('/api/emails/blocklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern: newPattern.trim(), reason: newReason.trim() || null }),
+      });
+      setNewPattern('');
+      setNewReason('');
+      await loadBlocklist();
+    } catch {
+      // Silent
+    } finally {
+      setBlocklistBusy(false);
+    }
+  };
+
+  const removeBlocklistEntry = async (id: string) => {
+    setBlocklistBusy(true);
+    try {
+      await fetchAuth(`/api/emails/blocklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await loadBlocklist();
+    } catch {
+      // Silent
+    } finally {
+      setBlocklistBusy(false);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadBlocklist();
     // Auto-refresh every 10 minutes to pick up new triage runs
     const interval = setInterval(load, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, loadBlocklist]);
 
   const summary = data?.summary;
 
@@ -163,8 +217,20 @@ export default function EmailTriagePage() {
                     className="w-full flex items-center gap-3 p-3 rounded-lg border-l-2 border-l-jarvis-accent hover:bg-jarvis-bg-hover transition-colors text-left"
                   >
                     {/* Draft status dot */}
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${email.draft_created ? 'bg-jarvis-success' : 'bg-jarvis-text-dim'}`}
-                      title={email.draft_created ? 'Draft created' : 'No draft'}
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${
+                      email.draft_created
+                        ? 'bg-jarvis-success'
+                        : email.draft_skipped_reason
+                          ? 'bg-amber-500'
+                          : 'bg-jarvis-text-dim'
+                    }`}
+                      title={
+                        email.draft_created
+                          ? 'Draft created'
+                          : email.draft_skipped_reason
+                            ? `No draft — ${email.draft_skipped_reason}`
+                            : 'No draft'
+                      }
                     />
 
                     {/* From + Subject */}
@@ -219,7 +285,12 @@ export default function EmailTriagePage() {
                           </p>
                         </div>
                       )}
-                      {!email.draft_created && (
+                      {!email.draft_created && email.draft_skipped_reason && (
+                        <p className="text-[11px] text-amber-500">
+                          Draft skipped — {email.draft_skipped_reason}. Action likely happens inside the email (button/link).
+                        </p>
+                      )}
+                      {!email.draft_created && !email.draft_skipped_reason && (
                         <p className="text-[11px] text-jarvis-text-dim">
                           Draft not created — check email app for manual response.
                         </p>
@@ -281,6 +352,83 @@ export default function EmailTriagePage() {
             )}
           </div>
         )}
+
+        {/* Draft Blocklist Section */}
+        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
+          <button
+            onClick={() => setShowBlocklist(!showBlocklist)}
+            className="w-full flex items-center justify-between"
+          >
+            <h2 className="text-[15px] font-medium text-jarvis-text-primary">
+              Draft Blocklist
+              <span className="ml-2 text-xs font-mono text-jarvis-text-dim">{blocklist.length}</span>
+              <span className="ml-2 text-[11px] text-jarvis-text-dim font-normal">— senders for which Jarvis skips drafting</span>
+            </h2>
+            <svg
+              className={`w-4 h-4 text-jarvis-text-dim transition-transform ${showBlocklist ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showBlocklist && (
+            <div className="mt-4 space-y-3">
+              {blocklist.length === 0 ? (
+                <p className="text-[12px] text-jarvis-text-dim">No blocked senders yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {blocklist.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg bg-jarvis-bg border border-jarvis-border/50"
+                    >
+                      <span className="text-[12px] font-mono text-jarvis-text-primary">{entry.pattern}</span>
+                      {entry.reason && (
+                        <span className="text-[11px] text-jarvis-text-dim truncate flex-1">{entry.reason}</span>
+                      )}
+                      {!entry.reason && <span className="flex-1" />}
+                      <button
+                        onClick={() => removeBlocklistEntry(entry.id)}
+                        disabled={blocklistBusy}
+                        className="text-[11px] text-jarvis-text-dim hover:text-red-400 transition-colors disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-jarvis-border/30">
+                <input
+                  type="text"
+                  placeholder="Pattern (e.g. kantorku)"
+                  value={newPattern}
+                  onChange={(e) => setNewPattern(e.target.value)}
+                  className="flex-1 px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-lg text-jarvis-text-primary placeholder:text-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
+                />
+                <input
+                  type="text"
+                  placeholder="Reason (optional)"
+                  value={newReason}
+                  onChange={(e) => setNewReason(e.target.value)}
+                  className="flex-1 px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-lg text-jarvis-text-primary placeholder:text-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
+                />
+                <button
+                  onClick={addBlocklistEntry}
+                  disabled={blocklistBusy || !newPattern.trim()}
+                  className="px-4 py-2 text-[12px] bg-jarvis-accent/10 text-jarvis-accent border border-jarvis-accent/30 rounded-lg hover:bg-jarvis-accent/20 transition-colors disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+              <p className="text-[10px] text-jarvis-text-dim">
+                Pattern is matched as a case-insensitive substring on the sender address.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Empty state */}
         {!loading && data && data.summary.total === 0 && (
