@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { fetchAuth } from '@/lib/fetchAuth';
 
 const MEASUREMENT_TYPES = [
   { value: 'waist_circumference', label: 'Waist (cm)' },
@@ -48,7 +47,6 @@ export default function ManualEntryForm({ onSaved }: { onSaved?: () => void }) {
     setSaving(true);
     setMessage(null);
     try {
-      await fetchAuth('/api/health/measurements');
       const res = await fetch('/api/health/measurements', {
         method: 'POST',
         credentials: 'include',
