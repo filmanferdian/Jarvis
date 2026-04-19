@@ -145,15 +145,28 @@ export const GET = withAuth(async () => {
       .select('measurement_type, value, date')
       .order('date', { ascending: false });
 
+    // Map DB measurement_type (incl. legacy aliases) to canonical OKR key_result.
+    // Legacy aliases exist because the POST route's VALID_TYPES changed over
+    // time; historical rows still carry the old names.
+    const MEASUREMENT_TYPE_CANONICAL: Record<string, string> = {
+      dead_hang: 'dead_hang_seconds',
+      ohs_major_compensations: 'overhead_squat_compensations',
+      waist_circumference: 'waist_cm',
+      blood_pressure_systolic: 'bp_systolic',
+      blood_pressure_diastolic: 'bp_diastolic',
+    };
+    const canonicalType = (t: string) => MEASUREMENT_TYPE_CANONICAL[t] ?? t;
+
     const latestMeasurement: Record<string, { value: number; date: string }> = {};
     const previousMeasurement: Record<string, { value: number; date: string }> = {};
     if (measurements) {
       for (const m of measurements) {
+        const key = canonicalType(m.measurement_type);
         const entry = { value: Number(m.value), date: m.date };
-        if (!latestMeasurement[m.measurement_type]) {
-          latestMeasurement[m.measurement_type] = entry;
-        } else if (!previousMeasurement[m.measurement_type]) {
-          previousMeasurement[m.measurement_type] = entry;
+        if (!latestMeasurement[key]) {
+          latestMeasurement[key] = entry;
+        } else if (!previousMeasurement[key]) {
+          previousMeasurement[key] = entry;
         }
       }
     }
@@ -296,15 +309,9 @@ export const GET = withAuth(async () => {
         return { value: val ?? null, date: dateSource?.date ?? garminRows[0].date };
       }
 
-      // Health measurements — map key_result to actual measurement_type
+      // Health measurements — keys canonicalized when building the map
       if (t.source_table === 'health_measurements') {
-        const typeMap: Record<string, string> = {
-          waist_cm: 'waist_circumference',
-          bp_systolic: 'blood_pressure_systolic',
-          bp_diastolic: 'blood_pressure_diastolic',
-        };
-        const measurementKey = typeMap[t.key_result] || t.key_result;
-        const m = latestMeasurement[measurementKey];
+        const m = latestMeasurement[t.key_result];
         return m ? { value: m.value, date: m.date } : { value: null, date: null };
       }
 
@@ -354,15 +361,9 @@ export const GET = withAuth(async () => {
         }
       }
 
-      // Health measurements
+      // Health measurements — keys canonicalized when building the map
       if (t.source_table === 'health_measurements') {
-        const typeMap: Record<string, string> = {
-          waist_cm: 'waist_circumference',
-          bp_systolic: 'blood_pressure_systolic',
-          bp_diastolic: 'blood_pressure_diastolic',
-        };
-        const measurementKey = typeMap[t.key_result] || t.key_result;
-        const prev = previousMeasurement[measurementKey];
+        const prev = previousMeasurement[t.key_result];
         return prev ? prev.value : null;
       }
 
