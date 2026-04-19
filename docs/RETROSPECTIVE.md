@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-19 — v2.4.44 → v2.4.46 OKR manual-entry chain
+
+**Well:**
+- Root-caused each failure layer in order: stray GET pre-flight (405) → OKR typeMap masking the saved rows → legacy rows orphaned by the typeMap cleanup. Each ship was small and reversible.
+- Build validated locally before every push.
+
+**Wrong:**
+- First fix (v2.4.44) only addressed the save path. Didn't verify the read path would actually surface the new row — would have caught the typeMap bug in one ship instead of three.
+- v2.4.45 removed the typeMap entries without auditing the DB for legacy data stored under old names. Broke OHS "2 counts" for the user. Should have grep'd the codebase and migrations for historical aliases first.
+- The read/write naming convention in `health_measurements` has drifted over time (`dead_hang` → `dead_hang_seconds`, `ohs_major_compensations` → `overhead_squat_compensations`). No migration was run when the POST route's VALID_TYPES was renamed.
+
+**Next:**
+- Consider a Supabase migration that rewrites legacy `measurement_type` rows to canonical names, so the OKR canonicalization layer can eventually be removed. Flag for BACKLOG.md.
+- Whenever changing `VALID_TYPES` in a write endpoint, audit all readers that filter on that column in the same ship.
+
+---
+
 ## 2026-04-18 — v2.4.39 email draft blocklist
 
 **Well:**
