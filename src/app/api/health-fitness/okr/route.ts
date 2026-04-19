@@ -299,8 +299,6 @@ export const GET = withAuth(async () => {
       // Health measurements — map key_result to actual measurement_type
       if (t.source_table === 'health_measurements') {
         const typeMap: Record<string, string> = {
-          dead_hang_seconds: 'dead_hang',
-          overhead_squat_compensations: 'ohs_major_compensations',
           waist_cm: 'waist_circumference',
           bp_systolic: 'blood_pressure_systolic',
           bp_diastolic: 'blood_pressure_diastolic',
@@ -359,8 +357,6 @@ export const GET = withAuth(async () => {
       // Health measurements
       if (t.source_table === 'health_measurements') {
         const typeMap: Record<string, string> = {
-          dead_hang_seconds: 'dead_hang',
-          overhead_squat_compensations: 'ohs_major_compensations',
           waist_cm: 'waist_circumference',
           bp_systolic: 'blood_pressure_systolic',
           bp_diastolic: 'blood_pressure_diastolic',

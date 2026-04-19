@@ -4,6 +4,11 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [2.4.45] — 2026-04-19
+
+### Fixed
+- `/api/health-fitness/okr` now reads manually-entered `dead_hang_seconds` and `overhead_squat_compensations` rows correctly. The `typeMap` remapped those OKR keys to `'dead_hang'` / `'ohs_major_compensations'`, but `/api/health/measurements` only accepts (and stores) the long names — so values saved from the `/health` manual entry form never surfaced on the OKR card. Dropped the two bogus mappings; kept the legitimate `waist_cm` / `bp_*` → long-name translations.
+
 ## [2.4.44] — 2026-04-19
 
 ### Fixed
