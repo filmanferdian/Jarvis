@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
 import AppShell from '@/components/AppShell';
+import EmailThread, { Thread } from '@/components/EmailThread';
 
 interface TriageEmail {
   from_name: string | null;
@@ -51,19 +52,27 @@ interface TriageData {
   otherEmails: OtherEmail[];
 }
 
-const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  informational: { bg: 'bg-jarvis-bg-elevated', text: 'text-jarvis-text-muted', label: 'Info' },
-  newsletter: { bg: 'bg-jarvis-bg-elevated', text: 'text-jarvis-text-dim', label: 'Newsletter' },
-  notification: { bg: 'bg-amber-500/10', text: 'text-jarvis-warn', label: 'Notification' },
-  automated: { bg: 'bg-jarvis-bg-elevated', text: 'text-jarvis-text-dim', label: 'Automated' },
+type Tab = 'needs' | 'other' | 'blocked';
+
+const TAB_LABELS: Record<Tab, string> = {
+  needs: 'Needs response',
+  other: 'Other',
+  blocked: 'Blocked',
 };
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-  const h = wib.getUTCHours().toString().padStart(2, '0');
-  const m = wib.getUTCMinutes().toString().padStart(2, '0');
+function formatWibTime(iso: string): string {
+  const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+  const h = String(wib.getUTCHours()).padStart(2, '0');
+  const m = String(wib.getUTCMinutes()).padStart(2, '0');
   return `${h}:${m}`;
+}
+
+function initials(name: string | null, address: string): string {
+  const base = (name && name.trim()) || address.split('@')[0];
+  const parts = base.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function sourceLabel(source: string): string {
@@ -72,12 +81,24 @@ function sourceLabel(source: string): string {
   return source;
 }
 
+interface ListRow {
+  key: string;
+  from_name: string | null;
+  from_address: string;
+  subject: string;
+  source: string;
+  preview: string;
+  receivedAt: string;
+  draftReady: boolean;
+  draftSkipped: boolean;
+  category?: string;
+}
+
 export default function EmailTriagePage() {
   const [data, setData] = useState<TriageData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
-  const [showOther, setShowOther] = useState(false);
-  const [showBlocklist, setShowBlocklist] = useState(false);
+  const [tab, setTab] = useState<Tab>('needs');
+  const [selected, setSelected] = useState<string | null>(null);
   const [blocklist, setBlocklist] = useState<BlocklistEntry[]>([]);
   const [newPattern, setNewPattern] = useState('');
   const [newReason, setNewReason] = useState('');
@@ -88,7 +109,7 @@ export default function EmailTriagePage() {
       const result = await fetchAuth<TriageData>('/api/emails/triage');
       setData(result);
     } catch {
-      // Silent
+      /* silent */
     } finally {
       setLoading(false);
     }
@@ -99,7 +120,7 @@ export default function EmailTriagePage() {
       const result = await fetchAuth<{ entries: BlocklistEntry[] }>('/api/emails/blocklist');
       setBlocklist(result.entries);
     } catch {
-      // Silent
+      /* silent */
     }
   }, []);
 
@@ -116,7 +137,7 @@ export default function EmailTriagePage() {
       setNewReason('');
       await loadBlocklist();
     } catch {
-      // Silent
+      /* silent */
     } finally {
       setBlocklistBusy(false);
     }
@@ -128,7 +149,7 @@ export default function EmailTriagePage() {
       await fetchAuth(`/api/emails/blocklist?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       await loadBlocklist();
     } catch {
-      // Silent
+      /* silent */
     } finally {
       setBlocklistBusy(false);
     }
@@ -137,311 +158,355 @@ export default function EmailTriagePage() {
   useEffect(() => {
     load();
     loadBlocklist();
-    // Auto-refresh every 10 minutes to pick up new triage runs
     const interval = setInterval(load, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, [load, loadBlocklist]);
+
+  // Build list rows based on active tab
+  const rows: ListRow[] = useMemo(() => {
+    if (!data) return [];
+    if (tab === 'needs') {
+      return groupNeedsResponse(data.needResponse);
+    }
+    if (tab === 'other') {
+      return data.otherEmails.map((e) => ({
+        key: `${e.from_address}__${e.received_at}`,
+        from_name: e.from_name,
+        from_address: e.from_address,
+        subject: e.subject,
+        source: e.source,
+        preview: '',
+        receivedAt: e.received_at,
+        draftReady: false,
+        draftSkipped: false,
+        category: e.category,
+      }));
+    }
+    return [];
+  }, [data, tab]);
+
+  // When rows change, make sure selection is valid
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelected(null);
+    } else if (!selected || !rows.find((r) => r.key === selected)) {
+      setSelected(rows[0].key);
+    }
+  }, [rows, selected]);
+
+  const selectedThread: Thread | null = useMemo(() => {
+    if (!data || tab !== 'needs' || !selected) return null;
+    const msgs = data.needResponse.filter((e) => e.from_address === selected);
+    if (msgs.length === 0) return null;
+    const sorted = [...msgs].sort(
+      (a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime(),
+    );
+    const latest = sorted[sorted.length - 1];
+    return {
+      key: latest.from_address,
+      from_name: latest.from_name,
+      from_address: latest.from_address,
+      subject: latest.subject,
+      source: latest.source,
+      messages: sorted.map((m) => ({
+        from_name: m.from_name,
+        from_address: m.from_address,
+        subject: m.subject,
+        received_at: m.received_at,
+        body_snippet: m.body_snippet,
+        source: m.source,
+      })),
+      draft_snippet: latest.draft_snippet,
+      draft_skipped_reason: latest.draft_skipped_reason,
+    };
+  }, [data, tab, selected]);
 
   const summary = data?.summary;
 
   return (
     <AppShell>
-      <div className="max-w-5xl mx-auto w-full space-y-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-jarvis-text-muted">
-          <a href="/" className="hover:text-jarvis-accent transition-colors">Dashboard</a>
-          <span>/</span>
-          <span className="text-jarvis-text-primary">Email Triage</span>
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h1
+              className="text-[22px] text-jarvis-text-primary"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '-0.01em' }}
+            >
+              Email Triage
+            </h1>
+            <p className="text-[12px] text-jarvis-text-dim mt-0.5">
+              {summary?.total ?? 0} scanned · {summary?.need_response ?? 0} need response ·{' '}
+              {summary?.drafts_created ?? 0} drafted
+            </p>
+          </div>
           {data && (
-            <span className="ml-auto text-xs font-mono text-jarvis-text-dim">
+            <span className="text-[11px] font-mono text-jarvis-text-faint">
               {data.date}
-              {data.lastRefreshedAt && ` · Updated ${formatTime(data.lastRefreshedAt)} WIB`}
+              {data.lastRefreshedAt && ` · Updated ${formatWibTime(data.lastRefreshedAt)} WIB`}
             </span>
           )}
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4 animate-pulse">
-                <div className="h-6 bg-jarvis-border/50 rounded w-12 mb-2" />
-                <div className="h-3 bg-jarvis-border/50 rounded w-20" />
-              </div>
-            ))
-          ) : (
-            <>
-              <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-                <p className="text-2xl font-mono font-semibold text-jarvis-text-primary">{summary?.total ?? 0}</p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase mt-1">Total Scanned</p>
-              </div>
-              <div className="rounded-xl border border-jarvis-accent/30 bg-jarvis-accent/5 p-4">
-                <p className="text-2xl font-mono font-semibold text-jarvis-accent">{summary?.need_response ?? 0}</p>
-                <p className="text-[11px] text-jarvis-accent/70 uppercase mt-1">Need Response</p>
-              </div>
-              <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-                <p className="text-2xl font-mono font-semibold text-jarvis-success">{summary?.drafts_created ?? 0}</p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase mt-1">Drafts Created</p>
-              </div>
-              <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-4">
-                <p className="text-2xl font-mono font-semibold text-jarvis-text-muted">
-                  {(summary?.total ?? 0) - (summary?.need_response ?? 0)}
-                </p>
-                <p className="text-[11px] text-jarvis-text-dim uppercase mt-1">Other</p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Need Response Section */}
-        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
-          <h2 className="text-[15px] font-medium text-jarvis-text-primary mb-4">
-            Needs Response
-            {summary && summary.need_response > 0 && (
-              <span className="ml-2 text-xs font-mono text-jarvis-accent bg-jarvis-accent/10 px-2 py-0.5 rounded-full">
-                {summary.need_response}
-              </span>
-            )}
-          </h2>
-
-          {loading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-jarvis-border/50 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : !data || data.needResponse.length === 0 ? (
-            <p className="text-sm text-jarvis-text-dim">No emails requiring response today.</p>
-          ) : (
-            <div className="space-y-0">
-              {data.needResponse.map((email, idx) => (
-                <div key={idx}>
+        {/* Split pane */}
+        <div
+          className="grid gap-5"
+          style={{ gridTemplateColumns: '400px 1fr', height: 'calc(100vh - 180px)' }}
+        >
+          {/* List */}
+          <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-hidden flex flex-col">
+            {/* Tabs */}
+            <div className="flex gap-1 px-3 py-2.5 border-b border-jarvis-border">
+              {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
+                const active = tab === t;
+                const count =
+                  t === 'needs'
+                    ? summary?.need_response ?? 0
+                    : t === 'other'
+                      ? (summary?.total ?? 0) - (summary?.need_response ?? 0)
+                      : blocklist.length;
+                return (
                   <button
-                    onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg border-l-2 border-l-jarvis-accent hover:bg-jarvis-bg-hover transition-colors text-left"
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className="px-3 py-1.5 text-[12px] rounded-[8px] transition-colors"
+                    style={{
+                      background: active ? 'var(--color-jarvis-cta-soft)' : 'transparent',
+                      color: active ? 'var(--color-jarvis-cta)' : 'var(--color-jarvis-text-dim)',
+                    }}
                   >
-                    {/* Draft status dot */}
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${
-                      email.draft_created
-                        ? 'bg-jarvis-success'
-                        : email.draft_skipped_reason
-                          ? 'bg-amber-500'
-                          : 'bg-jarvis-text-dim'
-                    }`}
-                      title={
-                        email.draft_created
-                          ? 'Draft created'
-                          : email.draft_skipped_reason
-                            ? `No draft — ${email.draft_skipped_reason}`
-                            : 'No draft'
-                      }
-                    />
-
-                    {/* From + Subject */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-jarvis-text-primary truncate">
-                        <span className="font-medium">{email.from_name || email.from_address}</span>
-                        {email.from_name && (
-                          <span className="text-jarvis-text-dim ml-1.5 text-[11px]">{email.from_address}</span>
-                        )}
-                      </p>
-                      <p className="text-[12px] text-jarvis-text-secondary truncate">{email.subject}</p>
-                    </div>
-
-                    {/* Source badge */}
-                    <span className="text-[10px] font-mono text-jarvis-text-dim px-1.5 py-0.5 border border-jarvis-border/50 rounded shrink-0">
-                      {sourceLabel(email.source)}
-                    </span>
-
-                    {/* Time */}
-                    <span className="text-[11px] font-mono text-jarvis-text-dim shrink-0">
-                      {formatTime(email.received_at)}
-                    </span>
-
-                    {/* Expand chevron */}
-                    <svg
-                      className={`w-3.5 h-3.5 text-jarvis-text-dim shrink-0 transition-transform ${expandedIdx === idx ? 'rotate-180' : ''}`}
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {TAB_LABELS[t]}
+                    <span className="ml-1.5 opacity-70">{count}</span>
                   </button>
-
-                  {/* Expanded content */}
-                  {expandedIdx === idx && (
-                    <div className="ml-8 mr-3 mb-3 space-y-3">
-                      {email.category_reason && (
-                        <p className="text-[11px] text-jarvis-text-dim italic">{email.category_reason}</p>
-                      )}
-                      {email.body_snippet && (
-                        <div className="p-3 rounded-lg bg-jarvis-bg border border-jarvis-border/50">
-                          <p className="text-[10px] uppercase text-jarvis-text-dim mb-1.5 font-medium">Original</p>
-                          <p className="text-[12px] text-jarvis-text-muted whitespace-pre-wrap leading-relaxed">
-                            {email.body_snippet}
-                          </p>
-                        </div>
-                      )}
-                      {email.draft_created && email.draft_snippet && (
-                        <div className="p-3 rounded-lg bg-jarvis-accent/5 border border-jarvis-accent/20">
-                          <p className="text-[10px] uppercase text-jarvis-accent/70 mb-1.5 font-medium">Draft Reply</p>
-                          <p className="text-[12px] text-jarvis-text-secondary whitespace-pre-wrap leading-relaxed">
-                            {email.draft_snippet}
-                          </p>
-                        </div>
-                      )}
-                      {!email.draft_created && email.draft_skipped_reason && (
-                        <p className="text-[11px] text-amber-500">
-                          Draft skipped — {email.draft_skipped_reason}. Action likely happens inside the email (button/link).
-                        </p>
-                      )}
-                      {!email.draft_created && !email.draft_skipped_reason && (
-                        <p className="text-[11px] text-jarvis-text-dim">
-                          Draft not created — check email app for manual response.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
-          )}
-        </div>
 
-        {/* Other Emails Section (collapsible) */}
-        {data && data.otherEmails.length > 0 && (
-          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
-            <button
-              onClick={() => setShowOther(!showOther)}
-              className="w-full flex items-center justify-between"
-            >
-              <h2 className="text-[15px] font-medium text-jarvis-text-primary">
-                Other Emails
-                <span className="ml-2 text-xs font-mono text-jarvis-text-dim">
-                  {data.otherEmails.length}
-                </span>
-              </h2>
-              <svg
-                className={`w-4 h-4 text-jarvis-text-dim transition-transform ${showOther ? 'rotate-180' : ''}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {showOther && (
-              <div className="mt-4 space-y-1">
-                {data.otherEmails.map((email, idx) => {
-                  const style = CATEGORY_STYLES[email.category] || CATEGORY_STYLES.automated;
-                  return (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 py-2 px-1 border-b border-jarvis-border/30 last:border-b-0"
-                    >
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${style.bg} ${style.text} shrink-0`}>
-                        {style.label}
-                      </span>
-                      <span className="text-[12px] text-jarvis-text-muted truncate flex-1">
-                        {email.subject}
-                      </span>
-                      <span className="text-[10px] text-jarvis-text-dim shrink-0 hidden sm:block">
-                        {email.from_name || email.from_address}
-                      </span>
-                      <span className="text-[10px] font-mono text-jarvis-text-dim shrink-0">
-                        {formatTime(email.received_at)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Draft Blocklist Section */}
-        <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5">
-          <button
-            onClick={() => setShowBlocklist(!showBlocklist)}
-            className="w-full flex items-center justify-between"
-          >
-            <h2 className="text-[15px] font-medium text-jarvis-text-primary">
-              Draft Blocklist
-              <span className="ml-2 text-xs font-mono text-jarvis-text-dim">{blocklist.length}</span>
-              <span className="ml-2 text-[11px] text-jarvis-text-dim font-normal">— senders for which Jarvis skips drafting</span>
-            </h2>
-            <svg
-              className={`w-4 h-4 text-jarvis-text-dim transition-transform ${showBlocklist ? 'rotate-180' : ''}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {showBlocklist && (
-            <div className="mt-4 space-y-3">
-              {blocklist.length === 0 ? (
-                <p className="text-[12px] text-jarvis-text-dim">No blocked senders yet.</p>
-              ) : (
-                <div className="space-y-1">
-                  {blocklist.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg bg-jarvis-bg border border-jarvis-border/50"
-                    >
-                      <span className="text-[12px] font-mono text-jarvis-text-primary">{entry.pattern}</span>
-                      {entry.reason && (
-                        <span className="text-[11px] text-jarvis-text-dim truncate flex-1">{entry.reason}</span>
-                      )}
-                      {!entry.reason && <span className="flex-1" />}
-                      <button
-                        onClick={() => removeBlocklistEntry(entry.id)}
-                        disabled={blocklistBusy}
-                        className="text-[11px] text-jarvis-text-dim hover:text-red-400 transition-colors disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
+            {/* List body */}
+            <div className="overflow-y-auto flex-1">
+              {loading ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-14 bg-jarvis-border/50 rounded animate-pulse" />
                   ))}
                 </div>
+              ) : tab === 'blocked' ? (
+                <div className="p-4 space-y-3">
+                  {blocklist.length === 0 ? (
+                    <p className="text-[12.5px] text-jarvis-text-dim">No blocked senders yet.</p>
+                  ) : (
+                    blocklist.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center gap-3 py-2 px-3 rounded-[10px] border border-jarvis-border bg-jarvis-bg-elevated"
+                      >
+                        <span className="text-[12px] font-mono text-jarvis-text-primary">
+                          {entry.pattern}
+                        </span>
+                        {entry.reason && (
+                          <span className="text-[11px] text-jarvis-text-dim truncate flex-1">
+                            {entry.reason}
+                          </span>
+                        )}
+                        {!entry.reason && <span className="flex-1" />}
+                        <button
+                          onClick={() => removeBlocklistEntry(entry.id)}
+                          disabled={blocklistBusy}
+                          className="text-[11px] text-jarvis-text-dim hover:text-jarvis-danger transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))
+                  )}
+
+                  <div className="flex flex-col gap-2 pt-3 border-t border-jarvis-border">
+                    <input
+                      type="text"
+                      placeholder="Pattern (e.g. kantorku)"
+                      value={newPattern}
+                      onChange={(e) => setNewPattern(e.target.value)}
+                      className="px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-[8px] text-jarvis-text-primary placeholder:text-jarvis-text-faint focus:outline-none focus:border-jarvis-cta"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Reason (optional)"
+                      value={newReason}
+                      onChange={(e) => setNewReason(e.target.value)}
+                      className="px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-[8px] text-jarvis-text-primary placeholder:text-jarvis-text-faint focus:outline-none focus:border-jarvis-cta"
+                    />
+                    <button
+                      onClick={addBlocklistEntry}
+                      disabled={blocklistBusy || !newPattern.trim()}
+                      className="px-3 py-2 text-[12px] rounded-[8px] text-white transition-colors disabled:opacity-50"
+                      style={{ background: 'var(--color-jarvis-cta)' }}
+                    >
+                      Add pattern
+                    </button>
+                    <p className="text-[10.5px] text-jarvis-text-faint">
+                      Matched as case-insensitive substring on the sender address.
+                    </p>
+                  </div>
+                </div>
+              ) : rows.length === 0 ? (
+                <p className="p-6 text-[12.5px] text-jarvis-text-dim">
+                  {tab === 'needs' ? 'No emails requiring response today.' : 'Nothing else in today\u2019s scan.'}
+                </p>
+              ) : (
+                rows.map((row) => {
+                  const active = selected === row.key;
+                  return (
+                    <button
+                      key={row.key}
+                      onClick={() => setSelected(row.key)}
+                      className="w-full text-left block px-4 py-3.5 border-b border-jarvis-border transition-colors"
+                      style={{
+                        background: active
+                          ? 'var(--color-jarvis-ambient-soft)'
+                          : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[13px] font-medium text-jarvis-text-primary truncate">
+                          {row.from_name || row.from_address}
+                        </span>
+                        <span
+                          className="text-[10.5px] text-jarvis-text-faint shrink-0"
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                        >
+                          {formatWibTime(row.receivedAt)}
+                        </span>
+                      </div>
+                      <p className="text-[12.5px] text-jarvis-text-dim mt-1 truncate">{row.subject}</p>
+                      {row.preview && (
+                        <p className="text-[11.5px] text-jarvis-text-faint mt-1.5 truncate">
+                          {row.preview}
+                        </p>
+                      )}
+                      <div className="flex gap-1.5 mt-1.5">
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full border border-jarvis-border text-jarvis-text-faint"
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                        >
+                          {sourceLabel(row.source)}
+                        </span>
+                        {row.draftReady && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full"
+                            style={{
+                              background: 'var(--color-jarvis-ambient-soft)',
+                              color: 'var(--color-jarvis-ambient)',
+                            }}
+                          >
+                            Draft ready
+                          </span>
+                        )}
+                        {row.draftSkipped && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full"
+                            style={{
+                              background: 'rgba(192,122,30,0.12)',
+                              color: 'var(--color-jarvis-warn)',
+                            }}
+                          >
+                            Action only
+                          </span>
+                        )}
+                        {row.category && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full text-jarvis-text-faint capitalize"
+                            style={{ background: 'var(--color-jarvis-track)' }}
+                          >
+                            {row.category.replace('_', ' ')}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
               )}
-
-              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-jarvis-border/30">
-                <input
-                  type="text"
-                  placeholder="Pattern (e.g. kantorku)"
-                  value={newPattern}
-                  onChange={(e) => setNewPattern(e.target.value)}
-                  className="flex-1 px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-lg text-jarvis-text-primary placeholder:text-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
-                />
-                <input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={newReason}
-                  onChange={(e) => setNewReason(e.target.value)}
-                  className="flex-1 px-3 py-2 text-[12px] bg-jarvis-bg border border-jarvis-border rounded-lg text-jarvis-text-primary placeholder:text-jarvis-text-dim focus:outline-none focus:border-jarvis-accent"
-                />
-                <button
-                  onClick={addBlocklistEntry}
-                  disabled={blocklistBusy || !newPattern.trim()}
-                  className="px-4 py-2 text-[12px] bg-jarvis-accent/10 text-jarvis-accent border border-jarvis-accent/30 rounded-lg hover:bg-jarvis-accent/20 transition-colors disabled:opacity-50"
-                >
-                  Add
-                </button>
-              </div>
-              <p className="text-[10px] text-jarvis-text-dim">
-                Pattern is matched as a case-insensitive substring on the sender address.
-              </p>
             </div>
-          )}
-        </div>
-
-        {/* Empty state */}
-        {!loading && data && data.summary.total === 0 && (
-          <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-8 text-center">
-            <p className="text-sm text-jarvis-text-dim">No emails triaged today yet.</p>
-            <p className="text-xs text-jarvis-text-dim mt-1">Triage runs at 7am, 1pm, and 7pm WIB.</p>
           </div>
-        )}
+
+          {/* Detail */}
+          <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-y-auto flex flex-col">
+            {tab === 'needs' && selectedThread ? (
+              <EmailThread thread={selectedThread} />
+            ) : tab === 'other' && selected && data ? (
+              <OtherEmailDetail row={rows.find((r) => r.key === selected)!} />
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-[12.5px] text-jarvis-text-dim">
+                  {tab === 'blocked'
+                    ? 'Manage sender patterns on the left.'
+                    : 'Select an email to view the thread.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+function OtherEmailDetail({ row }: { row: ListRow }) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center gap-4 pb-5 border-b border-jarvis-border">
+        <div
+          className="w-11 h-11 rounded-full flex items-center justify-center text-white text-[15px] font-semibold"
+          style={{
+            background: 'linear-gradient(135deg, var(--color-jarvis-ambient), var(--color-jarvis-aurora))',
+            fontFamily: 'var(--font-display)',
+          }}
+        >
+          {initials(row.from_name, row.from_address)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[15px] text-jarvis-text-primary truncate">
+            {row.from_name || row.from_address}
+          </h3>
+          <p className="text-[12px] text-jarvis-text-faint truncate">{row.subject}</p>
+        </div>
+        <span
+          className="text-[10.5px] font-mono text-jarvis-text-faint"
+        >
+          {formatWibTime(row.receivedAt)} WIB
+        </span>
+      </div>
+      <div className="py-5">
+        <p className="text-[11px] uppercase text-jarvis-text-faint mb-2" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.1em' }}>
+          Category · {row.category?.replace('_', ' ')}
+        </p>
+        <p className="text-[13px] text-jarvis-text-dim">
+          No response needed. Classified automatically by the triage cron.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function groupNeedsResponse(emails: TriageEmail[]): ListRow[] {
+  const byAddr = new Map<string, ListRow>();
+  for (const e of emails) {
+    const existing = byAddr.get(e.from_address);
+    const row: ListRow = {
+      key: e.from_address,
+      from_name: e.from_name,
+      from_address: e.from_address,
+      subject: e.subject,
+      source: e.source,
+      preview: e.body_snippet?.replace(/\s+/g, ' ').slice(0, 140) ?? '',
+      receivedAt: e.received_at,
+      draftReady: e.draft_created,
+      draftSkipped: !e.draft_created && !!e.draft_skipped_reason,
+    };
+    if (!existing || new Date(e.received_at) > new Date(existing.receivedAt)) {
+      byAddr.set(e.from_address, row);
+    }
+  }
+  return Array.from(byAddr.values()).sort(
+    (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime(),
   );
 }
