@@ -38,6 +38,10 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 - All three streams merged with zero file-level conflicts (disjoint scope design).
 - `npm run build` clean after each merge.
 
+### Follow-ups (same-version bugfixes, no bump)
+- `BriefingOverlay.tsx`: playback rewritten to mirror `TTSButton.tsx`'s robust pattern — fetch-as-blob for the stored Supabase Storage URL instead of binding it directly as `audio.src`, `playsinline` + `preload='auto'` + wait for `canplaythrough` (5s fallback), AbortController, 20s timeout, and Web Speech fallback if both stored-audio and `/api/tts` fail. Play button now shows a loading spinner while fetching/buffering. Fixes the "can't play the briefing" regression from the initial v3.0 ship.
+- `TopBar.tsx`, `Sidebar.tsx`: version chip is now visible in the UI again. TopBar renders a `v{VERSION.string}` pill next to the greeting; Sidebar appends it inline after the `JARVIS` wordmark (visible when expanded/pinned).
+
 ## [2.4.48] — 2026-04-20
 
 ### Added

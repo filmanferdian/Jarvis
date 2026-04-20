@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { VERSION } from '@/lib/version';
 
 const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
   {
@@ -132,11 +133,14 @@ export default function Sidebar() {
           </svg>
         </div>
         <span
-          className={`font-[family-name:var(--font-display)] font-semibold text-[18px] tracking-[-0.02em] text-jarvis-text-primary transition-opacity duration-300 ${
+          className={`flex items-baseline gap-2 font-[family-name:var(--font-display)] font-semibold text-[18px] tracking-[-0.02em] text-jarvis-text-primary transition-opacity duration-300 ${
             pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
           }`}
         >
           JARVIS
+          <span className="font-[family-name:var(--font-mono)] font-normal text-[10px] tracking-[0.1em] text-jarvis-text-faint">
+            v{VERSION.string}
+          </span>
         </span>
       </div>
 
