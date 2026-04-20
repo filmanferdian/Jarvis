@@ -61,7 +61,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Docs-only exception:** pushes that touch only `.md` files skip the bump. Version should track runtime behavior, not push count.
 - Use semver: `major.minor.patch` (e.g., `2.4.39`). Bump patch for every runtime-affecting deploy.
 - Include the version bump in the same commit or as a separate `chore: bump version to vX.Y.Z` commit.
-- Never push runtime changes to main without updating the version — the dashboard header shows it.
+- **Codebase vs. front-end split:** `package.json` uses full semver (`3.0.1`, `3.0.2`…). UI surfaces must display major.minor only (`v3.0`) — use `VERSION.display` from `src/lib/version.ts`, never `VERSION.string`. The v3.0 "Atmosphere" release is one product label; patch bumps are internal.
 
 ## Branch Discipline
 - Railway deploys from `main`. Never point it at a worktree branch.
