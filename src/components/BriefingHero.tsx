@@ -5,13 +5,7 @@ import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
 import Mindmap from '@/components/Mindmap';
 import BriefingOverlay, { type BriefingData } from '@/components/BriefingOverlay';
-
-function getPreview(briefing: string): string {
-  const paragraphs = briefing.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  const firstContent = paragraphs.find((p) => !/^\*\*[^*]+\*\*$/.test(p)) ?? paragraphs[0] ?? '';
-  const stripped = firstContent.replace(/\*\*([^*]+)\*\*/g, '$1');
-  return stripped.length > 200 ? stripped.slice(0, 200) + '…' : stripped;
-}
+import { briefingPreview } from '@/lib/briefingText';
 
 export default function BriefingHero() {
   const { data, loading, refetch } = usePolling<BriefingData>(
@@ -23,7 +17,7 @@ export default function BriefingHero() {
   const hasBriefing = !!data?.briefing;
   const estDuration =
     data?.briefing ? Math.max(1, Math.round((data.briefing.split(/\s+/).length || 0) / 150)) : null;
-  const preview = hasBriefing ? getPreview(data!.briefing!) : '';
+  const preview = hasBriefing ? briefingPreview(data!.briefing!) : '';
 
   if (loading) {
     return (

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Mindmap from '@/components/Mindmap';
 import { useSpeaking } from '@/contexts/SpeakingContext';
+import { sanitizeBriefing, splitBriefingLines } from '@/lib/briefingText';
 
 export type BriefingData = {
   date: string;
@@ -18,31 +19,6 @@ type Props = {
   data: BriefingData | null;
   onClose: () => void;
 };
-
-// Strip common markdown markers before we render prose or feed it to splitLines.
-// Keeps the sentence text intact; drops heading-only and list-marker-only lines.
-function sanitizeForSpeech(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => line
-      .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
-      .replace(/\*([^*]+)\*/g, '$1') // italic
-      .replace(/^#{1,6}\s+/, '') // heading prefix
-      .replace(/^\s*[-•]\s+/, '') // bullet marker
-      .replace(/^\s*\d+\.\s+/, '') // numbered marker
-      .trim())
-    .filter((line) => line.length > 0)
-    // Drop lines that are effectively just a label (2–4 words, no sentence punctuation)
-    .filter((line) => !(line.split(/\s+/).length <= 4 && !/[.!?]/.test(line)))
-    .join('\n');
-}
-
-function splitLines(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 function isIOS(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -70,7 +46,7 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
 
   const lines = useMemo(() => {
     const source = data?.voiceover ?? data?.briefing ?? '';
-    return splitLines(sanitizeForSpeech(source));
+    return splitBriefingLines(sanitizeBriefing(source));
   }, [data?.voiceover, data?.briefing]);
   linesRef.current = lines;
 
