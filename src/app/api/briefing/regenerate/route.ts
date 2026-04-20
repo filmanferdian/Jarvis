@@ -5,6 +5,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { detectRedFlags, RedFlag } from '@/lib/fitness/redflags';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
+import { sanitizeBriefing } from '@/lib/briefingText';
 
 // POST: Regenerate today's morning briefing using real calendar + tasks + fitness data
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -370,7 +371,13 @@ Target 400-500 words. No markdown formatting, no bullet points. Plain text with 
 ===VOICEOVER===
 
 === VERSION 2: VOICEOVER SCRIPT ===
-This version is read aloud by TTS. Natural spoken English — flowing sentences, conversational transitions. British butler warmth with occasional dry wit. No section markers, no lists, no formatting. Just speech.
+This version is read aloud by TTS. Natural spoken English — flowing sentences, conversational transitions. British butler warmth with occasional dry wit.
+STRICT FORMAT RULES — read aloud means NO written-page affordances:
+- No markdown whatsoever. No **bold**, no *italic*, no # headings, no ## subheadings.
+- No section labels like "Calendar Overview" or "Today's Priorities" as standalone lines.
+- No bullet points, no numbered lists ("1.", "2.", "- ", "• ").
+- No square-bracket markers like [SCHEDULE] or [FITNESS].
+- Just sentences, in paragraphs, separated by blank lines.
 
 Target 350-450 words (~3 minutes spoken). Cover the same content as the written version but optimized for listening.
 
@@ -432,10 +439,14 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
       });
     } catch { /* non-critical */ }
 
-    // Split dual-script output
+    // Split dual-script output. Sanitize the voiceover before storing + TTS
+    // so the client never sees markdown markers and ElevenLabs never reads
+    // them aloud (saves characters too). Written side keeps markdown — it's
+    // rendered through renderMarkdown on the dashboard.
     const parts = rawOutput.split('===VOICEOVER===');
     const writtenText = parts[0].trim();
-    const voiceoverText = parts.length > 1 ? parts[1].trim() : writtenText;
+    const rawVoiceover = parts.length > 1 ? parts[1].trim() : writtenText;
+    const voiceoverText = sanitizeBriefing(rawVoiceover);
 
     const dataSources = {
       calendar: !!(events && events.length > 0),
