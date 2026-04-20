@@ -50,6 +50,19 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
   }, [data?.voiceover, data?.briefing]);
   linesRef.current = lines;
 
+  // Char-weighted timeline. Each line claims a slice of duration equal to its
+  // length / total length, so long lines hold the subtitle while short ones
+  // pass quickly — matches ElevenLabs's roughly-linear render pacing.
+  const cumCharsRef = useRef<number[]>([0]);
+  const totalCharsRef = useRef(0);
+  const { cumChars, totalChars } = useMemo(() => {
+    const cum: number[] = [0];
+    for (const line of lines) cum.push(cum[cum.length - 1] + line.length);
+    return { cumChars: cum, totalChars: cum[cum.length - 1] };
+  }, [lines]);
+  cumCharsRef.current = cumChars;
+  totalCharsRef.current = totalChars;
+
   const teardownAudio = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -123,8 +136,17 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
         setProgress(cur);
         const dur = audio.duration;
         const ls = linesRef.current;
-        if (Number.isFinite(dur) && dur > 0 && ls.length > 0) {
-          setLineIdx(Math.min(ls.length - 1, Math.floor((cur / dur) * ls.length)));
+        const cum = cumCharsRef.current;
+        const total = totalCharsRef.current;
+        if (Number.isFinite(dur) && dur > 0 && ls.length > 0 && total > 0) {
+          const progressChars = (cur / dur) * total;
+          // Largest i such that cum[i] <= progressChars.
+          let idx = 0;
+          for (let i = 0; i < ls.length; i++) {
+            if (cum[i] <= progressChars) idx = i;
+            else break;
+          }
+          setLineIdx(idx);
         }
       };
       audio.onplay = () => {
