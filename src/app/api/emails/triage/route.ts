@@ -74,5 +74,7 @@ export const GET = withAuth(async (_req: NextRequest) => {
     else if (hour >= 11) latestSlot = 'Afternoon';
   }
 
-  return NextResponse.json({ date, latestSlot, summary, needResponse, otherEmails });
+  const lastRefreshedAt = latestCreatedAt > 0 ? new Date(latestCreatedAt).toISOString() : null;
+
+  return NextResponse.json({ date, latestSlot, lastRefreshedAt, summary, needResponse, otherEmails });
 });

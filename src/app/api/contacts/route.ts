@@ -32,5 +32,11 @@ export const GET = withAuth(async (req: NextRequest) => {
     synced_count: all.filter((c) => c.status === 'synced').length,
   };
 
-  return NextResponse.json({ contacts: all, summary });
+  const latestUpdated = all.reduce((max, c) => {
+    const t = c.updated_at ? new Date(c.updated_at).getTime() : 0;
+    return t > max ? t : max;
+  }, 0);
+  const lastRefreshedAt = latestUpdated > 0 ? new Date(latestUpdated).toISOString() : null;
+
+  return NextResponse.json({ contacts: all, summary, lastRefreshedAt });
 });

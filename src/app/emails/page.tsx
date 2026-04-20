@@ -45,6 +45,7 @@ interface TriageSummary {
 
 interface TriageData {
   date: string;
+  lastRefreshedAt: string | null;
   summary: TriageSummary;
   needResponse: TriageEmail[];
   otherEmails: OtherEmail[];
@@ -152,7 +153,10 @@ export default function EmailTriagePage() {
           <span>/</span>
           <span className="text-jarvis-text-primary">Email Triage</span>
           {data && (
-            <span className="ml-auto text-xs font-mono text-jarvis-text-dim">{data.date}</span>
+            <span className="ml-auto text-xs font-mono text-jarvis-text-dim">
+              {data.date}
+              {data.lastRefreshedAt && ` · Updated ${formatTime(data.lastRefreshedAt)} WIB`}
+            </span>
           )}
         </div>
 

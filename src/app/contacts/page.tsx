@@ -24,6 +24,17 @@ interface ContactsData {
     existing_count: number;
     synced_count: number;
   };
+  lastRefreshedAt: string | null;
+}
+
+function formatWibDateTime(iso: string): string {
+  const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+  const y = wib.getUTCFullYear();
+  const mo = String(wib.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(wib.getUTCDate()).padStart(2, '0');
+  const h = String(wib.getUTCHours()).padStart(2, '0');
+  const mi = String(wib.getUTCMinutes()).padStart(2, '0');
+  return `${y}-${mo}-${d} ${h}:${mi}`;
 }
 
 interface ScanResult {
@@ -242,6 +253,11 @@ export default function ContactsPage() {
           <div>
             <h1 className="text-lg font-semibold text-jarvis-text-primary">Contacts</h1>
             <p className="text-xs text-jarvis-text-muted">External contacts from calendar invites</p>
+            {data?.lastRefreshedAt && (
+              <p className="text-[11px] font-mono text-jarvis-text-dim mt-0.5">
+                Last refreshed {formatWibDateTime(data.lastRefreshedAt)} WIB
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <button
