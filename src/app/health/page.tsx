@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchAuth } from '@/lib/fetchAuth';
 import AppShell from '@/components/AppShell';
-import OkrCard, { type RidgelineObjective } from '@/components/health/OkrCard';
+import OkrCard from '@/components/health/OkrCard';
 import BloodWorkPanel from '@/components/health/BloodWorkPanel';
 import ManualEntryForm from '@/components/health/ManualEntryForm';
 import HealthInsights from '@/components/health/HealthInsights';
@@ -79,18 +79,6 @@ const HEADLINE_METRICS: Array<{ key: string; unit: string }> = [
   { key: 'vo2_max', unit: 'ml/kg/min' },
   { key: 'weight', unit: 'kg' },
 ];
-
-function synthHistory(currentPct: number | null): number[] {
-  if (currentPct == null || currentPct <= 0) return Array(14).fill(0);
-  const n = 14;
-  const out: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    const eased = 1 - Math.pow(1 - t, 2.2);
-    out.push(Math.round(currentPct * eased));
-  }
-  return out;
-}
 
 function toneFor(status: KrProgress['status']): string {
   switch (status) {
@@ -215,15 +203,6 @@ export default function HealthPage() {
     return picks;
   })();
 
-  const ridgelineObjectives: RidgelineObjective[] = okrData
-    ? okrData.objectives.map((o) => ({
-        name: o.label,
-        krs: o.key_results.length,
-        current: o.overall_pct ?? 0,
-        history: synthHistory(o.overall_pct),
-      }))
-    : [];
-
   return (
     <AppShell>
       <div className="max-w-5xl mx-auto w-full space-y-5">
@@ -323,11 +302,39 @@ export default function HealthPage() {
           </div>
         )}
 
-        {/* OKR Ridgeline */}
-        {ridgelineObjectives.length > 0 && <OkrCard objectives={ridgelineObjectives} />}
+        {/* OKR objective cards: O1–O4 */}
+        {okrData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {okrData.objectives
+              .filter((o) => o.objective !== 'O5')
+              .map((obj) => (
+                <OkrCard
+                  key={obj.objective}
+                  objective={obj.objective}
+                  label={obj.label}
+                  keyResults={obj.key_results}
+                  overallPct={obj.overall_pct}
+                />
+              ))}
+          </div>
+        )}
 
         {/* Blood-work panel */}
         <BloodWorkPanel entries={bloodWork} lastTestDate={lastBloodDate} />
+
+        {/* OKR objective card: O5 (Recovery) */}
+        {okrData &&
+          okrData.objectives
+            .filter((o) => o.objective === 'O5')
+            .map((obj) => (
+              <OkrCard
+                key={obj.objective}
+                objective={obj.objective}
+                label={obj.label}
+                keyResults={obj.key_results}
+                overallPct={obj.overall_pct}
+              />
+            ))}
 
         {/* AI Health Insights (narrative-annotation slot) */}
         <HealthInsights narrative={narrative} />
