@@ -40,7 +40,20 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 
 ### Follow-ups (same-version bugfixes, no bump)
 - `BriefingOverlay.tsx`: playback rewritten to mirror `TTSButton.tsx`'s robust pattern — fetch-as-blob for the stored Supabase Storage URL instead of binding it directly as `audio.src`, `playsinline` + `preload='auto'` + wait for `canplaythrough` (5s fallback), AbortController, 20s timeout, and Web Speech fallback if both stored-audio and `/api/tts` fail. Play button now shows a loading spinner while fetching/buffering. Fixes the "can't play the briefing" regression from the initial v3.0 ship.
-- `TopBar.tsx`, `Sidebar.tsx`: version chip is now visible in the UI again. TopBar renders a `v{VERSION.string}` pill next to the greeting; Sidebar appends it inline after the `JARVIS` wordmark (visible when expanded/pinned).
+- `TopBar.tsx`, `Sidebar.tsx`: version chip is now visible in the UI again. TopBar renders a `v{VERSION.display}` pill next to the greeting; Sidebar appends it inline after the `JARVIS` wordmark (visible when expanded/pinned).
+
+### Mobile polish (v3.0.1) — 2026-04-20
+- `AppShell`: mobile-aware sidebar drawer state + reduced gutter padding (`px-4 sm:px-6 md:px-8`).
+- `Sidebar`: below `md:` hides by default and slides in as a fixed 240px drawer with backdrop when `mobileOpen`. Labels force-visible during drawer mode; drawer auto-closes on route change.
+- `TopBar`: hamburger visible below `md:`, greeting date/time hides below `sm:`, ⌘K search collapses to icon-only below `md:`.
+- `/emails`: removed the hardcoded `400px 1fr` split. Mobile uses single-pane master-detail — list hides when a row is selected; detail shows a "Back to list" button. Dropped the auto-pick-first-row effect so the list is what loads on mobile.
+- `/utilities` cron log: stacks to a 2-line card layout below `md:` (Job + status, Last run · Duration). Desktop keeps the 4-column grid.
+- `/utilities` API usage table: hides Tokens in / Tokens out / Chars columns below `sm:`; keeps Service / Calls / Cost.
+- `BriefingOverlay`: padding reduced from `px-8 py-16` to `px-4 py-8 sm:px-8 sm:py-16`.
+- `/health` readiness hero: `text-[56px] sm:text-[72px]`, `p-5 sm:p-7`, `gap-5 md:gap-8`.
+- `/cardio-analysis` zone distribution: dropped fixed `60px 1fr 80px` inline columns; uses `grid-cols-[auto_1fr_auto]` so narrow labels don't crush the bar.
+- `VERSION.display` now consumed by the UI chips (was still reading `VERSION.string` pre-merge).
+- `package.json` bumped to `3.0.1` (full semver, per updated CLAUDE.md split — UI still displays `v3.0`).
 
 ## [2.4.48] — 2026-04-20
 

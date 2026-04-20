@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v3.0.1 mobile polish pass
+
+**Well:**
+- Triage-first kept scope honest. Spawned an Explore agent to grep inline grid styles, fixed-px widths, hardcoded font sizes; returned a prioritized top-10 with `file:line`. Worked from that list in one pass — no drift into speculative redesigns.
+- All responsive logic is pure Tailwind (`sm:`, `md:`, `hidden`, `md:flex`, etc.) — zero `window.innerWidth` or `matchMedia` in render paths, so no SSR / hydration flash. The triage agent originally suggested JS-gated layout; pushed back on that.
+- Master-detail pattern on `/emails` picked the simplest path: list visible when nothing selected, detail visible when selected, back button returns. Dropped the desktop auto-pick-first effect that was making mobile immediately show detail on load.
+
+**Wrong:**
+- Late conflict with a parallel session that shipped the version chip + `VERSION.display` to main while I was still in my worktree. Rebased cleanly but had to manually reconcile the `display` getter return format (chose "3.0" without "v" prefix, per main's version) and switch my call sites from `VERSION.string` to `VERSION.display`. If the CLAUDE.md versioning-split rule had been written *before* I started, the bump and call-site change would have been in my first commit.
+- Cron log mobile layout took two edits to get the grid-`contents` pattern right. First draft had duplicate duration rendering; cleaned up on the second pass.
+
+**Next:**
+- Run the actual app at 375px (not just code audit) and capture screenshots — the triage is structural, not visual. There will be residual issues (line-heights, gap tightness, badge overflow) that only show up in the rendered DOM.
+- Retire legacy v2 token aliases from `globals.css` (still a standing follow-up from the main migration).
+
+---
+
 ## 2026-04-20 — v3.0 "Atmosphere" migration (Streams 1 + 2 + 3)
 
 Single consolidated entry for the three-stream migration from v2 to v3.0 Atmosphere. Streams: (1) foundation + shell + dashboard, (2) health + cardio, (3) email + contacts + utilities. Versioning was collapsed to flat `3.0` post-merge at Filman's request — individual patch bumps (3.0.1 from Stream 3, 3.0.2 from Stream 2) were rolled back.
