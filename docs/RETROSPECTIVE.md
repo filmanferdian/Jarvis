@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v3.0.1 Atmosphere migration Stream 3 (Email / Contacts / Utilities)
+
+**Well:**
+- Ran as a parallel stream behind Stream 1's foundation. Polled `origin/main` every 30min and kicked off immediately when tokens + Mindmap + Space Grotesk landed. Disjoint-file design meant zero merge conflicts with Stream 1 and Wave 1 even across their restyle of Sidebar/TopBar/AppShell.
+- Tight scope discipline. Touched only `/emails`, `/contacts`, `/utilities`, `EmailCard`, and the new `EmailThread`. No API, Supabase, or auth. Build stayed clean.
+- Neon audit within scope came back empty on first try — routing all accents through ambient / cta / good / warn / danger tokens from the start avoided a clean-up pass.
+- Rebased once mid-ship when Stream 1 pushed Wave 1 shell. Clean rebase, no conflicts, version stayed at 3.0.1.
+
+**Wrong:**
+- Pre-rebase build passed, but `npm run build` after rebase caught a TypeScript narrowing bug in the contacts touch-history helper — TS inferred `bars` as `0[]` because every branch produced literal 0 or 1. Should have typed the array explicitly in the first draft.
+- Tone picker is cosmetic. Without a per-thread regenerate endpoint, "Direct / Warm / Brief" changes only local state. UI is faithful to the spec but the feature is a shell. Flagged to backlog.
+- "Send as-is" / "Edit draft" both deep-link to the provider drafts folder, not to the specific draft — we don't currently store a draft URL on the triage row. Acceptable for now but noted.
+
+**Next:**
+- Backlog item: `/api/emails/drafts/regenerate?tone=warm&triage_id=...` to wire the tone picker.
+- Backlog item: store the provider-side draft URL on `email_triage` rows so "Send as-is" / "Edit" can open the specific draft.
+- Final Atmosphere sweep (all three streams): one global neon-green grep and a mobile spot-check at 375px.
+
+---
+
 ## 2026-04-20 — v2.4.47 LTHR auto-sync for HR Zone 2 calculator
 
 **Well:**

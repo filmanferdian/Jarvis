@@ -4,6 +4,34 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-20 — Tone regeneration endpoint for email drafts
+
+**Context:** Stream 3 of the v3.0 Atmosphere migration shipped the tone-picker UI (Direct / Warm / Brief) in `EmailThread.tsx`, but the buttons only update local state — there is no server-side draft regeneration. Clicking a new tone does not produce a new draft.
+
+**Scope:**
+- New route `POST /api/emails/drafts/regenerate` accepting `{ triage_id, tone }`.
+- Pulls the original email row + current draft from `email_triage`, re-prompts Claude with the ghostwriting style guide + the tone adjective, and overwrites `draft_snippet` in place (same provider-side Outlook/Gmail draft updated via Graph/Gmail API).
+- Surface a loading state on the clicked tone chip and re-render the draft bubble on response.
+
+**Why defer:** Kept Stream 3 as a pure UI/visual ship — no API surface change.
+
+**Effort estimate:** ~1.5 hours (route + Claude prompt + provider draft update).
+
+---
+
+## 2026-04-20 — Store provider-side draft URL on email_triage rows
+
+**Context:** The v3.0 email thread's "Send as-is" and "Edit draft" buttons currently deep-link to the generic Gmail/Outlook drafts folder. The triage row doesn't carry the draft's provider URL, so we can't open the specific draft.
+
+**Scope:**
+- Migration: `supabase/migration-NNN-email-triage-draft-url.sql` adds a nullable `draft_url` column.
+- `src/lib/sync/emailTriage.ts` captures `webLink` (Graph) / draft ID (Gmail) during creation.
+- `/api/emails/triage` returns it; `EmailThread` uses it in place of the folder fallback.
+
+**Effort estimate:** ~45 min (migration + sync capture + thread link update).
+
+---
+
 ## 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
 
 **Context:** Deferred from the Jarvis 3.0 "Atmosphere" migration (Wave 2 §9). The new `HealthInsights` component has a narrative-annotation slot per spec §8.3 — each metric gets a Claude-written sentence (e.g. "Yesterday's threshold intervals hit harder than the plan called for — your average HR in Z5 was 12bpm above target. I've moved tomorrow's threshold session to Wednesday."). Wave 2 ships with the slot accepting a `narrative` prop; this item wires up the server-side generator.

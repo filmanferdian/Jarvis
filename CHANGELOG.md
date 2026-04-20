@@ -4,6 +4,17 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [3.0.1] — 2026-04-20
+
+### Changed
+- `/emails`, `/contacts`, `/utilities` rewritten to the v3.0 "Atmosphere" visual (Stream 3 of the migration). No API, Supabase, auth, or cron changes.
+- Email Triage now uses a 400px list + detail split-pane per app.html `.email-grid`. Tabs for Needs response / Other / Blocked; blocklist management lives in its own tab instead of a collapsible section.
+- New `src/components/EmailThread.tsx`: sender-grouped thread card with inline draft bubble, tone picker (Direct / Warm / Brief), and Send as-is / Edit draft actions that deep-link to the Gmail/Outlook drafts folder. Tone switching is cosmetic for now — flagged in backlog pending a regeneration endpoint.
+- `EmailCard` (dashboard) is now a compact "Needs response" preview grouped by sender, linking to `/emails`. Drops the synthesis-prose accordion.
+- `/contacts` is now a 2-col card grid with gradient avatars, a 12-week touch-history bar chart, and an italic ambient Jarvis suggestion line ("Last seen N days ago. Light follow-up may be timely."). Filter chips (All / Pending / In Notion / Ignored) replace the table-heavy layout.
+- `/utilities` rewritten to 2-col connector cards + a recent cron-run log table (sourced from the existing `/api/cron/status` endpoint). Status lights use semantic tokens (good / warn / danger) — no neon in this scope.
+- Neon-green audit within `emails/*`, `contacts/*`, `utilities/*`: 0 hits.
+
 ## [2.4.48] — 2026-04-20
 
 ### Added
