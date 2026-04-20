@@ -275,7 +275,7 @@ export default function UtilitiesPage() {
             </h2>
             <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-hidden">
               <div
-                className="grid gap-3 px-4 py-3 text-[10px] uppercase text-jarvis-text-faint"
+                className="hidden md:grid gap-3 px-4 py-3 text-[10px] uppercase text-jarvis-text-faint"
                 style={{
                   gridTemplateColumns: '1fr 120px 90px 90px',
                   fontFamily: 'var(--font-mono)',
@@ -298,16 +298,24 @@ export default function UtilitiesPage() {
                 return (
                   <div
                     key={row.name}
-                    className="grid gap-3 px-4 py-2.5 border-t border-jarvis-border text-[11.5px] text-jarvis-text-dim"
-                    style={{
-                      gridTemplateColumns: '1fr 120px 90px 90px',
-                      fontFamily: 'var(--font-mono)',
-                    }}
+                    className="px-4 py-3 border-t border-jarvis-border text-[11.5px] text-jarvis-text-dim md:grid md:gap-3 md:py-2.5 md:[grid-template-columns:1fr_120px_90px_90px]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
                   >
-                    <span className="truncate text-jarvis-text-primary">{row.name}</span>
-                    <span>{formatWibDateTime(row.lastRun)}</span>
-                    <span>{row.durationMs != null ? `${row.durationMs}ms` : '—'}</span>
-                    <span style={{ color: statusColor }} className="capitalize">
+                    {/* Job + (mobile) status inline */}
+                    <div className="flex items-center justify-between gap-2 md:block">
+                      <span className="truncate text-jarvis-text-primary">{row.name}</span>
+                      <span style={{ color: statusColor }} className="capitalize md:hidden shrink-0">
+                        {row.status}
+                      </span>
+                    </div>
+                    {/* Last run · Duration — stacked on mobile, own grid cells on desktop */}
+                    <div className="flex items-center gap-2 mt-1 text-jarvis-text-faint md:mt-0 md:contents md:text-jarvis-text-dim">
+                      <span>{formatWibDateTime(row.lastRun)}</span>
+                      <span className="md:hidden">·</span>
+                      <span>{row.durationMs != null ? `${row.durationMs}ms` : '—'}</span>
+                    </div>
+                    {/* Status — desktop column 4 */}
+                    <span style={{ color: statusColor }} className="capitalize hidden md:inline">
                       {row.status}
                     </span>
                   </div>
@@ -332,9 +340,9 @@ export default function UtilitiesPage() {
                     <tr className="text-jarvis-text-faint border-b border-jarvis-border">
                       <th className="text-left py-2 font-normal">Service</th>
                       <th className="text-right py-2 font-normal">Calls</th>
-                      <th className="text-right py-2 font-normal">Tokens in</th>
-                      <th className="text-right py-2 font-normal">Tokens out</th>
-                      <th className="text-right py-2 font-normal">Chars</th>
+                      <th className="text-right py-2 font-normal hidden sm:table-cell">Tokens in</th>
+                      <th className="text-right py-2 font-normal hidden sm:table-cell">Tokens out</th>
+                      <th className="text-right py-2 font-normal hidden sm:table-cell">Chars</th>
                       <th className="text-right py-2 font-normal">Cost</th>
                     </tr>
                   </thead>
@@ -347,13 +355,13 @@ export default function UtilitiesPage() {
                           <td className="py-2 text-right font-mono text-jarvis-text-primary">
                             {row.calls.toLocaleString()}
                           </td>
-                          <td className="py-2 text-right font-mono text-jarvis-text-dim">
+                          <td className="py-2 text-right font-mono text-jarvis-text-dim hidden sm:table-cell">
                             {row.tokens_input > 0 ? row.tokens_input.toLocaleString() : '—'}
                           </td>
-                          <td className="py-2 text-right font-mono text-jarvis-text-dim">
+                          <td className="py-2 text-right font-mono text-jarvis-text-dim hidden sm:table-cell">
                             {row.tokens_output > 0 ? row.tokens_output.toLocaleString() : '—'}
                           </td>
-                          <td className="py-2 text-right font-mono text-jarvis-text-dim">
+                          <td className="py-2 text-right font-mono text-jarvis-text-dim hidden sm:table-cell">
                             {row.characters > 0 ? row.characters.toLocaleString() : '—'}
                           </td>
                           <td className="py-2 text-right font-mono text-jarvis-text-primary">

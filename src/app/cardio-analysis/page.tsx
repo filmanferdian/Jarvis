@@ -363,8 +363,7 @@ export default function CardioAnalysisPage() {
               {zoneDistribution.map((z) => (
                 <div
                   key={z.key}
-                  className="grid items-center gap-3 text-[12.5px]"
-                  style={{ gridTemplateColumns: '60px 1fr 80px' }}
+                  className="grid items-center gap-2 sm:gap-3 text-[12.5px] grid-cols-[auto_1fr_auto]"
                 >
                   <span className="font-mono text-[10.5px] text-jarvis-text-dim">
                     {z.label} · {z.short}

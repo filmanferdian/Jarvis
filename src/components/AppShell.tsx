@@ -14,6 +14,7 @@ interface AppShellProps {
 export default function AppShell({ children }: AppShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteVoice, setPaletteVoice] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const openPalette = useCallback((options?: { voice?: boolean }) => {
     setPaletteVoice(!!options?.voice);
@@ -40,10 +41,13 @@ export default function AppShell({ children }: AppShellProps) {
     <AuthGate>
       <SpeakingProvider>
         <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <TopBar onOpenPalette={openPalette} />
-            <main className="flex-1 overflow-y-auto px-8 py-7 pb-20 bg-jarvis-bg">
+          <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+            <TopBar
+              onOpenPalette={openPalette}
+              onToggleSidebar={() => setSidebarOpen((v) => !v)}
+            />
+            <main className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-5 md:py-7 pb-20 bg-jarvis-bg">
               <div className="max-w-[1400px] mx-auto">
                 {children}
               </div>

@@ -78,7 +78,12 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
 
 const PIN_KEY = 'jarvis.sidebar.pinned';
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [pinned, setPinned] = useState(false);
 
@@ -89,6 +94,12 @@ export default function Sidebar() {
       // no-op
     }
   }, []);
+
+  // Close mobile drawer on route change.
+  useEffect(() => {
+    if (mobileOpen && onClose) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const togglePin = () => {
     setPinned((prev) => {
@@ -102,13 +113,27 @@ export default function Sidebar() {
     });
   };
 
+  // Mobile: drawer is expanded (240px) when open; otherwise not rendered inline.
+  // Desktop (md+): existing 72px → 240px hover-or-pin behavior.
+  const desktopWidth = pinned ? 'md:w-[240px]' : 'md:w-[72px] md:hover:w-[240px]';
+  const mobileVisibility = mobileOpen
+    ? 'fixed inset-y-0 left-0 w-[240px] shadow-lg md:shadow-none md:static'
+    : 'hidden md:flex';
+
   return (
-    <aside
-      className={`group/sidebar relative flex flex-col gap-2 overflow-hidden border-r border-jarvis-border bg-jarvis-bg-card px-3.5 py-5 transition-[width] duration-400 ease-[cubic-bezier(.25,.46,.45,.94)] z-10 ${
-        pinned ? 'w-[240px]' : 'w-[72px] hover:w-[240px]'
-      }`}
-      aria-expanded={pinned}
-    >
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-20 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`group/sidebar flex flex-col gap-2 overflow-hidden border-r border-jarvis-border bg-jarvis-bg-card px-3.5 py-5 transition-[width] duration-400 ease-[cubic-bezier(.25,.46,.45,.94)] z-30 ${mobileVisibility} ${desktopWidth}`}
+        aria-expanded={pinned || mobileOpen}
+      >
       {/* Brand */}
       <div className="flex items-center gap-3 px-1 mb-5 min-w-[200px]">
         <div className="relative w-10 h-10 rounded-[11px] flex-shrink-0 overflow-hidden"
@@ -134,12 +159,12 @@ export default function Sidebar() {
         </div>
         <span
           className={`flex items-baseline gap-2 font-[family-name:var(--font-display)] font-semibold text-[18px] tracking-[-0.02em] text-jarvis-text-primary transition-opacity duration-300 ${
-            pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
+            pinned || mobileOpen ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
           }`}
         >
           JARVIS
           <span className="font-[family-name:var(--font-mono)] font-normal text-[10px] tracking-[0.1em] text-jarvis-text-faint">
-            v{VERSION.string}
+            v{VERSION.display}
           </span>
         </span>
       </div>
@@ -162,7 +187,7 @@ export default function Sidebar() {
               <span className="w-5 h-5 flex-shrink-0">{item.icon}</span>
               <span
                 className={`min-w-[160px] transition-opacity duration-300 ${
-                  pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
+                  pinned || mobileOpen ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
                 }`}
               >
                 {item.label}
@@ -184,12 +209,13 @@ export default function Sidebar() {
         </svg>
         <span
           className={`transition-opacity duration-300 ${
-            pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
+            pinned || mobileOpen ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
           }`}
         >
           {pinned ? 'Unpin sidebar' : 'Pin sidebar'}
         </span>
       </button>
-    </aside>
+      </aside>
+    </>
   );
 }

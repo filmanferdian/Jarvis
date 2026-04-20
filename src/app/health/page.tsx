@@ -236,7 +236,7 @@ export default function HealthPage() {
 
         {/* Narrative-hero */}
         <div
-          className="rounded-[14px] border p-7 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8 items-center"
+          className="rounded-[14px] border p-5 sm:p-7 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5 md:gap-8 items-center"
           style={{
             background: 'var(--color-jarvis-bg-card)',
             borderColor: 'var(--color-jarvis-border)',
@@ -244,7 +244,7 @@ export default function HealthPage() {
         >
           <div>
             <div className="font-[family-name:var(--font-display)] font-medium leading-none tracking-[-0.02em]">
-              <span className="text-[72px] text-jarvis-text-primary">{totalScore ?? '—'}</span>
+              <span className="text-[56px] sm:text-[72px] text-jarvis-text-primary">{totalScore ?? '—'}</span>
               <span className="text-[16px] text-jarvis-text-faint ml-1">/100</span>
             </div>
             <p className="mt-2 font-mono text-[11px] text-jarvis-text-dim uppercase tracking-[0.15em]">
