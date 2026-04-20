@@ -23,6 +23,23 @@ Small wrap-up session catching three post-release issues after the main v3.0 con
 
 ---
 
+## 2026-04-20 — v3.0.4 shared briefing text lib + server-side voiceover sanitize
+
+**Well:**
+- Clean backlog-to-ship path. Two related follow-ups from the v3.0.2 retro ("extract shared helpers" + "sanitize server-side") shipped as one coherent patch instead of two small ones — the shared helper is what makes the server-side sanitize a one-line call. Kept scope discipline: exactly the two backlog entries, nothing bolt-on.
+- Defense in depth without over-engineering. Server-side sanitize runs at write time; client-side sanitize stays at read time. Historical `briefing_cache` rows continue to render cleanly, and fresh rows also save ElevenLabs characters by not feeding it markers in the first place.
+- Prompt tightening matched the sanitize rules one-for-one ("no `**bold**`, no bullets, no `[SECTION]` markers") so the sanitizer should rarely have to strip anything from a well-behaved run — it's the belt that catches the suspenders slipping.
+
+**Wrong:**
+- Parallel session landed v3.0.3 (dashboard email synthesis restore) while I was in my worktree, causing a `package.json` conflict at rebase. Third time this week — clearly the default pattern when multiple sessions touch `package.json`. The new CLAUDE.md "two-phase rule" codifies what to bump to (now 3.0.x patches during this phase), but the conflict itself is still mechanical churn.
+- `briefingPreview()` retains a slightly different rule than `sanitizeBriefing` + `splitBriefingLines` (it preserves short paragraphs, keeps the first paragraph whether or not it has sentence punctuation). That's correct — the hero's 200-char preview shouldn't filter out "No briefing yet." — but the asymmetry deserves a comment in `briefingText.ts` if it ever confuses someone. Added to the file but not flagged as a follow-up.
+
+**Next:**
+- When a new session starts and `package.json` is "close to" another session's version, stash the bump until just before commit. Reduces rebase surface.
+- The sanitize + split helpers are now easy to unit-test — no test framework configured on this repo, so flagging as a "when we add tests" starting point rather than a blocker.
+
+---
+
 ## 2026-04-20 — v3.0.2 briefing overlay readability + preload
 
 **Well:**

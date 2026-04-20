@@ -4,34 +4,6 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-20 — Sanitize briefing voiceover server-side
-
-**Context:** v3.0.2 added client-side markdown stripping in `BriefingOverlay` (via a new `sanitizeForSpeech` helper) because the Claude-generated voiceover was leaking `**bold**` markers, `## headings`, and `1.` list labels into what the user saw on screen. The fix works, but the client should not have to do this — the voiceover is also fed to ElevenLabs TTS where these markers briefly get read aloud.
-
-**Scope:**
-- Update the briefing-regenerate prompt in `src/app/api/briefing/regenerate/route.ts` to produce voiceover as plain prose: no markdown, no numbered/bulleted lists, no short label-only paragraphs like "Calendar Overview".
-- Keep the written `briefing` path as-is (markdown is valid there — `renderMarkdown.ts` handles it).
-- Optionally move `sanitizeForSpeech` into `src/lib/briefingText.ts` and apply it server-side as a belt-and-suspenders before storing voiceover + generating audio.
-
-**Why defer:** The client-side fix is sufficient for the user-visible bug. Server-side cleanup is a separate ship that also saves ElevenLabs characters.
-
-**Effort estimate:** ~45 minutes (prompt tweak + one test regen + verify TTS audio).
-
----
-
-## 2026-04-20 — Share briefing text utilities between Hero and Overlay
-
-**Context:** `BriefingHero.tsx` has a `getPreview()` helper and `BriefingOverlay.tsx` has `sanitizeForSpeech()` + `splitLines()`. Both strip markdown; both skip heading-only paragraphs. Duplicated logic with slightly different rules — a legitimate short sentence could get dropped in one place and kept in another.
-
-**Scope:**
-- Extract to `src/lib/briefingText.ts` exporting `sanitizeBriefing(text)`, `previewLine(text)`, `splitLines(text)`.
-- Update `BriefingHero.tsx` + `BriefingOverlay.tsx` to import.
-- Unit test or manual regression: "Morning briefing is ready." preview, overlay subtitle, scrubber line-tracking still work.
-
-**Effort estimate:** ~20 minutes.
-
----
-
 ## 2026-04-20 — Tone regeneration endpoint for email drafts
 
 **Context:** Stream 3 of the v3.0 Atmosphere migration shipped the tone-picker UI (Direct / Warm / Brief) in `EmailThread.tsx`, but the buttons only update local state — there is no server-side draft regeneration. Clicking a new tone does not produce a new draft.
