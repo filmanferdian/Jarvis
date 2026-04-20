@@ -4,6 +4,24 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
+
+**Context:** Deferred from the Jarvis 3.0 "Atmosphere" migration (Wave 2 §9). The new `HealthInsights` component has a narrative-annotation slot per spec §8.3 — each metric gets a Claude-written sentence (e.g. "Yesterday's threshold intervals hit harder than the plan called for — your average HR in Z5 was 12bpm above target. I've moved tomorrow's threshold session to Wednesday."). Wave 2 ships with the slot accepting a `narrative` prop; this item wires up the server-side generator.
+
+**Scope:**
+- New route `src/app/api/health/narrate/route.ts` wrapped with `withCronAuth`.
+- Pulls: readiness, HRV, sleep debt, training load, most recent workout summary from Supabase.
+- Claude prompt synthesises 1–2 sentence narrative per metric in spec §10 voice (British butler, no emoji, no exclamation).
+- Cache in Supabase `health_narratives` table (new migration) keyed by date + metric.
+- Hooked into cron-job.org at 06:00 WIB daily, post-Garmin sync.
+- `HealthInsights` fetches latest narrative row for today on render.
+
+**Why defer:** Keeps the 3.0 migration UI-only. API + migration + cron job is a separate, verifiable ship.
+
+**Effort estimate:** ~2 hours (route + migration + cron wiring + prompt tuning).
+
+---
+
 ## 2026-04-19 — Migrate legacy `health_measurements.measurement_type` rows to canonical names
 
 **Context:** `health_measurements` has historical rows under old names (`dead_hang`, `ohs_major_compensations`) from before the POST endpoint's `VALID_TYPES` was renamed to `dead_hang_seconds` / `overhead_squat_compensations`. v2.4.46 works around this with a canonicalization layer in `/api/health-fitness/okr`, but the DB still carries drift.
