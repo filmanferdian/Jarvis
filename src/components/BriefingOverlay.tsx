@@ -19,6 +19,24 @@ type Props = {
   onClose: () => void;
 };
 
+// Strip common markdown markers before we render prose or feed it to splitLines.
+// Keeps the sentence text intact; drops heading-only and list-marker-only lines.
+function sanitizeForSpeech(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => line
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+      .replace(/\*([^*]+)\*/g, '$1') // italic
+      .replace(/^#{1,6}\s+/, '') // heading prefix
+      .replace(/^\s*[-•]\s+/, '') // bullet marker
+      .replace(/^\s*\d+\.\s+/, '') // numbered marker
+      .trim())
+    .filter((line) => line.length > 0)
+    // Drop lines that are effectively just a label (2–4 words, no sentence punctuation)
+    .filter((line) => !(line.split(/\s+/).length <= 4 && !/[.!?]/.test(line)))
+    .join('\n');
+}
+
 function splitLines(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -34,7 +52,7 @@ function isIOS(): boolean {
   );
 }
 
-type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'error';
+type PlaybackStatus = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'error';
 
 export default function BriefingOverlay({ open, data, onClose }: Props) {
   const { setSpeaking, registerStopFn } = useSpeaking();
@@ -50,13 +68,13 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const linesRef = useRef<string[]>([]);
 
-  const lines = useMemo(
-    () => splitLines(data?.voiceover ?? data?.briefing ?? ''),
-    [data?.voiceover, data?.briefing]
-  );
+  const lines = useMemo(() => {
+    const source = data?.voiceover ?? data?.briefing ?? '';
+    return splitLines(sanitizeForSpeech(source));
+  }, [data?.voiceover, data?.briefing]);
   linesRef.current = lines;
 
-  const stop = useCallback(() => {
+  const teardownAudio = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     if (timeoutRef.current) {
@@ -80,9 +98,16 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
     if (typeof window !== 'undefined') {
       window.speechSynthesis?.cancel();
     }
+  }, []);
+
+  const stop = useCallback(() => {
+    teardownAudio();
     setStatus('idle');
+    setProgress(0);
+    setDuration(0);
+    setLineIdx(0);
     setSpeaking(false);
-  }, [setSpeaking]);
+  }, [teardownAudio, setSpeaking]);
 
   useEffect(() => {
     registerStopFn(stop);
@@ -103,155 +128,183 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
     };
   }, [stop]);
 
-  const fallbackToWebSpeech = (text: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setStatus('error');
-      setErrorMsg('Audio playback unavailable in this browser.');
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onend = () => { setStatus('idle'); setSpeaking(false); };
-    utterance.onerror = () => { setStatus('idle'); setSpeaking(false); };
-    window.speechSynthesis.speak(utterance);
-    setStatus('playing');
-    setSpeaking(true);
-  };
+  const attachAudioElement = useCallback(
+    (blob: Blob) => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
 
-  const playAudioBlob = async (blob: Blob) => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(blob);
-    objectUrlRef.current = url;
+      const audio = new Audio();
+      audio.setAttribute('playsinline', 'true');
+      audio.preload = 'auto';
+      audioRef.current = audio;
 
-    const audio = new Audio();
-    audio.setAttribute('playsinline', 'true');
-    audio.preload = 'auto';
-    audioRef.current = audio;
+      audio.onloadedmetadata = () => {
+        if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+      };
+      audio.ontimeupdate = () => {
+        const cur = audio.currentTime || 0;
+        setProgress(cur);
+        const dur = audio.duration;
+        const ls = linesRef.current;
+        if (Number.isFinite(dur) && dur > 0 && ls.length > 0) {
+          setLineIdx(Math.min(ls.length - 1, Math.floor((cur / dur) * ls.length)));
+        }
+      };
+      audio.onplay = () => {
+        setStatus('playing');
+        setSpeaking(true);
+      };
+      audio.onpause = () => {
+        if (!audio.ended) {
+          setStatus('paused');
+          setSpeaking(false);
+        }
+      };
+      audio.onended = () => {
+        setStatus('paused');
+        setSpeaking(false);
+      };
 
-    audio.onloadedmetadata = () => {
-      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
-    };
-    audio.ontimeupdate = () => {
-      const cur = audio.currentTime || 0;
-      setProgress(cur);
-      const dur = audio.duration;
-      const ls = linesRef.current;
-      if (Number.isFinite(dur) && dur > 0 && ls.length > 0) {
-        setLineIdx(Math.min(ls.length - 1, Math.floor((cur / dur) * ls.length)));
-      }
-    };
-    audio.onended = () => { setStatus('idle'); setSpeaking(false); };
+      audio.src = url;
+      return audio;
+    },
+    [setSpeaking],
+  );
 
-    audio.src = url;
-
-    await new Promise<void>((resolve, reject) => {
-      audio.oncanplaythrough = () => resolve();
-      audio.onerror = () => reject(new Error('Audio load failed'));
-      setTimeout(resolve, 5000);
+  const waitForReady = (audio: HTMLAudioElement) =>
+    new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve();
+      };
+      audio.oncanplaythrough = finish;
+      audio.oncanplay = finish;
+      audio.onerror = finish;
+      setTimeout(finish, 5000);
     });
 
-    await audio.play();
-    setStatus('playing');
-    setSpeaking(true);
-  };
+  const loadFromStoredUrl = useCallback(
+    async (url: string, controller: AbortController) => {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Stored audio fetch failed: ${res.status}`);
+      const blob = await res.blob();
+      const audio = attachAudioElement(blob);
+      await waitForReady(audio);
+    },
+    [attachAudioElement],
+  );
 
-  const playStoredAudio = async (url: string, controller: AbortController) => {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`Stored audio fetch failed: ${res.status}`);
-    const blob = await res.blob();
-    await playAudioBlob(blob);
-  };
+  const loadFromTTS = useCallback(
+    async (text: string, controller: AbortController) => {
+      const endpoint = isIOS() ? '/api/tts' : '/api/tts?stream=true';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
+      const blob = await res.blob();
+      const audio = attachAudioElement(blob);
+      await waitForReady(audio);
+    },
+    [attachAudioElement],
+  );
 
-  const playStreaming = async (text: string, controller: AbortController) => {
-    const res = await fetch('/api/tts?stream=true', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ text }),
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
-    if (!res.body) throw new Error('No response body for streaming');
-    const reader = res.body.getReader();
-    const chunks: ArrayBuffer[] = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value.buffer as ArrayBuffer);
-    }
-    const blob = new Blob(chunks, { type: 'audio/mpeg' });
-    await playAudioBlob(blob);
-  };
-
-  const playBlob = async (text: string, controller: AbortController) => {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ text }),
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`TTS API error: ${res.status}`);
-    const blob = await res.blob();
-    await playAudioBlob(blob);
-  };
-
-  const play = async () => {
-    if (!data) return;
+  // Preload audio whenever the overlay opens with data. Play button just hits
+  // audio.play() afterwards — no fetch latency on the first tap, and the scrubber
+  // can seek freely once the blob is in memory.
+  useEffect(() => {
+    if (!open || !data) return;
     const text = data.voiceover || data.briefing;
     if (!text) return;
 
-    setStatus('loading');
-    setErrorMsg(null);
+    let cancelled = false;
     const controller = new AbortController();
     abortRef.current = controller;
 
+    setStatus('loading');
+    setErrorMsg(null);
+
     timeoutRef.current = setTimeout(() => {
-      if (abortRef.current === controller) {
+      if (!cancelled && abortRef.current === controller) {
         controller.abort();
-        fallbackToWebSpeech(text);
+        setStatus('error');
+        setErrorMsg('Audio load timed out.');
       }
     }, 20000);
 
-    try {
-      if (data.audioUrl) {
-        try {
-          await playStoredAudio(data.audioUrl, controller);
-          return;
-        } catch (storedErr) {
-          if (controller.signal.aborted) return;
-          console.warn('[Briefing] Stored audio failed, falling back to live TTS:', storedErr);
+    (async () => {
+      try {
+        if (data.audioUrl) {
+          try {
+            await loadFromStoredUrl(data.audioUrl, controller);
+            if (!cancelled) setStatus('ready');
+            return;
+          } catch (storedErr) {
+            if (controller.signal.aborted) return;
+            console.warn('[Briefing] Stored audio failed, falling back to live TTS:', storedErr);
+          }
+        }
+        await loadFromTTS(text, controller);
+        if (!cancelled) setStatus('ready');
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.warn('[Briefing] Audio load failed:', err);
+        if (!cancelled) {
+          setStatus('error');
+          setErrorMsg('Audio unavailable. Try regenerating the briefing.');
+        }
+      } finally {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
         }
       }
+    })();
 
-      if (isIOS()) {
-        await playBlob(text, controller);
-      } else {
-        await playStreaming(text, controller);
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      console.warn('[Briefing] TTS failed, falling back to Web Speech:', err);
-      fallbackToWebSpeech(text);
-    } finally {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+    return () => {
+      cancelled = true;
+      controller.abort();
+      teardownAudio();
+      setStatus('idle');
+      setProgress(0);
+      setDuration(0);
+      setLineIdx(0);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, data?.audioUrl, data?.voiceover, data?.briefing]);
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (status === 'playing') {
+      audio.pause();
+    } else {
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn('[Briefing] Play failed:', err);
       }
     }
   };
 
-  const jumpToLine = (idx: number) => {
-    setLineIdx(idx);
-    if (audioRef.current && duration > 0 && lines.length > 0) {
-      audioRef.current.currentTime = (idx / lines.length) * duration;
-    }
+  const seek = (pct: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    const clamped = Math.max(0, Math.min(1, pct));
+    audio.currentTime = clamped * audio.duration;
+    setProgress(audio.currentTime);
   };
 
   if (!open) return null;
 
   const current = lines[lineIdx] ?? '';
-  const past = lines.slice(Math.max(0, lineIdx - 2), lineIdx);
-  const upcoming = lines.slice(lineIdx + 1, lineIdx + 3);
+  const preview = lines[lineIdx + 1] ?? '';
   const fmt = (s: number) => {
     if (!Number.isFinite(s)) return '00:00';
     const m = Math.floor(s / 60);
@@ -261,6 +314,7 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
 
   const isPlaying = status === 'playing';
   const isLoading = status === 'loading';
+  const canInteract = status === 'ready' || status === 'playing' || status === 'paused';
 
   return (
     <div
@@ -281,41 +335,35 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
         </svg>
       </button>
 
-      <div className="px-4 py-8 sm:px-8 sm:py-16 flex flex-col items-center gap-5 sm:gap-7 min-h-full">
-        <div className="w-[min(560px,90vw)] aspect-square relative">
+      <div className="px-4 py-8 sm:px-8 sm:py-16 flex flex-col items-center gap-6 sm:gap-8 min-h-full">
+        {/* Subtitle — current line with a muted next-line preview underneath */}
+        <div className="w-full max-w-[780px] text-center px-5 min-h-[9rem] sm:min-h-[11rem] flex flex-col justify-end">
+          <p className="font-[family-name:var(--font-display)] text-[26px] sm:text-[32px] leading-[1.3] tracking-[-0.015em] text-jarvis-text-primary font-medium">
+            {current || (isLoading ? 'Loading briefing…' : lines.length === 0 ? 'No briefing content.' : '—')}
+          </p>
+          {preview && (
+            <p className="mt-3 font-[family-name:var(--font-display)] text-[16px] sm:text-[18px] leading-[1.45] text-jarvis-text-faint">
+              {preview}
+            </p>
+          )}
+        </div>
+
+        <div className="w-[min(480px,80vw)] aspect-square relative">
           <Mindmap
-            size={560}
+            size={480}
             state={isPlaying ? 'speaking' : isLoading ? 'thinking' : 'idle'}
             density="dense"
             className="rounded-3xl w-full h-full"
           />
         </div>
 
-        <div className="w-full max-w-[720px] text-center px-5 py-4">
-          {past.map((line, i) => (
-            <p key={`p-${i}`} className="font-[family-name:var(--font-display)] text-[14px] my-2 text-jarvis-text-faint">
-              {line}
-            </p>
-          ))}
-          <p className="font-[family-name:var(--font-display)] text-[22px] font-medium my-3 leading-[1.35] tracking-[-0.01em] text-jarvis-text-primary">
-            {current || '—'}
-          </p>
-          {upcoming.map((line, i) => (
-            <p key={`u-${i}`} className="font-[family-name:var(--font-display)] text-[14px] my-2 text-jarvis-text-dim">
-              {line}
-            </p>
-          ))}
-        </div>
-
         <div className="w-full max-w-[720px] flex items-center gap-4 px-5 py-3.5 bg-jarvis-bg-card border border-jarvis-border rounded-2xl">
           <button
             type="button"
-            onClick={isPlaying || isLoading ? stop : play}
-            disabled={!data?.briefing}
+            onClick={togglePlay}
+            disabled={!canInteract}
             className="w-11 h-11 rounded-full bg-jarvis-cta text-white flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(37,99,235,0.4)] hover:bg-jarvis-cta-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label={
-              isLoading ? 'Loading briefing audio' : isPlaying ? 'Pause briefing' : 'Play briefing'
-            }
+            aria-label={isLoading ? 'Loading briefing audio' : isPlaying ? 'Pause briefing' : 'Play briefing'}
           >
             {isLoading ? (
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -333,13 +381,21 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
               </svg>
             )}
           </button>
-          <div className="flex-1 h-1 bg-jarvis-track rounded-full relative">
-            <div
-              className="h-full bg-jarvis-ambient rounded-full transition-[width] duration-150"
-              style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }}
-            />
-          </div>
-          <span className="font-[family-name:var(--font-mono)] text-[11px] text-jarvis-text-dim">
+
+          {/* Seekable scrubber */}
+          <input
+            type="range"
+            min={0}
+            max={1000}
+            step={1}
+            value={duration > 0 ? Math.round((progress / duration) * 1000) : 0}
+            onChange={(e) => seek(Number(e.target.value) / 1000)}
+            disabled={!canInteract || duration <= 0}
+            aria-label="Seek"
+            className="flex-1 h-1 accent-jarvis-ambient cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          />
+
+          <span className="font-[family-name:var(--font-mono)] text-[11px] text-jarvis-text-dim tabular-nums">
             {fmt(progress)} / {fmt(duration)}
           </span>
         </div>
@@ -347,28 +403,6 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
         {status === 'error' && errorMsg && (
           <div className="max-w-[720px] text-[12px] text-jarvis-danger font-[family-name:var(--font-mono)]">
             {errorMsg}
-          </div>
-        )}
-
-        {lines.length > 0 && (
-          <div className="w-full max-w-[720px] flex flex-col gap-1">
-            {lines.map((line, i) => (
-              <button
-                key={`c-${i}`}
-                type="button"
-                onClick={() => jumpToLine(i)}
-                className={`grid grid-cols-[48px_1fr_auto] gap-2.5 items-center px-3 py-2.5 rounded-[10px] text-[13px] text-left transition-colors ${
-                  i === lineIdx
-                    ? 'bg-jarvis-ambient-soft text-jarvis-ambient'
-                    : 'text-jarvis-text-dim hover:bg-jarvis-bg-deep'
-                }`}
-              >
-                <span className={`font-[family-name:var(--font-mono)] text-[11px] ${i === lineIdx ? 'text-jarvis-ambient' : 'text-jarvis-text-faint'}`}>
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="truncate">{line}</span>
-              </button>
-            ))}
           </div>
         )}
       </div>
