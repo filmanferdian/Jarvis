@@ -62,7 +62,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use semver: `major.minor.patch` (e.g., `2.4.39`). Bump patch for every runtime-affecting deploy.
 - Include the version bump in the same commit or as a separate `chore: bump version to vX.Y.Z` commit.
 - **Codebase vs. front-end split:** `package.json` uses full semver (`3.0.1`, `3.0.2`…). UI surfaces must display major.minor only (`v3.0`) — use `VERSION.display` from `src/lib/version.ts`, never `VERSION.string`. The v3.0 "Atmosphere" release is one product label; patch bumps are internal.
-- **v3 two-phase rule (2026-04-20 onward):** Phase 1 — while multiple parallel sessions are still landing v3.0 follow-ups, bump patch on every ship (`3.0.1`, `3.0.2`, `3.0.3`, …). Applies to `/ship-stream` in this project too (override its default "don't bump"). Phase 2 — once parallel-stream work settles, switch to minor-only bumps (`3.1`, `3.2`, …) for continuous ship. Transition signal: a new `## [3.1]` section appears in CHANGELOG. If unsure which phase, ask before the first bump of a new session.
+- **Tool-keyed bump rule (2026-04-20 onward):** `/ship-stream` bumps the patch (third number) — `3.0.3` → `3.0.4`. `/ship` bumps the minor (second number) — `3.0.x` → `3.1.0`. This overrides `/ship-stream`'s built-in "do NOT bump" instruction for this project. Every ship writes a CHANGELOG entry: patch bumps nest under the current `## [3.x]` header as a `### Title (v3.x.y)` subsection; minor bumps open a new `## [3.x]` section.
 
 ## Branch Discipline
 - Railway deploys from `main`. Never point it at a worktree branch.
