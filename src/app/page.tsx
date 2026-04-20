@@ -23,13 +23,13 @@ export default function Dashboard() {
 
   return (
     <AppShell>
-      <BriefingHero />
-      <KpiRow />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-        <ScheduleStrip />
-        <TasksCard />
-      </div>
-      <div className="mt-5 space-y-5">
+      <div className="space-y-5">
+        <BriefingHero />
+        <KpiRow />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <ScheduleStrip />
+          <TasksCard />
+        </div>
         <EmailCard />
         <NewsCard />
         <FitnessCard />
