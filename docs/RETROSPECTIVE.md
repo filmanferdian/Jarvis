@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v3.0 post-release wrap (briefing preview, dashboard rhythm, versioning split)
+
+Small wrap-up session catching three post-release issues after the main v3.0 consolidation and v3.0.1 mobile polish had landed.
+
+**Well:**
+- **Surfaced the versioning decision as documentation, not convention.** Filman said "3.0 on front-end, 3.0.x in codebase." Captured it in CLAUDE.md Versioning Discipline, added `VERSION.display` to `src/lib/version.ts`, and verified every UI surface binds to `.display` — two chips (TopBar, Sidebar) briefly were still on `.string` after a parallel session landed them first; caught on the audit pass.
+- **Markdown-leak fix stayed 5 lines.** Inline `getPreview()` in `BriefingHero.tsx` instead of reaching for `src/lib/renderMarkdown.ts` (which renders HTML via `dangerouslySetInnerHTML` — heavier than a single-line subtitle warrants). One regex to skip heading-only paragraphs, one regex to strip inline bold.
+- **Dashboard spacing ticket was bigger than the screenshot suggested.** The hero/KpiRow fused because only the downstream blocks had `mt-5` wrappers. Collapsed three separate spacing mechanisms into one `space-y-5` root stack — simpler and consistent.
+
+**Wrong:**
+- **Parallel ship raced me twice.** While I had the fix worktree open, another session merged v3.0.1 mobile polish (which also added `VERSION.display` and bumped to 3.0.1 independently). Second race: they shipped the TopBar/Sidebar version chips binding to `VERSION.string`, so I had to ship a tiny follow-up swapping to `VERSION.display`. Net work was ~3 merges where one would have sufficed if sessions coordinated on the chip API first.
+- **Memory thrash on the version rule.** Wrote the rule as "two-part major.minor in package.json" after Filman said "only 3.x not 3.x.x". Had to rewrite the memory when he clarified with the codebase/front-end split. Should have asked "do you mean the display format or the package.json string?" before writing the memory.
+
+**Next:**
+- When starting a fresh session during an active multi-stream release, first `git log origin/main --oneline -15` to read what other sessions just landed — avoids the two-chip-rebind kind of race.
+- When saving a new feedback memory that contradicts project CLAUDE.md, propose the CLAUDE.md edit in the same PR so convention and memory stay in sync from the start.
+
+---
+
 ## 2026-04-20 — v3.0.1 mobile polish pass
 
 **Well:**

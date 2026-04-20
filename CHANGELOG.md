@@ -41,6 +41,8 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 ### Follow-ups (same-version bugfixes, no bump)
 - `BriefingOverlay.tsx`: playback rewritten to mirror `TTSButton.tsx`'s robust pattern — fetch-as-blob for the stored Supabase Storage URL instead of binding it directly as `audio.src`, `playsinline` + `preload='auto'` + wait for `canplaythrough` (5s fallback), AbortController, 20s timeout, and Web Speech fallback if both stored-audio and `/api/tts` fail. Play button now shows a loading spinner while fetching/buffering. Fixes the "can't play the briefing" regression from the initial v3.0 ship.
 - `TopBar.tsx`, `Sidebar.tsx`: version chip is now visible in the UI again. TopBar renders a `v{VERSION.display}` pill next to the greeting; Sidebar appends it inline after the `JARVIS` wordmark (visible when expanded/pinned).
+- `BriefingHero.tsx`: preview subtitle no longer shows literal `**Calendar Overview**...`. New `getPreview()` helper skips leading heading-only paragraphs and strips inline `**bold**` markers so the subtitle reads as clean prose, not raw markdown.
+- `src/app/page.tsx` dashboard: wrapped all children in a single `space-y-5` stack so `BriefingHero` and `KpiRow` are no longer flush; replaces the earlier ad-hoc `mt-5` wrappers on the grid and email/news/fitness blocks.
 
 ### Mobile polish (v3.0.1) — 2026-04-20
 - `AppShell`: mobile-aware sidebar drawer state + reduced gutter padding (`px-4 sm:px-6 md:px-8`).
