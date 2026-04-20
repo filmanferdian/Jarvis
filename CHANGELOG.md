@@ -44,6 +44,13 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 - `BriefingHero.tsx`: preview subtitle no longer shows literal `**Calendar Overview**...`. New `getPreview()` helper skips leading heading-only paragraphs and strips inline `**bold**` markers so the subtitle reads as clean prose, not raw markdown.
 - `src/app/page.tsx` dashboard: wrapped all children in a single `space-y-5` stack so `BriefingHero` and `KpiRow` are no longer flush; replaces the earlier ad-hoc `mt-5` wrappers on the grid and email/news/fitness blocks.
 
+### Briefing readability + preload (v3.0.2) — 2026-04-20
+- `BriefingOverlay`: strip markdown (`**bold**`, `*italic*`, `# heading`, `- ` and `1. ` list markers) from both the voiceover and briefing source before `splitLines`. Drop heading-only short lines (2–4 words, no sentence punctuation) so section labels like "Calendar Overview" don't appear as their own subtitle beat.
+- Drop the full `01…NN` transcript rail. Keep a single centered subtitle — current line in 26–32px display type, with a faint next-line preview underneath.
+- Preload audio the moment the overlay opens. New effect chains fetch → attach `<audio>` → wait for `canplay` (5s cap) → `status='ready'`. Play button is now instant; `onplay` / `onpause` drive status, so tapping pause/resume doesn't re-fetch.
+- Scrubber is now a seekable `<input type="range">` bound to `audio.currentTime`. Fully seekable once the blob is in memory.
+- Mindmap stage trimmed 560 → 480px to give the new subtitle vertical air above it.
+
 ### Mobile polish (v3.0.1) — 2026-04-20
 - `AppShell`: mobile-aware sidebar drawer state + reduced gutter padding (`px-4 sm:px-6 md:px-8`).
 - `Sidebar`: below `md:` hides by default and slides in as a fixed 240px drawer with backdrop when `mobileOpen`. Labels force-visible during drawer mode; drawer auto-closes on route change.

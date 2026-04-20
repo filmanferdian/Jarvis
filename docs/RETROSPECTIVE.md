@@ -23,6 +23,23 @@ Small wrap-up session catching three post-release issues after the main v3.0 con
 
 ---
 
+## 2026-04-20 — v3.0.2 briefing overlay readability + preload
+
+**Well:**
+- Screenshot-led diagnosis. Filman sent a single image showing `**Calendar Overview**`, orphan `1.` / `2.` rows, the 01–10 transcript rail, and `00:00 / 00:00` on the player. Three independent bugs, one image — confirmed all three fixes up front before touching code.
+- One file touched. `BriefingOverlay.tsx` only. No API changes, no prompt changes on the briefing generator side. The markdown leak was strictly a rendering bug.
+- Preload-on-open is the right mental model. Overlay open = intent to listen; zero reason to defer the fetch until the Play tap. Play now feels instant and scrubbing just works because the blob is already in memory.
+
+**Wrong:**
+- Accidentally ran `git add -A` from `/Users/filmanferdian/Documents/Jarvis` instead of the worktree path — got "nothing to commit" because main's working tree was clean. Fast to recognize and cd into the worktree, but another argument for always using `git -C <path>` on merge ships.
+- Sanitizer's "drop heading-only short lines" rule is heuristic (≤4 words, no `.!?`). If the voiceover legitimately opens with a short declarative like "All clear." it will get dropped. Accepted because the voiceover prompt is already prose-first — but flagged for follow-up if it bites.
+
+**Next:**
+- Consider moving the sanitize + splitLines logic into a shared helper (`src/lib/briefingText.ts`) so any future briefing preview, card, or transcript rendering uses the same rules — `BriefingHero.tsx` already has a near-duplicate `getPreview()`.
+- The briefing generator prompt could emit voiceover as already-sanitized prose so the client doesn't need to strip markers. Server-side would also let TTS skip them cleanly.
+
+---
+
 ## 2026-04-20 — v3.0.1 mobile polish pass
 
 **Well:**
