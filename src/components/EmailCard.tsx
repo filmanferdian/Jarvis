@@ -1,38 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { usePolling } from '@/lib/usePolling';
 import { fetchAuth } from '@/lib/fetchAuth';
-import { renderMarkdown } from '@/lib/renderMarkdown';
-import Link from 'next/link';
 
-interface SlotData {
-  timeSlot: string;
-  label: string;
-  synthesis: string;
-  importantCount?: number;
-  deadlineCount?: number;
-  createdAt?: string;
-}
-
-interface PreviousSynthesis {
-  date: string;
-  timeSlot: string;
-  synthesis: string;
-  importantCount?: number;
-  createdAt?: string;
-}
-
-interface EmailData {
-  date: string;
-  synthesis: string | null;
-  timeSlot?: string;
-  importantCount?: number;
-  deadlineCount?: number;
-  createdAt?: string;
-  slots?: SlotData[];
-  previous?: PreviousSynthesis | null;
-  message?: string;
+interface TriageEmail {
+  from_name: string | null;
+  from_address: string;
+  subject: string;
+  source: string;
+  draft_created: boolean;
+  draft_snippet: string | null;
+  category_reason: string | null;
+  received_at: string;
+  body_snippet: string | null;
 }
 
 interface TriageSummary {
@@ -43,166 +24,141 @@ interface TriageSummary {
 
 interface TriageData {
   date: string;
+  lastRefreshedAt: string | null;
   summary: TriageSummary;
+  needResponse: TriageEmail[];
 }
 
-const SLOT_LABELS: Record<string, string> = {
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-};
+function formatWibTime(iso: string): string {
+  const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+  const h = String(wib.getUTCHours()).padStart(2, '0');
+  const m = String(wib.getUTCMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
 
-function getWibTimeSlotLabel(): string {
-  const wibOffset = 7 * 60 * 60 * 1000;
-  const wib = new Date(Date.now() + wibOffset);
-  const hour = wib.getUTCHours();
-  if (hour >= 5 && hour < 11) return 'Morning';
-  if (hour >= 11 && hour < 17) return 'Afternoon';
-  return 'Evening';
+function initials(name: string | null, address: string): string {
+  const base = (name && name.trim()) || address.split('@')[0];
+  const parts = base.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export default function EmailCard() {
-  const { data, loading } = usePolling<EmailData>(
-    () => fetchAuth('/api/emails'),
-    5 * 60 * 1000
-  );
-
-  const { data: triageData } = usePolling<TriageData>(
+  const { data, loading } = usePolling<TriageData>(
     () => fetchAuth('/api/emails/triage'),
-    5 * 60 * 1000
+    5 * 60 * 1000,
   );
-
-  const [expanded, setExpanded] = useState(false);
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
+      <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card p-5">
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-jarvis-border rounded w-1/3" />
           <div className="h-3 bg-jarvis-border rounded w-full" />
+          <div className="h-3 bg-jarvis-border rounded w-4/5" />
         </div>
       </div>
     );
   }
 
-  if (!data?.synthesis) {
-    return (
-      <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-        <h2 className="text-base font-medium text-jarvis-text-muted mb-2">
-          Email Digest
-        </h2>
-        <p className="text-base text-jarvis-text-dim">
-          {data?.message || 'No email synthesis available yet.'}
-        </p>
-      </div>
-    );
-  }
-
-  const slots = data.slots ?? [];
-  // The latest slot is shown expanded by default; older slots are collapsible
-  const latestSlot = slots.length > 0 ? slots[0] : null;
-  const olderSlots = slots.slice(1);
+  const threads = groupBySender(data?.needResponse ?? []).slice(0, 3);
 
   return (
-    <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[15px] font-medium text-jarvis-text-primary">
-          Email Digest
+    <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card p-5">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="text-[15px] text-jarvis-text-primary" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+          Needs response
         </h2>
-        <div className="flex items-center gap-3">
-          {latestSlot && (
-            <span className="text-sm font-mono text-jarvis-accent">
-              {latestSlot.label}
-            </span>
-          )}
-          {(data.importantCount ?? 0) > 0 && (
-            <span className="text-sm font-mono text-jarvis-warn">
-              {data.importantCount} important
-            </span>
-          )}
-          {(data.deadlineCount ?? 0) > 0 && (
-            <span className="text-sm font-mono text-red-400">
-              {data.deadlineCount} deadline{data.deadlineCount !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
+        {data && (
+          <span className="text-[11px] font-mono text-jarvis-text-faint">
+            {data.summary.need_response} today · {data.summary.drafts_created} drafted
+          </span>
+        )}
       </div>
 
-      {/* Triage summary strip */}
-      {triageData && triageData.summary.total > 0 && (
-        <Link
-          href="/emails"
-          className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-jarvis-bg border border-jarvis-border/50 hover:border-jarvis-accent/30 transition-colors"
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-jarvis-accent" />
-            <span className="text-xs font-mono text-jarvis-accent font-medium">
-              {triageData.summary.need_response}
-            </span>
-            <span className="text-[11px] text-jarvis-text-muted">need response</span>
-          </div>
-          <span className="text-jarvis-border">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-jarvis-success" />
-            <span className="text-xs font-mono text-jarvis-success font-medium">
-              {triageData.summary.drafts_created}
-            </span>
-            <span className="text-[11px] text-jarvis-text-muted">drafted</span>
-          </div>
-          <span className="text-jarvis-border">|</span>
-          <span className="text-[11px] text-jarvis-text-dim">
-            {triageData.summary.total} total
-          </span>
-          <span className="ml-auto text-[10px] font-mono text-jarvis-text-dim">
-            {triageData.date} {getWibTimeSlotLabel()}
-          </span>
-          <svg className="w-3 h-3 text-jarvis-text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      )}
-
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left"
-      >
-        <svg
-          className={`w-3 h-3 text-jarvis-text-muted transition-transform ${
-            expanded ? 'rotate-90' : ''
-          }`}
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M8 5v14l11-7z" />
-        </svg>
-        <span className="text-base text-jarvis-text-secondary">
-          {expanded ? 'Hide synthesis' : 'Show synthesis'}
-        </span>
-      </button>
-
-      {expanded && (
-        <>
-          {/* Latest slot */}
-          <div
-            className="mt-3 text-base text-jarvis-text-secondary whitespace-pre-line"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(data.synthesis) }}
-          />
-
-          {/* Older today's slots */}
-          {olderSlots.map((slot) => (
-            <details key={slot.timeSlot} className="mt-4 border-t border-jarvis-border pt-3">
-              <summary className="text-sm text-jarvis-text-muted cursor-pointer hover:text-jarvis-text-secondary transition-colors">
-                {slot.label}
-              </summary>
+      {threads.length === 0 ? (
+        <p className="text-[13px] text-jarvis-text-dim">Inbox is clear. No replies owed today.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {threads.map((t) => (
+            <div
+              key={t.key}
+              className="flex items-start gap-3 p-3 rounded-[10px] border border-jarvis-border bg-jarvis-bg-elevated"
+            >
               <div
-                className="mt-2 text-base text-jarvis-text-secondary whitespace-pre-line opacity-80"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(slot.synthesis) }}
-              />
-            </details>
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-semibold shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, var(--color-jarvis-ambient), var(--color-jarvis-aurora))',
+                  fontFamily: 'var(--font-display)',
+                }}
+              >
+                {initials(t.from_name, t.from_address)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-[13px] text-jarvis-text-primary font-medium truncate">
+                    {t.from_name || t.from_address}
+                  </p>
+                  <span className="text-[10.5px] font-mono text-jarvis-text-faint shrink-0">
+                    {formatWibTime(t.latestReceivedAt)}
+                  </span>
+                </div>
+                <p className="text-[12px] text-jarvis-text-dim truncate mt-0.5">{t.subject}</p>
+                {t.draft_snippet && (
+                  <p className="text-[11.5px] text-jarvis-text-faint truncate mt-1 italic">
+                    Draft ready · {t.draft_snippet.slice(0, 80)}…
+                  </p>
+                )}
+              </div>
+            </div>
           ))}
-
-        </>
+        </div>
       )}
+
+      <Link
+        href="/emails"
+        className="inline-flex items-center gap-1 mt-4 text-[12px]"
+        style={{ color: 'var(--color-jarvis-cta)' }}
+      >
+        Open Email Triage
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
     </div>
+  );
+}
+
+interface GroupedThread {
+  key: string;
+  from_name: string | null;
+  from_address: string;
+  subject: string;
+  latestReceivedAt: string;
+  draft_snippet: string | null;
+}
+
+function groupBySender(emails: TriageEmail[]): GroupedThread[] {
+  const byAddr = new Map<string, GroupedThread>();
+  for (const e of emails) {
+    const existing = byAddr.get(e.from_address);
+    if (!existing) {
+      byAddr.set(e.from_address, {
+        key: e.from_address,
+        from_name: e.from_name,
+        from_address: e.from_address,
+        subject: e.subject,
+        latestReceivedAt: e.received_at,
+        draft_snippet: e.draft_snippet,
+      });
+    } else if (new Date(e.received_at) > new Date(existing.latestReceivedAt)) {
+      existing.subject = e.subject;
+      existing.latestReceivedAt = e.received_at;
+      existing.draft_snippet = e.draft_snippet ?? existing.draft_snippet;
+    }
+  }
+  return Array.from(byAddr.values()).sort(
+    (a, b) => new Date(b.latestReceivedAt).getTime() - new Date(a.latestReceivedAt).getTime(),
   );
 }
