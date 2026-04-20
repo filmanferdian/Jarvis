@@ -23,6 +23,22 @@ Small wrap-up session catching three post-release issues after the main v3.0 con
 
 ---
 
+## 2026-04-20 — v3.0.5 char-weighted briefing subtitle pacing
+
+**Well:**
+- Tight, diagnostic-led fix. User reported "sub text on top is too fast" — went straight to the `ontimeupdate` handler, saw the equal-slice math, and the weighting fix fell out immediately. Two refs + a linear scan. No new dependencies, no prompt work, no server changes.
+- Scrubbing continued to work without extra wiring because the range input writes `currentTime` and the existing `ontimeupdate` re-derives `lineIdx` from it. Deriving rather than storing is the right pattern here.
+
+**Wrong:**
+- The equal-slice math has been wrong since v3.0.2 when the line-tracking subtitle was added. Should have caught it at implementation: "does line index equal time index?" is a question I could have asked by looking at the math, not by shipping and waiting for a bug report.
+- No unit test. "Given lines `['a', 'verylongsentence', 'b']` and cur/dur=0.5, line index should be 1" is a one-liner. Repo still has no test framework, so this stays as mental checklist rather than codified.
+
+**Next:**
+- If ElevenLabs is ever swapped for a TTS with non-linear pacing (rate adjustments, SSML pauses), revisit — char weighting may need per-line duration metadata from the TTS response.
+- Consider exposing `lines` + `cumChars` through `src/lib/briefingText.ts` so any future briefing component (card preview tracker, etc.) uses the same pacing math.
+
+---
+
 ## 2026-04-20 — v3.0.4 shared briefing text lib + server-side voiceover sanitize
 
 **Well:**

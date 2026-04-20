@@ -44,6 +44,11 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 - `BriefingHero.tsx`: preview subtitle no longer shows literal `**Calendar Overview**...`. New `getPreview()` helper skips leading heading-only paragraphs and strips inline `**bold**` markers so the subtitle reads as clean prose, not raw markdown.
 - `src/app/page.tsx` dashboard: wrapped all children in a single `space-y-5` stack so `BriefingHero` and `KpiRow` are no longer flush; replaces the earlier ad-hoc `mt-5` wrappers on the grid and email/news/fitness blocks.
 
+### Char-weighted briefing subtitle pacing (v3.0.5) — 2026-04-20
+- `BriefingOverlay`: the current-line subtitle was advancing faster than the ElevenLabs voice because each line got an equal `1 / lines.length` share of the timeline regardless of length. Short lines raced ahead; long lines under-held.
+- Replaced with a cumulative-char weighting: precompute `cumChars[]` where `cumChars[i] = sum(lines[0..i).length)`, then on each `ontimeupdate` compute `progressChars = (currentTime / duration) * totalChars` and pick the largest `i` with `cumChars[i] <= progressChars`. ElevenLabs render time is roughly linear in char count, so subtitle now tracks voice pacing within a beat.
+- Scrubbing still snaps correctly — the range input writes `audio.currentTime`, and the next `ontimeupdate` re-derives `lineIdx` from the new position.
+
 ### Shared briefing text helpers + server-side voiceover sanitize (v3.0.4) — 2026-04-20
 - New `src/lib/briefingText.ts`: `sanitizeBriefing()` (strips `**bold**`, `*italic*`, `# heading`, bullet / numbered markers, `[SCHEDULE]`-style written-briefing section markers, and drops heading-only short lines), `splitBriefingLines()`, and `briefingPreview()`.
 - `BriefingOverlay` and `BriefingHero` now import the shared helpers. Drops the local `sanitizeForSpeech` / `splitLines` / `getPreview` duplicates so the two components can't drift again.
