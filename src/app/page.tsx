@@ -6,6 +6,7 @@ import BriefingHero from '@/components/BriefingHero';
 import ScheduleStrip from '@/components/ScheduleStrip';
 import TasksCard from '@/components/TasksCard';
 import EmailCard from '@/components/EmailCard';
+import EmailSynthesisCard from '@/components/EmailSynthesisCard';
 import NewsCard from '@/components/NewsCard';
 import FitnessCard from '@/components/FitnessCard';
 import KpiRow from '@/components/KpiRow';
@@ -30,7 +31,10 @@ export default function Dashboard() {
           <ScheduleStrip />
           <TasksCard />
         </div>
-        <EmailCard />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <EmailSynthesisCard />
+          <EmailCard />
+        </div>
         <NewsCard />
         <FitnessCard />
       </div>
