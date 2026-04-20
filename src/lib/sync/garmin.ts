@@ -335,10 +335,14 @@ interface RawData {
   trainingStatus: Record<string, unknown>;
   heartRate: Record<string, unknown>;
   sleep: Record<string, unknown>;
+  userSettings?: Record<string, unknown>;
 }
 
 function buildDailyRecord(dateStr: string, raw: RawData, stepsOverride?: number | null) {
-  const { summary, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep } = raw;
+  const { summary, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep, userSettings } = raw;
+  const userData = (userSettings?.userData as Record<string, unknown>) ?? {};
+  const lthrRaw = userData.lactateThresholdHeartRate;
+  const lthr = typeof lthrRaw === 'number' ? Math.round(lthrRaw) : null;
 
   const sleepDTO = (sleep.dailySleepDTO as Record<string, unknown>) ?? {};
   const hrvSummary = (hrv.hrvSummary as Record<string, unknown>) ?? {};
@@ -378,6 +382,7 @@ function buildDailyRecord(dateStr: string, raw: RawData, stepsOverride?: number 
     endurance_score: null as number | null,
     training_load_acute: (acuteDTO.dailyTrainingLoadAcute as number) ?? null,
     training_load_chronic: (acuteDTO.dailyTrainingLoadChronic as number) ?? null,
+    lthr,
     raw_json: raw,
     last_synced: new Date().toISOString(),
   };
@@ -415,8 +420,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
     () => client.get(`${apiBase}/metrics-service/metrics/trainingreadiness/${today}`),
     () => client.get(`${apiBase}/metrics-service/metrics/trainingstatus/aggregated/${today}`),
     () => client.get(`${apiBase}/fitnessage-service/fitnessage/${today}`),
+    () => client.getUserSettings() as Promise<unknown>,
   ]);
-  const [steps, sleepData, heartRate, activities, dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus, fitnessAgeData] = allResults;
+  const [steps, sleepData, heartRate, activities, dailySummary, bodyBattery, stressData, hrvData, trainingReadiness, trainingStatus, fitnessAgeData, userSettingsData] = allResults;
 
   // Extract values safely
   const summary = dailySummary.status === 'fulfilled' ? dailySummary.value as Record<string, unknown> : {};
@@ -430,8 +436,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   const stepsVal = steps.status === 'fulfilled' ? steps.value as number : null;
 
   const fitnessAge = fitnessAgeData.status === 'fulfilled' ? fitnessAgeData.value as Record<string, unknown> : null;
+  const userSettings = userSettingsData.status === 'fulfilled' ? userSettingsData.value as Record<string, unknown> : undefined;
 
-  const rawData = { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep };
+  const rawData = { summary, bodyBattery: bb, stress, hrv, trainingReadiness: tr, trainingStatus: ts, heartRate: hr, sleep, userSettings };
   const dailyRecord = buildDailyRecord(today, rawData, stepsVal);
 
   // Override fitness_age from dedicated endpoint (more reliable than trainingStatus)

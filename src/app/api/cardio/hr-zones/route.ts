@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 
 export const GET = withAuth(async () => {
   const age = 35;
-  const lthr = 164;
   const maxHR = 220 - age;
 
   // Fetch 4-week average resting HR from Garmin
@@ -19,6 +18,23 @@ export const GET = withAuth(async () => {
     if (data && data.length > 0) {
       const sum = data.reduce((acc, row) => acc + (row.resting_hr ?? 0), 0);
       restingHR = Math.round(sum / data.length);
+    }
+  } catch {
+    // Use fallback
+  }
+
+  // Fetch latest LTHR from Garmin user settings (synced via getUserSettings in
+  // src/lib/sync/garmin.ts). Fallback applies until the next sync writes a value.
+  let lthr = 164;
+  try {
+    const { data } = await supabase
+      .from('garmin_daily')
+      .select('lthr')
+      .not('lthr', 'is', null)
+      .order('date', { ascending: false })
+      .limit(1);
+    if (data && data.length > 0 && data[0].lthr != null) {
+      lthr = data[0].lthr as number;
     }
   } catch {
     // Use fallback
