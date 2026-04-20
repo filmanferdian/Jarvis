@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Mindmap from '@/components/Mindmap';
+import { VERSION } from '@/lib/version';
 
 function useWibClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -51,6 +52,9 @@ export default function TopBar({ onOpenPalette }: TopBarProps) {
           {clock.greeting}{' '}
           <span className="text-jarvis-text-dim font-normal">{clock.dateTime}</span>
         </div>
+        <span className="px-2 py-0.5 rounded-full bg-jarvis-bg-deep font-[family-name:var(--font-mono)] text-[10px] tracking-[0.1em] text-jarvis-text-dim">
+          v{VERSION.string}
+        </span>
       </div>
 
       <button
