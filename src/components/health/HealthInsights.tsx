@@ -21,7 +21,26 @@ const SECTION_COLORS: Record<string, string> = {
   'FOCUS THIS WEEK': 'text-jarvis-accent',
 };
 
-export default function HealthInsights() {
+interface HealthInsightsProps {
+  narrative?: string;
+}
+
+function renderNarrative(narrative: string) {
+  // **text** → ambient-colored accent span (matches §8.3 .hl)
+  const parts = narrative.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**')) {
+      return (
+        <span key={i} style={{ color: 'var(--color-jarvis-ambient)' }}>
+          {p.slice(2, -2)}
+        </span>
+      );
+    }
+    return <span key={i}>{p}</span>;
+  });
+}
+
+export default function HealthInsights({ narrative }: HealthInsightsProps = {}) {
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +104,14 @@ export default function HealthInsights() {
           {data.cached ? 'Cached' : 'Fresh'} · {data.date}
         </span>
       </div>
+
+      {narrative && (
+        <p
+          className="font-[family-name:var(--font-display)] text-[15px] leading-[1.5] tracking-[-0.005em] mb-4 text-jarvis-text-primary"
+        >
+          {renderNarrative(narrative)}
+        </p>
+      )}
 
       {hasSections ? (
         <div className="space-y-4">
