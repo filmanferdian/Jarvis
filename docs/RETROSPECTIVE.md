@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v3.0.6 restore granular OKR objective cards
+
+Reverted the v3.0.2 OKR Ridgeline (single canvas, 5 objectives × 14 days, synthesized history) back to the pre-Stream-2 per-objective card (current vs target, progress bar, status badge, baseline, context, trend arrow). Filman: "OKR Ridgeline doesn't work for me — need to shift to previous version with more granular insights."
+
+**Well:**
+- **Git history pulled the exact prior version.** `git show 29aab8d~1:src/components/health/OkrCard.tsx > <path>` dropped the 291-line granular card straight into the worktree with no hand-rewrite. Tokens already v3-compatible via legacy aliases in globals.css (`bg-jarvis-bg-card`, `border-jarvis-border`, `text-jarvis-success`, …), so the light-theme Atmosphere reading worked without visual rework.
+- **Scope stayed narrow.** Only swapped the ridgeline block on /health for the per-objective grid. Narrative-readiness hero, 3-col health-grid headline metrics, blood-work panel, HealthInsights with narrative prop — all kept. Page still reads as v3.0 Atmosphere; only the detail surface changed.
+- **Imported the old layout pattern faithfully.** O1–O4 in a 2-col grid, BloodWorkPanel between, O5 full-width at the bottom. Matches the pre-v3 information architecture the user already knew.
+
+**Wrong:**
+- **Version race on v3.0.5.** A parallel session merged `v3.0.5 — char-weight briefing subtitle timing` while I had my worktree open and tagged as v3.0.5 in both `package.json` and CHANGELOG. Rebase surfaced the CHANGELOG conflict cleanly, but I had to re-author the commit message, re-tag the CHANGELOG entry, and re-bump to v3.0.6. One `git fetch origin main --quiet` + version sanity check right before my first commit would have avoided the churn.
+- **Ridgeline was built on synthetic data and I didn't flag the limitation up front.** The v3.0.2 ship interpolated a 14-day curve from the current `overall_pct` because no OKR-history endpoint existed. The visual fidelity of the ridgeline hid the fact that every curve was an ease-out line, not a real trajectory — exactly why it failed the first-real-use test. Should have surfaced "this is decorative until the history endpoint lands" in the v3.0.2 ship notes.
+
+**Next:**
+- If a per-day OKR progress endpoint is ever built, the ridgeline can return as a supplementary overview above the granular cards — compact sparkline on top, per-objective detail below. Not a goal for its own sake; only if the data exists.
+- Minor: retire the `RidgelineObjective` type from the shared type surface if nothing else imports it (grep confirmed only the page + card used it; both removed).
+- When a visual deliverable depends on data that doesn't exist yet, name the limitation in the first CHANGELOG entry so the next session doesn't have to rediscover it.
+
+---
+
 ## 2026-04-20 — v3.0 post-release wrap (briefing preview, dashboard rhythm, versioning split)
 
 Small wrap-up session catching three post-release issues after the main v3.0 consolidation and v3.0.1 mobile polish had landed.
