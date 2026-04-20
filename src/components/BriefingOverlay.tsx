@@ -281,7 +281,7 @@ export default function BriefingOverlay({ open, data, onClose }: Props) {
         </svg>
       </button>
 
-      <div className="px-8 py-16 flex flex-col items-center gap-7 min-h-full">
+      <div className="px-4 py-8 sm:px-8 sm:py-16 flex flex-col items-center gap-5 sm:gap-7 min-h-full">
         <div className="w-[min(560px,90vw)] aspect-square relative">
           <Mindmap
             size={560}

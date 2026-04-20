@@ -185,12 +185,12 @@ export default function EmailTriagePage() {
     return [];
   }, [data, tab]);
 
-  // When rows change, make sure selection is valid
+  // If the current selection disappears from rows (e.g. tab change), clear it.
+  // We deliberately do NOT auto-pick the first row — on mobile the master-detail
+  // pattern needs the list visible until the user taps in.
   useEffect(() => {
-    if (rows.length === 0) {
+    if (selected && !rows.find((r) => r.key === selected)) {
       setSelected(null);
-    } else if (!selected || !rows.find((r) => r.key === selected)) {
-      setSelected(rows[0].key);
     }
   }, [rows, selected]);
 
@@ -248,13 +248,14 @@ export default function EmailTriagePage() {
           )}
         </div>
 
-        {/* Split pane */}
-        <div
-          className="grid gap-5"
-          style={{ gridTemplateColumns: '400px 1fr', height: 'calc(100vh - 180px)' }}
-        >
+        {/* Split pane — stacks to single-pane master-detail on mobile */}
+        <div className="grid gap-5 grid-cols-1 md:grid-cols-[400px_1fr] md:h-[calc(100vh-180px)]">
           {/* List */}
-          <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-hidden flex flex-col">
+          <div
+            className={`rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-hidden flex-col ${
+              selected && tab !== 'blocked' ? 'hidden md:flex' : 'flex'
+            }`}
+          >
             {/* Tabs */}
             <div className="flex gap-1 px-3 py-2.5 border-b border-jarvis-border">
               {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
@@ -429,7 +430,23 @@ export default function EmailTriagePage() {
           </div>
 
           {/* Detail */}
-          <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-y-auto flex flex-col">
+          <div
+            className={`rounded-[14px] border border-jarvis-border bg-jarvis-bg-card overflow-y-auto flex-col ${
+              selected && tab !== 'blocked' ? 'flex' : 'hidden md:flex'
+            }`}
+          >
+            {/* Mobile back button */}
+            {selected && tab !== 'blocked' && (
+              <button
+                onClick={() => setSelected(null)}
+                className="md:hidden flex items-center gap-1.5 px-4 pt-3 text-[12.5px] text-jarvis-text-dim hover:text-jarvis-text-primary"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to list
+              </button>
+            )}
             {tab === 'needs' && selectedThread ? (
               <EmailThread thread={selectedThread} />
             ) : tab === 'other' && selected && data ? (

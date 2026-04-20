@@ -34,9 +34,10 @@ function useWibClock() {
 
 type TopBarProps = {
   onOpenPalette?: (options?: { voice?: boolean }) => void;
+  onToggleSidebar?: () => void;
 };
 
-export default function TopBar({ onOpenPalette }: TopBarProps) {
+export default function TopBar({ onOpenPalette, onToggleSidebar }: TopBarProps) {
   const clock = useWibClock();
 
   const handleLogout = async () => {
@@ -45,30 +46,42 @@ export default function TopBar({ onOpenPalette }: TopBarProps) {
   };
 
   return (
-    <header className="flex items-center gap-5 px-7 min-h-[64px] border-b border-jarvis-border bg-jarvis-bg-card flex-shrink-0">
-      <div className="flex items-center gap-3">
-        <Mindmap size={36} state="idle" className="rounded-lg" />
-        <div className="font-[family-name:var(--font-display)] text-[15px] font-medium tracking-[-0.01em] text-jarvis-text-primary">
-          {clock.greeting}{' '}
-          <span className="text-jarvis-text-dim font-normal">{clock.dateTime}</span>
+    <header className="flex items-center gap-3 sm:gap-5 px-4 sm:px-7 min-h-[64px] border-b border-jarvis-border bg-jarvis-bg-card flex-shrink-0">
+      {/* Mobile hamburger */}
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        className="md:hidden p-1.5 rounded-lg text-jarvis-text-dim hover:text-jarvis-text-primary hover:bg-jarvis-bg-deep transition-colors"
+        aria-label="Open navigation"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <div className="flex items-center gap-3 min-w-0">
+        <Mindmap size={36} state="idle" className="rounded-lg hidden sm:block" />
+        <div className="font-[family-name:var(--font-display)] text-[15px] font-medium tracking-[-0.01em] text-jarvis-text-primary truncate">
+          {clock.greeting}
+          <span className="hidden sm:inline text-jarvis-text-dim font-normal"> {clock.dateTime}</span>
         </div>
         <span className="px-2 py-0.5 rounded-full bg-jarvis-bg-deep font-[family-name:var(--font-mono)] text-[10px] tracking-[0.1em] text-jarvis-text-dim">
-          v{VERSION.string}
+          v{VERSION.display}
         </span>
       </div>
 
       <button
         type="button"
         onClick={() => onOpenPalette?.()}
-        className="flex items-center gap-2.5 flex-1 max-w-[420px] ml-auto px-3.5 py-2 bg-jarvis-bg-deep border border-transparent hover:border-jarvis-border-strong rounded-[10px] text-[13px] text-jarvis-text-faint hover:text-jarvis-text-dim transition-colors"
+        className="flex items-center gap-2.5 ml-auto md:flex-1 md:max-w-[420px] px-2 md:px-3.5 py-2 bg-jarvis-bg-deep border border-transparent hover:border-jarvis-border-strong rounded-[10px] text-[13px] text-jarvis-text-faint hover:text-jarvis-text-dim transition-colors"
         aria-label="Open command palette"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
           <circle cx="11" cy="11" r="7" />
           <path d="M16 16l4 4" />
         </svg>
-        <span>Ask, command, search…</span>
-        <span className="ml-auto px-1.5 py-[1px] rounded bg-jarvis-bg-card border border-jarvis-border font-[family-name:var(--font-mono)] text-[10px] text-jarvis-text-faint">
+        <span className="hidden md:inline">Ask, command, search…</span>
+        <span className="hidden md:inline ml-auto px-1.5 py-[1px] rounded bg-jarvis-bg-card border border-jarvis-border font-[family-name:var(--font-mono)] text-[10px] text-jarvis-text-faint">
           ⌘K
         </span>
       </button>

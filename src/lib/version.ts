@@ -7,7 +7,8 @@ export const VERSION = {
   get string() {
     return pkg.version as string;
   },
-  // User-facing label: major.minor only. Use for any UI surface.
+  // User-facing label: major.minor only (e.g. "3.0"). Callers add any "v" prefix.
+  // Patch bumps are internal only — v3.0 "Atmosphere" is one product label.
   get display() {
     return (pkg.version as string).split('.').slice(0, 2).join('.');
   },
