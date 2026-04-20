@@ -4,6 +4,13 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
 
+## [2.4.48] — 2026-04-20
+
+### Added
+- `/emails` breadcrumb now shows "Updated HH:MM WIB" from the most recent `email_triage.created_at`, giving a visible freshness signal (previously only a coarse Morning/Afternoon/Evening slot was derived internally, never rendered).
+- `/contacts` header now shows "Last refreshed YYYY-MM-DD HH:MM WIB" from `max(scanned_contacts.updated_at)`. Scans can be days apart, so the date matters — the page previously had no way to tell whether the list reflected a fresh scan.
+- API: `/api/emails/triage` and `/api/contacts` each return a new `lastRefreshedAt` ISO field (nullable). No schema changes.
+
 ## [2.4.46] — 2026-04-19
 
 ### Fixed

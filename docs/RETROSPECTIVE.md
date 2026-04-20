@@ -4,6 +4,20 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v2.4.48 last-refresh timestamps on triage and contacts
+
+**Well:**
+- Tiny, surgical two-page change. Reused existing `latestCreatedAt` reducer on the triage route and the project's hardcoded WIB-offset convention — no new utilities, no schema, no migration.
+- Caught the version collision at ship time: worktree branched off 2.4.43 but main had advanced to 2.4.47 mid-session. Rebased cleanly and bumped to 2.4.48 before merging.
+
+**Wrong:**
+- Started a fresh worktree while other sessions were shipping in parallel. Version bump had to be redone post-rebase. A `git fetch` + sanity check on `package.json` before committing would have avoided the collision.
+
+**Next:**
+- For short sessions, consider branching off `origin/main` directly after `git fetch` (not whatever `main` happens to be locally) to reduce version drift risk.
+
+---
+
 ## 2026-04-19 — v2.4.44 → v2.4.46 OKR manual-entry chain
 
 **Well:**
