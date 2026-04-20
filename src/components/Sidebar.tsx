@@ -139,7 +139,7 @@ export default function Sidebar() {
         >
           JARVIS
           <span className="font-[family-name:var(--font-mono)] font-normal text-[10px] tracking-[0.1em] text-jarvis-text-faint">
-            v{VERSION.string}
+            v{VERSION.display}
           </span>
         </span>
       </div>

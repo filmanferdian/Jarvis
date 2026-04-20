@@ -53,7 +53,7 @@ export default function TopBar({ onOpenPalette }: TopBarProps) {
           <span className="text-jarvis-text-dim font-normal">{clock.dateTime}</span>
         </div>
         <span className="px-2 py-0.5 rounded-full bg-jarvis-bg-deep font-[family-name:var(--font-mono)] text-[10px] tracking-[0.1em] text-jarvis-text-dim">
-          v{VERSION.string}
+          v{VERSION.display}
         </span>
       </div>
 
