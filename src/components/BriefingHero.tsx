@@ -6,6 +6,13 @@ import { fetchAuth } from '@/lib/fetchAuth';
 import Mindmap from '@/components/Mindmap';
 import BriefingOverlay, { type BriefingData } from '@/components/BriefingOverlay';
 
+function getPreview(briefing: string): string {
+  const paragraphs = briefing.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  const firstContent = paragraphs.find((p) => !/^\*\*[^*]+\*\*$/.test(p)) ?? paragraphs[0] ?? '';
+  const stripped = firstContent.replace(/\*\*([^*]+)\*\*/g, '$1');
+  return stripped.length > 200 ? stripped.slice(0, 200) + '…' : stripped;
+}
+
 export default function BriefingHero() {
   const { data, loading, refetch } = usePolling<BriefingData>(
     () => fetchAuth('/api/briefing'),
@@ -16,6 +23,7 @@ export default function BriefingHero() {
   const hasBriefing = !!data?.briefing;
   const estDuration =
     data?.briefing ? Math.max(1, Math.round((data.briefing.split(/\s+/).length || 0) / 150)) : null;
+  const preview = hasBriefing ? getPreview(data!.briefing!) : '';
 
   if (loading) {
     return (
@@ -53,9 +61,7 @@ export default function BriefingHero() {
             {hasBriefing ? 'Morning briefing is ready.' : 'No briefing yet.'}
           </h2>
           <p className="text-[14px] text-jarvis-text-dim m-0 mb-5 max-w-[520px]">
-            {hasBriefing
-              ? (data?.briefing?.split(/\n\n/)[0]?.slice(0, 200) ?? '') + (data?.briefing && data.briefing.length > 200 ? '…' : '')
-              : 'Generate manually or check back after 07:30 WIB.'}
+            {hasBriefing ? preview : 'Generate manually or check back after 07:30 WIB.'}
           </p>
 
           <div className="flex gap-2.5 items-center mt-auto">
