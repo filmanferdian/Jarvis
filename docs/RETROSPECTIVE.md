@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-20 — v2.4.47 LTHR auto-sync for HR Zone 2 calculator
+
+**Well:**
+- Tight scope: one Garmin API call added, one new column, one fallback swap. Resting HR path was already correct, so I explicitly did not touch it.
+- Verified end-to-end before calling it done — triggered the deployed cron endpoint and confirmed `garmin_daily.lthr = 166` landed for today's row, not just that the build passed.
+- The `RawData.userSettings` field is optional, so existing backfill/re-extract paths that don't have user settings kept compiling with no code churn.
+
+**Wrong:**
+- First post-deploy sync trigger hit the old Railway build (deployed ~90s earlier, Next build takes longer). First check showed `lthr = null` and briefly looked like a response-shape bug. Should have verified the deploy completed before triggering.
+- Merge collision with v2.4.48 ship that was happening in parallel — rebased and bumped to 2.4.47 mid-ship. Same class of drift flagged in the 2.4.48 retro.
+
+**Next:**
+- Add a `/api/health/version` unauthenticated endpoint (or use the existing dashboard header) to confirm the deployed commit before triggering validation syncs.
+- Follow-up candidate: also sync `age` and `lactateThresholdSpeed` from `userSettings.userData` so the HR zones route stops hardcoding age=35.
+
+---
+
 ## 2026-04-20 — v2.4.48 last-refresh timestamps on triage and contacts
 
 **Well:**
