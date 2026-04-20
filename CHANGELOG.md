@@ -2,18 +2,41 @@
 
 All notable changes to Jarvis are documented here.
 
-Format: `{major}.{sprint}.{iteration}` — major version, sprint number, iteration within sprint.
+Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
-## [3.0.1] — 2026-04-20
+## [3.0] — 2026-04-20 — "Atmosphere"
 
-### Changed
-- `/emails`, `/contacts`, `/utilities` rewritten to the v3.0 "Atmosphere" visual (Stream 3 of the migration). No API, Supabase, auth, or cron changes.
-- Email Triage now uses a 400px list + detail split-pane per app.html `.email-grid`. Tabs for Needs response / Other / Blocked; blocklist management lives in its own tab instead of a collapsible section.
-- New `src/components/EmailThread.tsx`: sender-grouped thread card with inline draft bubble, tone picker (Direct / Warm / Brief), and Send as-is / Edit draft actions that deep-link to the Gmail/Outlook drafts folder. Tone switching is cosmetic for now — flagged in backlog pending a regeneration endpoint.
-- `EmailCard` (dashboard) is now a compact "Needs response" preview grouped by sender, linking to `/emails`. Drops the synthesis-prose accordion.
-- `/contacts` is now a 2-col card grid with gradient avatars, a 12-week touch-history bar chart, and an italic ambient Jarvis suggestion line ("Last seen N days ago. Light follow-up may be timely."). Filter chips (All / Pending / In Notion / Ignored) replace the table-heavy layout.
-- `/utilities` rewritten to 2-col connector cards + a recent cron-run log table (sourced from the existing `/api/cron/status` endpoint). Status lights use semantic tokens (good / warn / danger) — no neon in this scope.
-- Neon-green audit within `emails/*`, `contacts/*`, `utilities/*`: 0 hits.
+Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light-primary cinematic, periwinkle ambient, neon green reserved only for liveness. Shipped via three parallel streams behind a shared foundation commit. No API, Supabase, auth, or cron changes across the whole migration.
+
+### Foundation & shell (Stream 1)
+- `src/app/globals.css`: new Atmosphere token set — surfaces (`#f7f8fc` canvas, `#ffffff` card, `#fafbff` elevated, `#ecedf5` deep), borders, ink hierarchy (`--color-jarvis-text-primary/-dim/-faint`), hybrid accents (`--color-jarvis-cta` blue / `-ambient` periwinkle / `-aurora` magenta / `-live` neon). Legacy v2 tokens kept as aliases during migration; will retire in a follow-up cleanup.
+- `src/app/layout.tsx`: register Space Grotesk + Inter + JetBrains Mono via `next/font/google` as CSS variables. Drop permanent `dark` class.
+- `src/components/Mindmap.tsx` (new): canvas brand glyph — Fibonacci-sphere node layout, depth-sorted edges, pulse firing proportional to state. Props `size`, `state` (`idle | thinking | speaking | listening`), `density`. Honors `prefers-reduced-motion` by freezing at idle snapshot.
+- `src/components/Sidebar.tsx`: rewrite as collapsible 72px → 240px on hover/pin (localStorage `jarvis.sidebar.pinned`). Static brand-mark SVG (7-neuron snapshot + radial gradient) + JARVIS wordmark. Seven routes: dashboard, briefing, health, cardio, email, contacts, utilities.
+- `src/components/TopBar.tsx`: rewrite — 36px animated Mindmap glyph + WIB greeting + ⌘K trigger + tokenized Online pill (the one sanctioned `--color-jarvis-live` use) + ambient-soft mic button.
+- `src/components/CommandPalette.tsx` (new): global `⌘K` / `Ctrl+K` shortcut, backdrop-blur overlay, grouped results (Actions / Jump to / Suggestions), integrated Web Speech API voice input, `↑↓ / ↵ / Esc` keyboard nav. Replaces the floating `VoiceMic` mount for desktop flows.
+- Split `BriefingCard.tsx` into `BriefingHero.tsx` (dashboard hero with 180px Mindmap + CTA + ghost "Read transcript" + duration meta) and `BriefingOverlay.tsx` (full-viewport cinematic portal: 560px mindmap stage, transcript rail with past/current/upcoming fades, scrubber, chapter list; reuses `SpeakingContext` for TTS).
+- `AppShell.tsx`: mounts Sidebar + TopBar + CommandPalette. Removed `SpeakingOverlay` mount.
+- Deleted `src/components/SpeakingOverlay.tsx` (replaced by `BriefingOverlay`).
+- Archived `/brand`, `/style-tile`, `/mood` + `ArcReactor.tsx` to `src/_archive/` (tsconfig-excluded).
+
+### Health & Cardio (Stream 2)
+- `/health`: readiness-narrative hero + 3-col health metric grid + OKR ridgeline + blood-work panel per spec §8.3.
+- `/cardio-analysis`: zone distribution as stacked horizontal bar in ambient colors, HRV-vs-load scatter, Jarvis verdict card. Tokenized hardcoded Recharts hex values.
+- `src/components/health/OkrCard.tsx`: rewritten as the **OKR Ridgeline** canvas (5 objectives × 14-day history, periwinkle gradient fills, JetBrains Mono axis labels) per spec §8.1. Ported `drawRidgeline` from the design-system prototype.
+- `src/components/health/HealthInsights.tsx`: added narrative-annotation slot per §8.3. Accepts narrative as a prop; generator endpoint `POST /api/health/narrate` is backlogged.
+
+### Email / Contacts / Utilities (Stream 3)
+- `/emails`: 400px list + detail split-pane per app.html `.email-grid`. Tabs for Needs response / Other / Blocked; blocklist moved out of collapsible into its own tab.
+- `src/components/EmailThread.tsx` (new): sender-grouped thread card with inline draft bubble, tone picker (Direct / Warm / Brief), and Send as-is / Edit draft actions that deep-link to the Gmail/Outlook drafts folder. Tone switching is cosmetic pending a regeneration endpoint (backlogged).
+- `EmailCard` (dashboard): compact "Needs response" preview grouped by sender, linking to `/emails`. Drops the synthesis-prose accordion.
+- `/contacts`: 2-col card grid with gradient avatars, 12-week touch-history bar chart, italic ambient Jarvis suggestion ("Last seen N days ago. Light follow-up may be timely."). Filter chips (All / Pending / In Notion / Ignored) replace the table-heavy layout.
+- `/utilities`: 2-col connector cards + recent cron-run log table (sourced from existing `/api/cron/status`). Status lights use semantic tokens (good / warn / danger) — no neon in this scope.
+
+### Discipline
+- Neon-green audit: 0 hits across all three streams' scope.
+- All three streams merged with zero file-level conflicts (disjoint scope design).
+- `npm run build` clean after each merge.
 
 ## [2.4.48] — 2026-04-20
 

@@ -4,23 +4,31 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
-## 2026-04-20 — v3.0.1 Atmosphere migration Stream 3 (Email / Contacts / Utilities)
+## 2026-04-20 — v3.0 "Atmosphere" migration (Streams 1 + 2 + 3)
+
+Single consolidated entry for the three-stream migration from v2 to v3.0 Atmosphere. Streams: (1) foundation + shell + dashboard, (2) health + cardio, (3) email + contacts + utilities. Versioning was collapsed to flat `3.0` post-merge at Filman's request — individual patch bumps (3.0.1 from Stream 3, 3.0.2 from Stream 2) were rolled back.
 
 **Well:**
-- Ran as a parallel stream behind Stream 1's foundation. Polled `origin/main` every 30min and kicked off immediately when tokens + Mindmap + Space Grotesk landed. Disjoint-file design meant zero merge conflicts with Stream 1 and Wave 1 even across their restyle of Sidebar/TopBar/AppShell.
-- Tight scope discipline. Touched only `/emails`, `/contacts`, `/utilities`, `EmailCard`, and the new `EmailThread`. No API, Supabase, or auth. Build stayed clean.
-- Neon audit within scope came back empty on first try — routing all accents through ambient / cta / good / warn / danger tokens from the start avoided a clean-up pass.
-- Rebased once mid-ship when Stream 1 pushed Wave 1 shell. Clean rebase, no conflicts, version stayed at 3.0.1.
+- **Parallel stream architecture held.** Three worktrees, three sessions, disjoint file scopes (Stream 1: shell + dashboard; Stream 2: `health/*`, `cardio-analysis/*`; Stream 3: `emails/*`, `contacts/*`, `utilities/*`). Zero file-level merge conflicts across all three streams. The "additive tokens" design (new Atmosphere vars layered alongside legacy v2 aliases) meant each stream's pre-merge build passed without stepping on the others.
+- **Foundation-first gating worked.** Stream 1 pushed a minimal foundation commit (tokens + Space Grotesk + `Mindmap.tsx`) as the first merge to main. Streams 2 & 3 branched off that point, unblocking parallel work within ~45 minutes of plan approval.
+- **Spec was the PR plan.** The design-system HTML's §12 was a file-by-file migration brief. Translating it 1:1 into the plan let each stream work independently against the same spec without re-litigating decisions mid-ship.
+- **Neon-green discipline held.** 0 unsanctioned neon hits across the whole migration. Each stream audited its own scope; only the TopBar Online pill and the live-dot animation kept the reserved `--color-jarvis-live`.
+- **Canvas port was cheap and visually faithful.** Porting the prototype `drawMindmap` and `drawRidgeline` directly beat rewriting in SVG/React.
 
 **Wrong:**
-- Pre-rebase build passed, but `npm run build` after rebase caught a TypeScript narrowing bug in the contacts touch-history helper — TS inferred `bars` as `0[]` because every branch produced literal 0 or 1. Should have typed the array explicitly in the first draft.
-- Tone picker is cosmetic. Without a per-thread regenerate endpoint, "Direct / Warm / Brief" changes only local state. UI is faithful to the spec but the feature is a shell. Flagged to backlog.
-- "Send as-is" / "Edit draft" both deep-link to the provider drafts folder, not to the specific draft — we don't currently store a draft URL on the triage row. Acceptable for now but noted.
+- **Working directory drift.** Early in Stream 1 I did a `cd` to main for a merge, then subsequent `git mv` / `rm` / `mkdir` calls executed there instead of the worktree. Archive-page moves landed on main by accident. Caught before push because the build errored showing old imports — reset-hard on main, redid in worktree. Absolute paths via `git -C` would have prevented it.
+- **Version bookkeeping churned.** Each stream ran its own `/ship` flow and patch-bumped independently (3.0.0 → 3.0.1 from Stream 3, then 3.0.2 from Stream 2). Filman then asked to collapse everything back to flat `3.0`. Net zero useful work. Should have agreed up-front whether parallel streams bump patches or hold for the final consolidated ship. Captured in the new CHANGELOG header as a convention going forward: minor only from 3.x onward.
+- **Stream 2 didn't push its final merge.** Stream 2's `/ship` completed locally but its worktree branch wasn't merged to `main` + pushed — Stream 1 (this session) had to finish the merge manually during consolidation.
+- **TypeScript narrowing bug in Stream 3's contacts helper.** TS inferred `bars` as `0[]` because every branch produced literal 0 or 1. Pre-rebase build passed; post-rebase build caught it. Should have typed the array explicitly first time.
+- **Tone picker is cosmetic.** Without a per-thread regenerate endpoint, the Email Triage tone picker changes only local state. Faithful to spec but the feature is a shell. Backlogged.
 
 **Next:**
-- Backlog item: `/api/emails/drafts/regenerate?tone=warm&triage_id=...` to wire the tone picker.
-- Backlog item: store the provider-side draft URL on `email_triage` rows so "Send as-is" / "Edit" can open the specific draft.
-- Final Atmosphere sweep (all three streams): one global neon-green grep and a mobile spot-check at 375px.
+- Retire legacy v2 token aliases from `globals.css` now that all pages consume Atmosphere tokens directly.
+- Global neon-green grep sweep and mobile spot-check at 375px.
+- Wire `POST /api/health/narrate` (backlogged) to feed real Claude-generated sentences into `HealthInsights`.
+- Wire `/api/emails/drafts/regenerate?tone=...&triage_id=...` to make the tone picker do real work.
+- Store provider-side draft URL on `email_triage` rows so "Send as-is" / "Edit" can open the specific draft.
+- For future parallel-stream work: sessions **do not** patch-bump — the coordinating session batches everything under one minor bump at final ship.
 
 ---
 
