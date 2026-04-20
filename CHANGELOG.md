@@ -44,6 +44,10 @@ Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light
 - `BriefingHero.tsx`: preview subtitle no longer shows literal `**Calendar Overview**...`. New `getPreview()` helper skips leading heading-only paragraphs and strips inline `**bold**` markers so the subtitle reads as clean prose, not raw markdown.
 - `src/app/page.tsx` dashboard: wrapped all children in a single `space-y-5` stack so `BriefingHero` and `KpiRow` are no longer flush; replaces the earlier ad-hoc `mt-5` wrappers on the grid and email/news/fitness blocks.
 
+### Dashboard email synthesis restored (v3.0.3) — 2026-04-20
+- `src/components/EmailSynthesisCard.tsx` (new): fetches `/api/emails`, renders the Claude-generated email synthesis prose via `renderMarkdown`, shows the latest slot label + important/deadline counts in the header, collapses earlier same-day slots behind a toggle. Matches v3.0 card styling (`rounded-[14px]`, `jarvis-border`, `bg-jarvis-bg-card`).
+- `src/app/page.tsx` dashboard: `EmailSynthesisCard` (left) and `EmailCard` (right) now sit in a `grid-cols-1 lg:grid-cols-2` block below the schedule/tasks row — synthesis overview on the left, actionable "Needs response" list on the right. Mobile stacks them. Restores the email synthesis that the initial v3.0 migration had dropped from the dashboard in favor of the compact triage preview alone.
+
 ### Briefing readability + preload (v3.0.2) — 2026-04-20
 - `BriefingOverlay`: strip markdown (`**bold**`, `*italic*`, `# heading`, `- ` and `1. ` list markers) from both the voiceover and briefing source before `splitLines`. Drop heading-only short lines (2–4 words, no sentence punctuation) so section labels like "Calendar Overview" don't appear as their own subtitle beat.
 - Drop the full `01…NN` transcript rail. Keep a single centered subtitle — current line in 26–32px display type, with a faint next-line preview underneath.
