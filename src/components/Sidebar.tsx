@@ -4,45 +4,24 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-interface Domain {
-  id: string;
-  name: string;
-  displayOrder: number;
-  alertThresholdDays: number;
-  healthStatus: 'green' | 'yellow' | 'red';
-  daysSinceUpdate: number | null;
-  lastUpdated: string | null;
-}
-
-const HEALTH_COLORS = {
-  green: 'bg-jarvis-success',
-  yellow: 'bg-jarvis-warn',
-  red: 'bg-jarvis-danger',
-};
-
-const HEALTH_TEXT = {
-  green: 'text-jarvis-success',
-  yellow: 'text-jarvis-warn',
-  red: 'text-jarvis-danger',
-};
-
-const FALLBACK_DOMAINS = [
-  'Work', 'Wealth', 'Side projects', 'Health', 'Fitness',
-  'Spiritual', 'Family', 'Learning', 'Networking', 'Personal branding',
-];
-
-interface SidebarProps {
-  mobileOpen?: boolean;
-  onClose?: () => void;
-}
-
 const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
   {
     href: '/',
     label: 'Dashboard',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12l9-8 9 8" />
+        <path d="M5 10v9h14v-9" />
+      </svg>
+    ),
+  },
+  {
+    href: '/briefing',
+    label: 'Briefing',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
+        <rect x="9" y="3" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
       </svg>
     ),
   },
@@ -50,17 +29,27 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
     href: '/health',
     label: 'Health & Fitness',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12h4l2-5 3 10 2-5h7" />
       </svg>
     ),
   },
   {
     href: '/cardio-analysis',
-    label: 'Cardio Analysis',
+    label: 'Cardio',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
+        <path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0" />
+      </svg>
+    ),
+  },
+  {
+    href: '/emails',
+    label: 'Email',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 7l9 6 9-6" />
       </svg>
     ),
   },
@@ -68,17 +57,9 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
     href: '/contacts',
     label: 'Contacts',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/emails',
-    label: 'Email Triage',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="3" />
+        <path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 3a3 3 0 0 1 0 6M21 20c0-2.5-1.8-4.5-4-5" />
       </svg>
     ),
   },
@@ -86,233 +67,125 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
     href: '/utilities',
     label: 'Utilities',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
       </svg>
     ),
   },
 ];
 
-export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
-  const [domains, setDomains] = useState<Domain[] | null>(null);
-  const [loading, setLoading] = useState(true);
+const PIN_KEY = 'jarvis.sidebar.pinned';
+
+export default function Sidebar() {
   const pathname = usePathname();
+  const [pinned, setPinned] = useState(false);
 
   useEffect(() => {
-    async function fetchDomains() {
-      try {
-        const res = await fetch('/api/domains', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setDomains(data.domains);
-        }
-      } catch {
-        // Fall back to static list
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setPinned(localStorage.getItem(PIN_KEY) === '1');
+    } catch {
+      // no-op
     }
-    fetchDomains();
   }, []);
 
-  const total = domains?.length ?? 0;
-  const greenCount = domains?.filter((d) => d.healthStatus === 'green').length ?? 0;
-  const yellowCount = domains?.filter((d) => d.healthStatus === 'yellow').length ?? 0;
-  const redCount = domains?.filter((d) => d.healthStatus === 'red').length ?? 0;
-
-  const healthScore = total > 0 ? Math.round((greenCount / total) * 100) : 0;
-  const greenPct = total > 0 ? (greenCount / total) * 100 : 0;
-  const yellowPct = total > 0 ? (yellowCount / total) * 100 : 0;
-  const redPct = total > 0 ? (redCount / total) * 100 : 0;
+  const togglePin = () => {
+    setPinned((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(PIN_KEY, next ? '1' : '0');
+      } catch {
+        // no-op
+      }
+      return next;
+    });
+  };
 
   return (
     <aside
-      className={`w-[260px] border-r border-jarvis-border bg-jarvis-bg overflow-y-auto transition-transform duration-200 ${
-        mobileOpen
-          ? 'fixed inset-y-0 left-0 z-50 translate-x-0'
-          : 'hidden md:block'
+      className={`group/sidebar relative flex flex-col gap-2 overflow-hidden border-r border-jarvis-border bg-jarvis-bg-card px-3.5 py-5 transition-[width] duration-400 ease-[cubic-bezier(.25,.46,.45,.94)] z-10 ${
+        pinned ? 'w-[240px]' : 'w-[72px] hover:w-[240px]'
       }`}
+      aria-expanded={pinned}
     >
-      <div className="p-4 space-y-6">
-        {/* Navigation */}
-        <nav className="space-y-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors ${
-                  isActive
-                    ? 'bg-jarvis-accent-muted text-jarvis-text-primary font-medium'
-                    : 'text-jarvis-text-muted hover:text-jarvis-text-secondary hover:bg-jarvis-bg-hover'
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-1 mb-5 min-w-[200px]">
+        <div className="relative w-10 h-10 rounded-[11px] flex-shrink-0 overflow-hidden"
+             style={{ background: 'radial-gradient(circle at 35% 30%, #a6b4ff, #4a5dcf 70%, #2a3580)' }}>
+          <svg viewBox="0 0 40 40" className="absolute inset-0 w-full h-full" aria-hidden="true">
+            <g fill="#fff" opacity="0.95">
+              <circle cx="14" cy="12" r="1.8" />
+              <circle cx="26" cy="14" r="1.2" />
+              <circle cx="30" cy="24" r="1.6" />
+              <circle cx="10" cy="22" r="1" />
+              <circle cx="18" cy="28" r="1.4" />
+              <circle cx="28" cy="30" r="1" />
+              <circle cx="20" cy="20" r="0.9" />
+            </g>
+            <g stroke="rgba(255,255,255,0.4)" strokeWidth="0.5">
+              <line x1="14" y1="12" x2="20" y2="20" />
+              <line x1="26" y1="14" x2="20" y2="20" />
+              <line x1="30" y1="24" x2="20" y2="20" />
+              <line x1="18" y1="28" x2="20" y2="20" />
+              <line x1="10" y1="22" x2="18" y2="28" />
+            </g>
+          </svg>
+        </div>
+        <span
+          className={`font-[family-name:var(--font-display)] font-semibold text-[18px] tracking-[-0.02em] text-jarvis-text-primary transition-opacity duration-300 ${
+            pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
+          }`}
+        >
+          JARVIS
+        </span>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex flex-col gap-0.5 flex-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3.5 px-2.5 py-2.5 rounded-[10px] text-[13.5px] font-medium whitespace-nowrap overflow-hidden transition-colors duration-150 ${
+                isActive
+                  ? 'bg-jarvis-cta-soft text-jarvis-cta'
+                  : 'text-jarvis-text-dim hover:bg-jarvis-bg-deep hover:text-jarvis-text-primary'
+              }`}
+            >
+              <span className="w-5 h-5 flex-shrink-0">{item.icon}</span>
+              <span
+                className={`min-w-[160px] transition-opacity duration-300 ${
+                  pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
                 }`}
               >
-                {/* Active indicator — blue left bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-jarvis-accent" />
-                )}
-                <span className={`flex items-center ${isActive ? 'text-jarvis-accent' : ''}`}>
-                  {item.icon}
-                </span>
                 {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Divider */}
-        <div className="h-px bg-jarvis-border" />
-
-        {/* Life Domains header */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-[11px] font-medium uppercase tracking-wider text-jarvis-text-dim">
-            Life Domains
-          </h2>
-          {mobileOpen && (
-            <button
-              onClick={onClose}
-              className="md:hidden p-1 rounded-lg hover:bg-jarvis-bg-hover text-jarvis-text-dim"
-              aria-label="Close sidebar"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Health Ring Donut */}
-        {domains && total > 0 && (
-          <div className="flex flex-col items-center">
-            <div className="relative w-20 h-20">
-              <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
-                <circle
-                  cx="18" cy="18" r="14"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.04)"
-                  strokeWidth="3.5"
-                />
-                <circle
-                  cx="18" cy="18" r="14"
-                  fill="none"
-                  stroke="#34d399"
-                  strokeWidth="3.5"
-                  strokeDasharray={`${greenPct * 0.88} ${88 - greenPct * 0.88}`}
-                  strokeDashoffset="0"
-                  strokeLinecap="round"
-                />
-                <circle
-                  cx="18" cy="18" r="14"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="3.5"
-                  strokeDasharray={`${yellowPct * 0.88} ${88 - yellowPct * 0.88}`}
-                  strokeDashoffset={`${-(greenPct * 0.88)}`}
-                  strokeLinecap="round"
-                />
-                <circle
-                  cx="18" cy="18" r="14"
-                  fill="none"
-                  stroke="#f87171"
-                  strokeWidth="3.5"
-                  strokeDasharray={`${redPct * 0.88} ${88 - redPct * 0.88}`}
-                  strokeDashoffset={`${-((greenPct + yellowPct) * 0.88)}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-base font-semibold text-jarvis-text-primary font-mono">
-                  {healthScore}%
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-2 text-[10px] text-jarvis-text-muted">
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-jarvis-success" />
-                {greenCount}
               </span>
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-jarvis-warn" />
-                {yellowCount}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-jarvis-danger" />
-                {redCount}
-              </span>
-            </div>
-          </div>
-        )}
+            </Link>
+          );
+        })}
+      </nav>
 
-        {/* Domain list */}
-        {loading ? (
-          <div className="space-y-1">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-jarvis-border animate-shimmer" />
-                <div className="h-3 bg-jarvis-border rounded w-3/4 animate-shimmer" />
-              </div>
-            ))}
-          </div>
-        ) : domains ? (
-          <>
-            <div className="space-y-0.5">
-              {domains.map((domain) => (
-                <div
-                  key={domain.id}
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-jarvis-bg-hover transition-colors group"
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${HEALTH_COLORS[domain.healthStatus]}`} />
-                  <span className="text-[13px] text-jarvis-text-muted flex-1 group-hover:text-jarvis-text-secondary transition-colors">
-                    {domain.name}
-                  </span>
-                  {domain.daysSinceUpdate !== null && (
-                    <span
-                      className={`text-[11px] font-mono opacity-0 group-hover:opacity-100 transition-opacity ${
-                        HEALTH_TEXT[domain.healthStatus]
-                      }`}
-                    >
-                      {domain.daysSinceUpdate}d
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {(redCount > 0 || yellowCount > 0) && (
-              <div className="px-3 py-2.5 rounded-lg bg-jarvis-bg-elevated border border-jarvis-border">
-                <p className="text-[11px] text-jarvis-text-dim mb-1.5 font-medium">Needs attention</p>
-                <div className="flex gap-3">
-                  {redCount > 0 && (
-                    <span className="text-[11px] font-mono text-jarvis-danger">
-                      {redCount} neglected
-                    </span>
-                  )}
-                  {yellowCount > 0 && (
-                    <span className="text-[11px] font-mono text-jarvis-warn">
-                      {yellowCount} aging
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="space-y-0.5">
-            {FALLBACK_DOMAINS.map((domain) => (
-              <div
-                key={domain}
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-jarvis-bg-hover transition-colors"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-jarvis-text-dim" />
-                <span className="text-[13px] text-jarvis-text-muted">{domain}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Pin toggle */}
+      <button
+        type="button"
+        onClick={togglePin}
+        className="mt-auto flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] text-jarvis-text-faint hover:text-jarvis-text-dim whitespace-nowrap"
+        aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+          <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5z M12 14v6" />
+        </svg>
+        <span
+          className={`transition-opacity duration-300 ${
+            pinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100'
+          }`}
+        >
+          {pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+        </span>
+      </button>
     </aside>
   );
 }

@@ -1,73 +1,39 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect } from 'react';
 import AppShell from '@/components/AppShell';
-import ArcReactor from '@/components/ArcReactor';
-
-function useTimeGreeting() {
-  const [greeting, setGreeting] = useState('Good evening');
-
-  useEffect(() => {
-    function update() {
-      const wibOffset = 7 * 60 * 60 * 1000;
-      const wib = new Date(Date.now() + wibOffset);
-      const hour = wib.getUTCHours();
-      if (hour < 12) setGreeting('Good morning');
-      else if (hour < 17) setGreeting('Good afternoon');
-      else setGreeting('Good evening');
-    }
-    update();
-    const interval = setInterval(update, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return greeting;
-}
-import BriefingCard from '@/components/BriefingCard';
+import BriefingHero from '@/components/BriefingHero';
 import ScheduleStrip from '@/components/ScheduleStrip';
 import TasksCard from '@/components/TasksCard';
 import EmailCard from '@/components/EmailCard';
 import NewsCard from '@/components/NewsCard';
 import FitnessCard from '@/components/FitnessCard';
 import KpiRow from '@/components/KpiRow';
-import VoiceMic from '@/components/VoiceMic';
 
 export default function Dashboard() {
-  const greeting = useTimeGreeting();
-
   // Auto-sync on dashboard load (fire-and-forget, debounced server-side).
-  // M2: httpOnly session cookie is sent automatically on same-origin fetch — no
-  // need (and no safe way) to read a Bearer token from localStorage.
   useEffect(() => {
     fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: '{}',
-    }).catch(() => {}); // silently ignore errors
+    }).catch(() => {});
   }, []);
 
   return (
     <AppShell>
-      {/* Jarvis Hero — visual identity */}
-      <div className="flex items-center gap-4 py-2">
-        <ArcReactor state="idle" size="md" />
-        <div>
-          <p className="text-[15px] font-medium text-jarvis-text-primary">{greeting}, Filman</p>
-          <p className="text-xs text-jarvis-text-muted">Standing by...</p>
-        </div>
-      </div>
-
+      <BriefingHero />
       <KpiRow />
-      <BriefingCard />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
         <ScheduleStrip />
         <TasksCard />
       </div>
-      <EmailCard />
-      <NewsCard />
-      <FitnessCard />
-      <VoiceMic />
+      <div className="mt-5 space-y-5">
+        <EmailCard />
+        <NewsCard />
+        <FitnessCard />
+      </div>
     </AppShell>
   );
 }
