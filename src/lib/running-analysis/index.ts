@@ -25,8 +25,8 @@ import { loadWeekSchedule, loadCardioProtocol, loadPreviousWeekInsight } from '.
 // Pre-adherence data is a weak baseline for pace/HR comparisons.
 const PLAN_ADHERENCE_START = '2026-04-13';
 
-// Outdoor running activity types to include (excludes treadmill, indoor, walking)
-const OUTDOOR_RUNNING_TYPES = new Set([
+// Running activity types to include (outdoor + treadmill/indoor variants)
+const RUNNING_TYPES = new Set([
   'running',
   'track_running',
   'trail_running',
@@ -34,17 +34,15 @@ const OUTDOOR_RUNNING_TYPES = new Set([
   'ultra_run',
   'obstacle_run',
   'virtual_run',
+  'treadmill_running',
+  'indoor_running',
 ]);
 
-function isOutdoorRun(activityType: string | null): boolean {
+function isRun(activityType: string | null): boolean {
   if (!activityType) return false;
   const t = activityType.toLowerCase();
-  // Explicit outdoor types
-  if (OUTDOOR_RUNNING_TYPES.has(t)) return true;
-  // Exclude treadmill and indoor variants explicitly
-  if (t.includes('treadmill') || t.includes('indoor')) return false;
-  // Include other running variants (e.g. "running" prefix)
-  return t === 'running' || (t.includes('run') && !t.includes('treadmill') && !t.includes('indoor'));
+  if (RUNNING_TYPES.has(t)) return true;
+  return t.includes('run') && !t.includes('walk');
 }
 
 // WIB timezone offset
@@ -312,15 +310,15 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
     throw new Error(`Supabase query failed: ${dbError.message}`);
   }
 
-  const outdoorRuns = (activities ?? []).filter((a) => isOutdoorRun(a.activity_type));
-  const activitiesFound = outdoorRuns.length;
+  const runs = (activities ?? []).filter((a) => isRun(a.activity_type));
+  const activitiesFound = runs.length;
 
   // --- Step 2: Data ingestion (unless analysis_only) ---
   if (!options.analysisOnly && activitiesFound > 0) {
     // Get existing Garmin IDs from Notion Runs DB
     const existingIds = await getExistingGarminIds(notionApiKey);
 
-    for (const row of outdoorRuns as GarminActivityRow[]) {
+    for (const row of runs as GarminActivityRow[]) {
       if (!options.forceResync && existingIds.has(row.activity_id)) {
         activitiesSkipped++;
         console.log(`[running-analysis] Skipping ${row.activity_id} — already in Notion`);
