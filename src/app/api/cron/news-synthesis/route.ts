@@ -5,7 +5,7 @@ import { runCronJob } from '@/lib/cronLog';
 
 export const GET = withCronAuth(async (_req: NextRequest) => {
   const r = await runCronJob('news-synthesis', () => syncNews(), {
-    itemsCount: (d) => d.emailCount,
+    itemsCount: (d) => d.email.count + d.indonesia.count + d.international.count,
   });
   return r.ok
     ? NextResponse.json(r.data)

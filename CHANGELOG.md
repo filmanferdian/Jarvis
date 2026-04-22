@@ -4,6 +4,18 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.2] — 2026-04-22 — Current Events: Indonesia + International tabs (v3.2.0)
+
+The Current Events card now has three tabs — Email, Indonesia, International — instead of one newsletter-only synthesis. Indonesia and International streams are pulled from Google News RSS (localized feeds: `hl=id&gl=ID` for Indonesia, `hl=en-US&gl=US` for International) with no API key, no crawling, and strong native-outlet coverage on the Indonesia side (Kompas, Detik, CNBC Indonesia, Liputan6, Antara, Bisnis, Databoks, Hukumonline, etc.).
+
+- New `supabase/migration-025-news-tabs.sql`: adds `indonesia_synthesis`, `international_synthesis`, `*_sources`, `*_article_count` columns to `news_synthesis`. Additive-only, backward-compatible. Applied via Supabase MCP.
+- New `src/lib/sources/googleNewsRss.ts`: thin RSS fetcher + pre-ranker. Each item is scored by outlet-count (number of unique outlets Google News bundles as covering the same story), with `pubDate` as tiebreaker. Claude sees the pre-ranked list, so theme selection is not left to pure prompt judgment.
+- `src/lib/sync/newsSynthesis.ts`: single Claude call now emits all three tab syntheses in tagged sections (`<<<EMAIL>>>`, `<<<INDONESIA>>>`, `<<<INTERNATIONAL>>>`). Prompt locks in top-down / BLUF paragraph style (one flowing 4-7 sentence paragraph per theme, no sub-bullets, no "Why it matters" label), analyst-brief voice, 3-5 themes per tab with "merge before pad" on thin news days. Jarvis context (`about_me`, `work`, `projects`) injected so themes weight against Filman's priorities. No cross-slot dedupe — developing stories keep surfacing.
+- `src/app/api/news/route.ts`: response shape extended with `latest.tabs.{email,indonesia,international}`. Legacy top-level fields preserved for any older client caches.
+- `src/components/NewsCard.tsx`: tabbed UI. Default tab picks the first non-empty among Email / Indonesia / International. Source chips render under the tab bar. Older slots accordion shows the active-tab content for each historical slot.
+- Cost: ~$0.04 per synthesis (Sonnet 4.5, ~2000 in + 2000 out), ~$3.50/month at 3 slots/day. Latency ~10s.
+- Verified end-to-end: cron trigger produced 38 Indonesia + 38 International items, 22 + 19 unique outlets per tab, multi-paragraph synthesis clean. UI verified in browser preview with all three tabs clicking through correctly.
+
 ## [3.1] — 2026-04-22 — Enable RLS on email_draft_blocklist (v3.1.0)
 
 Supabase security advisor flagged `public.email_draft_blocklist` as CRITICAL (`rls_disabled_in_public`) — anyone with the project URL + anon key could read/write the table. The app only touches this table via the service-role key (which bypasses RLS), so enabling RLS with no policy closes the hole without any app-code change.

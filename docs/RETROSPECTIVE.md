@@ -4,6 +4,30 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-22 — v3.2.0 Current Events tabs (Email / Indonesia / International)
+
+The News card synthesised only Bloomberg + NYT newsletters. Extended to three tabs pulling Indonesia and International streams from Google News RSS, with analyst-brief BLUF-style paragraph synthesis, outlet-count pre-ranking, and Jarvis-context weighting. One Claude call produces all three tab outputs in tagged sections.
+
+**Well:**
+- **POC before plan locked.** Pulled both RSS feeds live, ran a real Claude synthesis against the fetched data, and iterated on prompt style (first pass was bullet-blurb with "Why it matters" labels; user pushed back; second pass was flowing top-down paragraphs that landed). Locked the final prompt rules into the implementation instead of guessing what the output would read like.
+- **Strategy research up front.** Compared Perplexity Sonar, Google News RSS, and curated per-outlet RSS before picking. Picked Google News RSS once the POC showed native Bahasa coverage reaching Databoks, Hukumonline, Bloomberg Technoz, Humas Indonesia — sources Perplexity's English-biased index would have missed.
+- **Ranking is not left to vibes.** Every RSS item carries an `outletScore` = number of unique outlets Google News bundled as covering the same story. Claude sees the pre-ranked list with scores visible, plus Jarvis context for priority weighting. Theme selection has an explicit signal, not pure prompt judgment.
+- **Single Claude call for three outputs.** Kept cost and rate-limit budget identical to the old email-only synthesis by emitting all three tabs in tagged sections (`<<<EMAIL>>>` / `<<<INDONESIA>>>` / `<<<INTERNATIONAL>>>`) in one call, then regex-splitting the response.
+- **Additive migration.** `ALTER TABLE … ADD COLUMN IF NOT EXISTS` — no downtime, backward-compatible with existing rows, API route defensively falls back to legacy columns when new ones are null.
+
+**Wrong:**
+- **Env file drift.** Worktree was missing `.env.local` (CLAUDE.md warns about dual-env but I forgot on first cron trigger — got "Cron auth not configured" then "Unauthorized" before realising). Also initially truncated the `CRON_SECRET` with `head -c 40` when it was 64 chars. Two separate friction points against the same fix.
+- **No cross-slot dedupe is a conscious design choice, but we haven't tested the failure mode.** If Hormuz keeps dominating for days, every slot will lead with it. User explicitly said developing stories should re-surface, so this is feature not bug, but we should watch in practice whether it creates fatigue.
+- **UI verification blocked on auth gate.** Preview server rendered the auth screen; had to fish `JARVIS_AUTH_TOKEN` out of env, `preview_fill` it in, and click submit before I could see the actual tabs render. Minor, but every manual-UI-verify cycle pays this tax. A `NEXT_PUBLIC_DEV_AUTO_LOGIN` switch in dev mode would remove it.
+
+**Next:**
+- Watch the morning / afternoon / evening slots over a few days: is the 3-5 themes/tab cadence right? Does the "merge before pad" rule produce a jarringly short tab on slow days? Does cross-slot repetition feel coherent or redundant?
+- BACKLOG: voice read-out per tab (current `voiceover` is Email-only, still pointing at legacy `synthesis_text`).
+- BACKLOG: surface per-theme outlet URLs as click-through chips (the data is in `NewsItem.url` but not yet persisted or exposed).
+- If International RSS feels shallow versus what Filman sees in his actual consumption, revisit Perplexity Sonar for that tab only while keeping Google News RSS for Indonesia.
+
+---
+
 ## 2026-04-22 — v3.1.0 enable RLS on email_draft_blocklist
 
 Supabase sent a CRITICAL security email: `public.email_draft_blocklist` had RLS disabled, meaning any holder of the project URL + anon key could read/write the table directly, bypassing the app. Fix was a one-liner — `ALTER TABLE email_draft_blocklist ENABLE ROW LEVEL SECURITY;` — applied via Supabase MCP. No app-code change needed because every write already goes through the service-role key, which bypasses RLS regardless of policies.
