@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-22 — v3.1.0 enable RLS on email_draft_blocklist
+
+Supabase sent a CRITICAL security email: `public.email_draft_blocklist` had RLS disabled, meaning any holder of the project URL + anon key could read/write the table directly, bypassing the app. Fix was a one-liner — `ALTER TABLE email_draft_blocklist ENABLE ROW LEVEL SECURITY;` — applied via Supabase MCP. No app-code change needed because every write already goes through the service-role key, which bypasses RLS regardless of policies.
+
+**Well:**
+- **Advisor-driven triage.** Ran `get_advisors` before touching anything, confirmed only one ERROR-level lint (the one the email flagged) and separated it from ~25 WARN-level lints on other tables. Scope stayed surgical — one migration, one line.
+- **Correct pattern choice.** Dropped the permissive `FOR ALL USING (true)` policy that migration-018 used as its template — that's exactly the anti-pattern the WARN advisors flag. Enabling RLS with no policy is both more secure and matches the existing acceptable `cron_run_log` precedent (INFO lint, tolerable).
+- **Verified the fix.** Re-ran `get_advisors` after applying the migration — `email_draft_blocklist` moved from ERROR → INFO bucket. Closed the loop before writing any docs.
+
+**Wrong:**
+- **This shouldn't have been a surprise.** Migration-018 explicitly called out the "defense-in-depth RLS" pattern back when the codebase had fewer tables. Migration-021 (email_draft_blocklist, 2026-ish) and several tables since then were created without the `ENABLE ROW LEVEL SECURITY` line — drift from the established convention. No linter or pre-commit catches it; we only find out when Supabase emails.
+- **No automated guard.** The Supabase CLI has a `db lint` command that surfaces these advisors, but it's not wired into CI or `npm run build`. Every new table will silently drift again until we add it.
+
+**Next:**
+- Add an item to BACKLOG: sweep the ~25 tables still on `FOR ALL USING (true)` policies and drop the policies. Service-role access is unaffected; this removes real anon-key exposure for tables like `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, etc. — which DO contain sensitive data.
+- Also BACKLOG: a lightweight `scripts/check-rls.ts` that hits the Supabase advisor API and fails if any ERROR-level lints exist. Cheap defense against silent drift.
+- Pattern going forward: every new `CREATE TABLE` migration must include `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;` at the bottom unless there's a written reason.
+
+---
+
 ## 2026-04-20 — v3.0.6 restore granular OKR objective cards
 
 Reverted the v3.0.2 OKR Ridgeline (single canvas, 5 objectives × 14 days, synthesized history) back to the pre-Stream-2 per-objective card (current vs target, progress bar, status badge, baseline, context, trend arrow). Filman: "OKR Ridgeline doesn't work for me — need to shift to previous version with more granular insights."

@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.1] — 2026-04-22 — Enable RLS on email_draft_blocklist (v3.1.0)
+
+Supabase security advisor flagged `public.email_draft_blocklist` as CRITICAL (`rls_disabled_in_public`) — anyone with the project URL + anon key could read/write the table. The app only touches this table via the service-role key (which bypasses RLS), so enabling RLS with no policy closes the hole without any app-code change.
+
+- New migration `supabase/migration-024-enable-rls-email-draft-blocklist.sql`: `ALTER TABLE email_draft_blocklist ENABLE ROW LEVEL SECURITY;` Applied to production Supabase via MCP.
+- Post-fix advisor check: the table dropped from ERROR (`rls_disabled_in_public`) to INFO (`rls_enabled_no_policy`) — same acceptable pattern already used by `cron_run_log`.
+- Follow-up flagged in BACKLOG: ~25 other tables still carry permissive `FOR ALL USING (true)` policies (WARN level). App doesn't need them; a defense-in-depth cleanup pass could drop them entirely.
+
 ## [3.0] — 2026-04-20 — "Atmosphere"
 
 Complete UI migration from v2 (dark, arc-reactor) to v3.0 "Atmosphere" — light-primary cinematic, periwinkle ambient, neon green reserved only for liveness. Shipped via three parallel streams behind a shared foundation commit. No API, Supabase, auth, or cron changes across the whole migration.
