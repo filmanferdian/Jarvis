@@ -4,6 +4,19 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-22 — Current Events tabs: follow-ups (v3.2.0)
+
+**Context:** v3.2.0 shipped Email / Indonesia / International tabs for Current Events. A few items were explicitly scoped out and should be picked up in follow-up ships once the core tab experience settles.
+
+**Items:**
+- **Voice read-out per tab.** Current voiceover field still points at the Email (legacy synthesis_text) only. The briefing-read-aloud flow should either read the currently-active tab or offer a per-tab listen button.
+- **Per-theme outlet click-through.** NewsItem carries the Google News article URL but it is not persisted in news_synthesis nor surfaced in the UI. Consider storing the top N URLs per tab and rendering outlet chips as links.
+- **Sanity-check International depth.** If Filman finds Google News International feels shallow versus what he consumes daily, swap Perplexity Sonar in for that tab only while keeping Google News RSS for Indonesia. Cost delta is under one dollar per month.
+- **Cross-slot fatigue watch.** We deliberately did not dedupe across morning/afternoon/evening (developing stories should re-surface). Monitor whether this feels coherent or redundant in practice; revisit if fatigue.
+- **Auto-login in dev.** Preview-server UI verification always has to pass the JARVIS_AUTH_TOKEN prompt. A NEXT_PUBLIC_DEV_AUTO_LOGIN flag that skips the gate when NODE_ENV=development would save a step every session.
+
+---
+
 ## 2026-04-22 — RLS hardening sweep (drop permissive `FOR ALL USING (true)` policies)
 
 **Context:** v3.1.0 fixed the CRITICAL advisor by enabling RLS on `email_draft_blocklist`. A Supabase advisor sweep afterward showed ~25 other tables still carry permissive `FOR ALL USING (true)` policies (WARN level). These tables include sensitive ones: `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, `health_measurements`, `blood_work`, `okr_targets`, `api_usage`, `notion_tasks`, etc.
