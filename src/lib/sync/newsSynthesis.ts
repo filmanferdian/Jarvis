@@ -233,12 +233,13 @@ You are producing the ${slotLabel} Current Events briefing for ${today}. The bri
 
 VOICE AND STYLE — strict:
 - Top-down / BLUF. Lead sentence of every paragraph states the bottom-line insight. Everything after substantiates.
-- Each theme = a bolded title on its own line (3-8 words) followed by ONE coherent paragraph of 4-7 sentences. No sub-bullets. No "Why it matters" or "Sources" labels.
+- Each theme covers exactly ONE story or ONE tightly-related narrative arc. Do NOT bundle unrelated stories into the same paragraph. If two headlines do not share a common cause, consequence, or actor, they are separate themes — or one of them is cut.
+- Each theme = a bolded title on its own line (3-8 words) followed by ONE coherent paragraph of 4-7 sentences, all substantiating the ONE lead insight. No sub-bullets. No "Why it matters" or "Sources" labels.
 - Cite outlets inline in parentheses only where corroboration matters, e.g. "(WSJ, NYT, Al Jazeera)". Do not cite every sentence.
 - Analyst-brief voice. Confident. No hedging words unless the source itself expresses uncertainty.
 - No em-dashes. Use commas, periods, or semicolons.
-- 3-5 themes per tab. If a tab has thin news, return 3 solid themes rather than padding to 5.
-- Assume reader lens: Filman Ferdian, CEO of Infinid (Indonesian tech startup). Prioritise macro, policy, geopolitics, markets, AI/tech, fintech, and anything relevant to the projects and priorities in the context above. Skip pure human-interest. Use the outletScore signal as a tiebreaker for which themes lead (higher score = more outlets corroborating).
+- 3-5 themes per tab. **It is better to return 3 sharp themes than to pad to 5 by merging unrelated stories.** If the feed has fewer than 5 stories worth a full paragraph, stop at 3 or 4. Padding, grab-bag paragraphs ("Story A; also story B; also story C"), and semicolon-joined headline lists are explicitly forbidden.
+- Assume reader lens: Filman Ferdian, CEO of Infinid (Indonesian tech startup). Prioritise macro, policy, geopolitics, markets, AI/tech, fintech, and anything relevant to the projects and priorities in the context above. Skip pure human-interest, obituaries, and sports unless they have macro or business relevance. Use the outletScore signal as a tiebreaker for which themes lead (higher score = more outlets corroborating).
 - Developing stories that remain significant should be covered again across slots. Do NOT suppress a theme because it may have appeared in an earlier slot — surface what is current.
 
 OUTPUT FORMAT — must follow exactly:
