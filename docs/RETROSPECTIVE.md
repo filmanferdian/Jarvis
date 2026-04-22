@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-22 — v3.3.0 One-story-per-paragraph rule for news synthesis
+
+Hours after v3.2.0 shipped, the first real read-through surfaced a problem: paragraphs were bundling unrelated stories. Two headlines that shared no cause or consequence would end up joined with a semicolon and a second topic sentence — "Russia halts Kazakh oil to Germany; Spirit Airlines rescue talks advance" — which read as a grab-bag list, not a synthesis. Fixed by tightening the prompt.
+
+**Well:**
+- Caught on first real use. The v3.2.0 POC runs looked fine because they happened on a busy news day with enough distinct stories to fill five themes cleanly. The real-slot run hit a thinner international feed, the "merge before pad" rule kicked in, and the failure mode became visible immediately. Short feedback loop.
+- Prompt-only fix. No schema change, no new code path, no cost delta. Edited the synthesis prompt to ban semicolon-joined headline lists and to prefer 3 sharp themes over 5 padded ones.
+- Re-verified before shipping. Triggered the evening slot with the new prompt, confirmed Indonesia returned 3 clean themes (e-KTP penalty, tax deadline, urea export) and International returned 4 (Hormuz, Fed nominee, Google Workspace Intelligence, SpaceX/Cursor) — each a single coherent story, no grab-bag paragraphs.
+
+**Wrong:**
+- Should have caught this in the POC. The v3.2.0 POC output I showed the user actually contained examples of this failure mode — "Dave Mason dies; Wembanyama concussion" was in the international section — and I didn't flag it. The user did. Padding shows up most visibly when the reader-lens filter (skip sports/obituaries) is weak, so I also tightened that.
+- "Merge before pad" was a vague instruction. Claude interpreted it as "merge topically-adjacent items into one theme" rather than "cut low-value items." The revised rule is explicit: unrelated items go into separate themes or get dropped.
+
+**Next:**
+- Monitor the actual-cadence output for a few days. Is 3 themes too few on a thin slot? If yes, lower the minimum to 2 or allow even fewer rather than force synthesis.
+- Apply the same "one story per paragraph" discipline to the Email tab when newsletters are sparse — today's evening Email tab had only one fragmentary NYT item and the synthesis correctly noted "no substantive newsletters," so this is likely already fine, but worth watching.
+
+---
+
 ## 2026-04-22 — v3.2.0 Current Events tabs (Email / Indonesia / International)
 
 The News card synthesised only Bloomberg + NYT newsletters. Extended to three tabs pulling Indonesia and International streams from Google News RSS, with analyst-brief BLUF-style paragraph synthesis, outlet-count pre-ranking, and Jarvis-context weighting. One Claude call produces all three tab outputs in tagged sections.

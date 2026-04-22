@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.3] — 2026-04-22 — Current Events: one-story-per-paragraph rule (v3.3.0)
+
+First-day feedback on v3.2.0: paragraphs kept bundling unrelated stories ("Russia halts Kazakh oil; Spirit Airlines rescue advances" / "Dave Mason dies; Wembanyama concussion"). The v3.2.0 prompt's "merge before pad" rule encouraged Claude to combine thinly-related headlines into a single theme on slow-news days; the result read as grab-bag lists rather than coherent theme synthesis.
+
+- `src/lib/sync/newsSynthesis.ts`: tightened the synthesis prompt. Each theme now covers exactly ONE story or ONE tightly-related narrative arc. Explicit ban on semicolon-joined headline lists and "also story B; also story C" constructions. Two headlines without a shared cause/consequence/actor must split into separate themes (or one gets cut).
+- "Padding forbidden." Rule changed from "3-5 themes, merge before pad" to "it is better to return 3 sharp themes than to pad to 5 by merging unrelated stories." Fewer themes on thin days is now the correct behavior.
+- Reader-lens filter tightened: skip pure human-interest, obituaries, and sports unless they have macro or business relevance.
+- Verified: Indonesia tab returned 3 clean themes (e-KTP penalty proposal, tax-filing deadline, urea export deal) — each a single coherent story. International returned 4 (Hormuz, Fed nominee, Google Workspace Intelligence + TPU, SpaceX/Cursor) — each scoped to one narrative. No more grab-bag paragraphs.
+
 ## [3.2] — 2026-04-22 — Current Events: Indonesia + International tabs (v3.2.0)
 
 The Current Events card now has three tabs — Email, Indonesia, International — instead of one newsletter-only synthesis. Indonesia and International streams are pulled from Google News RSS (localized feeds: `hl=id&gl=ID` for Indonesia, `hl=en-US&gl=US` for International) with no API key, no crawling, and strong native-outlet coverage on the Indonesia side (Kompas, Detik, CNBC Indonesia, Liputan6, Antara, Bisnis, Databoks, Hukumonline, etc.).
