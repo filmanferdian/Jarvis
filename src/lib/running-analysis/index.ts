@@ -310,7 +310,14 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
     throw new Error(`Supabase query failed: ${dbError.message}`);
   }
 
-  const runs = (activities ?? []).filter((a) => isRun(a.activity_type));
+  const runs = (activities ?? []).filter((a) => {
+    if (!isRun(a.activity_type)) return false;
+    // Exclude walks (pace slower than 10:00/km) — catches incline-walk sessions
+    // logged as treadmill_running / indoor_running.
+    if (!a.duration_seconds || !a.distance_meters) return true;
+    const secPerKm = (a.duration_seconds / a.distance_meters) * 1000;
+    return secPerKm <= 600;
+  });
   const activitiesFound = runs.length;
 
   // --- Step 2: Data ingestion (unless analysis_only) ---

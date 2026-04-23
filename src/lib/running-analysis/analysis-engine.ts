@@ -256,10 +256,9 @@ The runner began strict plan adherence on ${planContext.planAdherenceStartDate}.
 
   const continuityBlock = previousWeekInsight
     ? `
-LAST WEEK'S SYNTHESIS (${previousWeekInsight.weekLabel}):
-- Focus that was set for this week: ${wrapUntrusted('untrusted_prior_focus', sanitizeMultiline(previousWeekInsight.focusNextWeek, 1500))}
-- Weaknesses flagged: ${wrapUntrusted('untrusted_prior_gaps', sanitizeMultiline(previousWeekInsight.whatNeedsWork, 1500))}
-Evaluate whether this week's sessions actually followed those cues.`
+LAST WEEK'S SYNTHESIS (${previousWeekInsight.weekLabel}) — context only, do not grade week-over-week adherence:
+- Focus set for this week: ${wrapUntrusted('untrusted_prior_focus', sanitizeMultiline(previousWeekInsight.focusNextWeek, 1500))}
+- Weaknesses flagged: ${wrapUntrusted('untrusted_prior_gaps', sanitizeMultiline(previousWeekInsight.whatNeedsWork, 1500))}`
     : '';
 
   const prompt = `${UNTRUSTED_PREAMBLE}
@@ -268,10 +267,9 @@ You are a running coach analyzing outdoor running sessions for a recreational ru
 
 The runner follows a structured program that ramps up over time — starting with a few runs per week and building toward ~5 Z2 runs plus VO2 max intervals at steady state. Different sessions target different intensities; Z2 runs are intentionally slow (target HR is in the protocol). Do NOT treat a slower pace on a Z2 day as regression.
 
-Your job: judge this week on THREE lenses simultaneously —
-1. PLAN ADHERENCE — did each session match its planned type, duration, and intended zone for that date?
-2. CONTINUITY — did the week follow through on last week's Focus Next Week?
-3. PROGRESSION IN CONTEXT — form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
+Your job: judge this week on TWO lenses simultaneously —
+1. WEEKLY MIX — did the week as a whole deliver the planned session types and volumes (Z2 count, tempo, VO2, long run)? Day-shifts within the week are expected and not a problem; only flag when the weekly total is off (missed session types, short on Z2 volume) or when a session slipped into the following week.
+2. PROGRESSION IN CONTEXT — form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
 ${planBlock}${continuityBlock}
 
 Week analyzed: ${weekLabel}
@@ -290,11 +288,11 @@ Note: historical averages span both loose and plan-adherent periods. Use history
 
 Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points). Be specific and data-driven. Reference actual numbers. Acknowledge Jakarta heat/humidity when it's a relevant factor.
 
-Section 1 — HOW WAS THIS WEEK (2-3 sentences): For each run, name its planned session type and state whether it hit the intended zone/duration and how the body responded. Note planned-but-missed sessions and done-but-not-planned sessions.
+Section 1 — HOW WAS THIS WEEK (2-3 sentences): For each run, name its session type and state whether it hit the intended zone/duration and how the body responded. Note if the weekly session mix under- or over-delivered vs the plan (e.g. only 3 of 5 planned Z2 runs, or skipped the tempo). Do not comment on which day of the week things happened.
 
-Section 2 — WHAT'S GOOD (2-3 sentences): Wins across the three lenses: plan adherence (sessions at right intensity and duration), progression signals (form/efficiency trending well AND like-for-like pace improvements), and execution of last week's focus.
+Section 2 — WHAT'S GOOD (2-3 sentences): Wins across the two lenses: sessions at the right intensity and duration when they did happen, and progression signals (form/efficiency trending well AND like-for-like pace improvements).
 
-Section 3 — WHAT NEEDS WORK (2-3 sentences): Gaps in any lens: ran Z2 too hot, skipped a planned session, cadence below target, high decoupling, poor tempo execution, inconsistent VO2 intervals. Do NOT flag slower raw average pace as a weakness when the weekly mix shifted toward Z2. If pace-at-same-HR on Z2 is worse than a prior Z2 day, call that out explicitly.
+Section 3 — WHAT NEEDS WORK (2-3 sentences): Gaps: ran Z2 too hot, cadence below target, high decoupling, poor tempo execution, inconsistent VO2 intervals, weekly volume of a session type below plan. Do NOT flag day-of-week shifts or sessions moved earlier/later in the week — only flag when the weekly total is off (missed session types, short on Z2 volume) or when a push slipped into the following week. Do NOT flag slower raw average pace as a weakness when the weekly mix shifted toward Z2. If pace-at-same-HR on Z2 is worse than a prior Z2 day, call that out explicitly.
 
 Section 4 — FOCUS NEXT WEEK (2-3 sentences): Concrete cues for next week's planned sessions. Reference plan targets (HR range, duration, session types from NEXT WEEK'S PLAN if provided) AND one or two form/efficiency/pace-at-HR targets carried over from the gaps above.
 

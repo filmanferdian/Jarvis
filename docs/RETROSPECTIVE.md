@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-23 — v3.4.0 Cardio analysis: Z5 calculator, walk filter, weekly-mix review
+
+Three small tweaks batched after real use of the v3.0.8 "include treadmill" change surfaced rough edges: the HR Zone Calculator only covered Z2 but VO2 max intervals need a Z5 target band; incline-walk sessions were flowing into the running log because `treadmill_running` is also what Garmin tags an incline-walk; and the weekly review was nitpicking day-of-week adherence when the actual training happens across a flexible week.
+
+**Well:**
+- The Z5 band definition is the useful refinement. First cut used "highest floor → highest ceiling" mirroring Z2, but all six methods' ceilings collapse at max HR (~185), making the band trivial. Switched to "spread of floors" — lowest Z5 floor to highest Z5 floor — which is actually what you want to see: the entry zone into Z5 across expert opinions. 167–180 bpm is a useful target to aim at; 180–185 was not.
+- Small pace filter, big signal cleanup. Single `secPerKm <= 600` check on the existing `activities.filter()` pulls incline walks out of VO2 max analysis without touching the activity-type allowlist or schema.
+- Prompt trim, not regenerate. Loosening the weekly review to "weekly mix" was a surgical edit to the existing prompt — dropped two lenses, rewrote three section instructions, kept the progression-in-context lens (which is the useful part). No new plumbing.
+
+**Wrong:**
+- Edited the wrong repo first. All three edits initially went to `/Users/filmanferdian/Documents/Jarvis/src/...` instead of the worktree path. The dev server was rendering the worktree (unchanged), so the toggle didn't appear when I tried to verify. Caught it via `git status` in the main repo showing three modified files that shouldn't be there; saved as a patch, reverted main, applied to worktree. The CLAUDE.md rule "never edit files directly on the main working tree" exists exactly for this — I should have checked `pwd` before the first Edit.
+- First Z5 consensus-band definition was wrong. Shipped "highest floor / highest ceiling" by analogy to Z2 without thinking through that Z5 ceilings all pin to max HR. User caught it and defined the right rule (min-of-floors to max-of-floors). Lesson: when copying a formula across domains, check that the inputs still mean what they did in the original domain.
+
+**Next:**
+- Watch next Saturday's weekly analysis to confirm the new prompt actually reads "weekly mix" rather than "you missed Tuesday's Z2." If still too plan-adherence-flavored, tighten the prompt further.
+- One-time cleanup of historical incline-walk entries in the Notion Runs DB — the pace filter only affects future ingestions. Flag for BACKLOG.
+
+---
+
 ## 2026-04-22 — v3.3.0 One-story-per-paragraph rule for news synthesis
 
 Hours after v3.2.0 shipped, the first real read-through surfaced a problem: paragraphs were bundling unrelated stories. Two headlines that shared no cause or consequence would end up joined with a semicolon and a second topic sentence — "Russia halts Kazakh oil to Germany; Spirit Airlines rescue talks advance" — which read as a grab-bag list, not a synthesis. Fixed by tightening the prompt.

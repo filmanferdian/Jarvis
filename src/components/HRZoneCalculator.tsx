@@ -23,7 +23,61 @@ interface ZoneMethod {
   color: string;
 }
 
-function computeZones(age: number, rhr: number, lthr: number, maxHR: number): ZoneMethod[] {
+type ZoneMode = 'z2' | 'z5';
+
+function computeZones(age: number, rhr: number, lthr: number, maxHR: number, mode: ZoneMode): ZoneMethod[] {
+  if (mode === 'z5') {
+    return [
+      {
+        name: 'Age-based',
+        short: 'Age',
+        low: Math.round(maxHR * 0.90),
+        high: Math.round(maxHR * 1.00),
+        expert: 'Traditional (90-100% maxHR)',
+        color: '#6b7280',
+      },
+      {
+        name: 'Karvonen',
+        short: 'Karvonen',
+        low: Math.round((maxHR - rhr) * 0.90 + rhr),
+        high: Math.round((maxHR - rhr) * 1.00 + rhr),
+        expert: 'HRR method (90-100%)',
+        color: '#3b82f6',
+      },
+      {
+        name: 'LTHR-based',
+        short: 'LTHR',
+        low: Math.round(lthr * 1.06),
+        high: Math.round(lthr * 1.10),
+        expert: 'Friel Z5 (≥106% LTHR)',
+        color: '#8b5cf6',
+      },
+      {
+        name: 'Attia',
+        short: 'Attia',
+        low: Math.round(maxHR * 0.90),
+        high: Math.round(maxHR * 1.00),
+        expert: 'Peter Attia (90-100% actual max)',
+        color: '#ef4444',
+      },
+      {
+        name: 'Coggan Z5',
+        short: 'Coggan',
+        low: Math.round(lthr * 1.10),
+        high: maxHR,
+        expert: 'Coggan VO2 (110%+ LTHR)',
+        color: '#ec4899',
+      },
+      {
+        name: 'Galpin Red',
+        short: 'Galpin',
+        low: Math.round(maxHR * 0.90),
+        high: Math.round(maxHR * 1.00),
+        expert: 'Andy Galpin (90-100% peak)',
+        color: '#10b981',
+      },
+    ];
+  }
   return [
     {
       name: 'Age-based',
@@ -114,6 +168,7 @@ export default function HRZoneCalculator() {
   const [lthr, setLthr] = useState(164);
   const [maxHR, setMaxHR] = useState(185);
   const [loaded, setLoaded] = useState(false);
+  const [mode, setMode] = useState<ZoneMode>('z2');
 
   useEffect(() => {
     fetchAuth<HRDefaults>('/api/cardio/hr-zones')
@@ -127,7 +182,7 @@ export default function HRZoneCalculator() {
       .catch(() => setLoaded(true));
   }, []);
 
-  const zones = useMemo(() => computeZones(age, rhr, lthr, maxHR), [age, rhr, lthr, maxHR]);
+  const zones = useMemo(() => computeZones(age, rhr, lthr, maxHR, mode), [age, rhr, lthr, maxHR, mode]);
 
   // Chart data: each bar shows the range from low to high
   const chartData = useMemo(() =>
@@ -143,9 +198,16 @@ export default function HRZoneCalculator() {
     [zones],
   );
 
-  // Consensus band: min = highest lower bound across ALL methods, max = highest upper bound across ALL
-  const consensusMin = Math.max(...zones.map((z) => z.low));
-  const consensusMax = Math.max(...zones.map((z) => z.high));
+  // Consensus band:
+  //  Z2 — min = highest lower bound, max = highest upper bound (keeps you from drifting too low)
+  //  Z5 — min = lowest floor, max = highest floor across methods (target is the *entry* to Z5,
+  //       ceilings are too close to max HR to be meaningful)
+  const consensusMin = mode === 'z5'
+    ? Math.min(...zones.map((z) => z.low))
+    : Math.max(...zones.map((z) => z.low));
+  const consensusMax = mode === 'z5'
+    ? Math.max(...zones.map((z) => z.low))
+    : Math.max(...zones.map((z) => z.high));
 
   if (!loaded) {
     return (
@@ -157,13 +219,32 @@ export default function HRZoneCalculator() {
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5 space-y-4">
-      <div>
-        <h2 className="text-[13px] font-medium text-jarvis-text-primary uppercase tracking-wider">
-          HR Zone 2 Calculator
-        </h2>
-        <p className="text-[12px] text-jarvis-text-dim mt-1">
-          Zone 2 ranges across expert methods. Min = highest lower bound, Max = highest upper bound.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[13px] font-medium text-jarvis-text-primary uppercase tracking-wider">
+            HR Zone {mode === 'z5' ? '5' : '2'} Calculator
+          </h2>
+          <p className="text-[12px] text-jarvis-text-dim mt-1">
+            {mode === 'z5'
+              ? 'Zone 5 (VO2 max) ranges across expert methods. Target band = spread of Z5 floors.'
+              : 'Zone 2 ranges across expert methods. Min = highest lower bound, Max = highest upper bound.'}
+          </p>
+        </div>
+        <div className="flex items-center rounded-md border border-jarvis-border bg-jarvis-bg-main p-0.5 flex-shrink-0">
+          {(['z2', 'z5'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
+                mode === m
+                  ? 'bg-jarvis-accent text-white'
+                  : 'text-jarvis-text-dim hover:text-jarvis-text-primary'
+              }`}
+            >
+              {m === 'z2' ? 'Zone 2' : 'Zone 5'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Inputs */}
@@ -189,7 +270,7 @@ export default function HRZoneCalculator() {
               tickLine={false}
             />
             <YAxis
-              domain={[90, 170]}
+              domain={mode === 'z5' ? [150, 200] : [90, 170]}
               tick={{ fill: '#9ca3af', fontSize: 11 }}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
               tickLine={false}
@@ -265,10 +346,12 @@ export default function HRZoneCalculator() {
       {/* Consensus summary */}
       <div className="rounded-lg bg-jarvis-bg-main border border-jarvis-border px-4 py-3">
         <p className="text-[12px] text-jarvis-text-secondary">
-          <span className="font-medium text-jarvis-text-primary">Target Zone 2:</span>{' '}
+          <span className="font-medium text-jarvis-text-primary">Target Zone {mode === 'z5' ? '5' : '2'}:</span>{' '}
           <span className="font-mono">{consensusMin}–{consensusMax} bpm</span>{' '}
           <span className="text-jarvis-text-dim">
-            (min = highest floor across all methods, max = highest ceiling)
+            {mode === 'z5'
+              ? '(min = lowest Z5 floor, max = highest Z5 floor across methods)'
+              : '(min = highest floor across all methods, max = highest ceiling)'}
           </span>
         </p>
       </div>
