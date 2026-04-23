@@ -4,6 +4,17 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-23 — Cardio analysis: follow-ups (v3.4.0)
+
+**Context:** v3.4.0 added Z5 calculator view, pace-based walk filter, and loosened weekly-review framing. A few items are out of scope for this ship.
+
+**Items:**
+- **Backfill: prune historical incline-walk entries.** The new `secPerKm <= 600` filter only applies to future ingestions. Any treadmill walks already logged to the Notion Runs DB from the v3.0.8 window remain. One-shot cleanup script that queries Notion Runs DB for pace > 10:00/km and archives them would clean the dataset the weekly analysis runs on.
+- **Max-HR input for Z5 band accuracy.** Z5 bands lean heavily on the age-based `maxHR = 220 − age` fallback when a measured max HR is not yet synced. Once a true max from a race or Garmin test is known, the Z5 consensus band will tighten meaningfully. Worth prompting the user to enter a tested max HR once they have one.
+- **Weekly-review observability.** The prompt change is invisible until the next Saturday cron fires. Add a "preview weekly analysis" button on `/cardio-analysis` that re-runs the analysis for the current partial week on demand, so prompt iterations can be tested without waiting for Saturday.
+
+---
+
 ## 2026-04-22 — Current Events tabs: follow-ups (v3.2.0)
 
 **Context:** v3.2.0 shipped Email / Indonesia / International tabs for Current Events. A few items were explicitly scoped out and should be picked up in follow-up ships once the core tab experience settles.

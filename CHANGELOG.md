@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.4] — 2026-04-23 — Cardio analysis: Z5 calculator, walk filter, weekly-mix review (v3.4.0)
+
+Three refinements to Cardio Analysis after v3.0.8 dropped the outdoor-only filter for treadmill runs.
+
+- `src/components/HRZoneCalculator.tsx`: HR Zone Calculator now toggles between Zone 2 and Zone 5. Z2 view unchanged (Age, Karvonen, LTHR, Attia, Galpin Blue, MAF with highest-floor/highest-ceiling consensus band). Z5 view shows Age 90-100%, Karvonen 90-100% HRR, LTHR-based Friel Z5 (≥106%), Attia 90-100%, Coggan VO2 (110%+ LTHR), Galpin Red 90-100%. Z5 consensus band is the spread of Z5 floors across methods (min of floors to max of floors) — the useful "entry to Z5" band, since ceilings all collapse at max HR. Header copy, target label, YAxis scale, and chart domain all switch with the mode. Same `/api/cardio/hr-zones` feed powers both.
+- `src/lib/running-analysis/index.ts`: added pace-based walk filter. Any activity with duration/distance implying pace slower than 10:00/km (600 sec/km) is dropped before ingestion, regardless of activity type. Catches incline-walk sessions that Garmin tags as `treadmill_running` / `indoor_running`. Outdoor runs and genuine treadmill runs are unaffected.
+- `src/lib/running-analysis/analysis-engine.ts`: loosened the weekly-review prompt. The "plan adherence per date" and "continuity vs last week's focus" lenses are gone. New framing is two lenses — WEEKLY MIX (did the week deliver the planned session types and volumes as a whole?) and PROGRESSION IN CONTEXT (form/efficiency + like-for-like pace, unchanged). Explicit instruction added to NOT flag day-of-week shifts or sessions moved within the week — only flag when weekly totals are off or when a push slips into the following week. Last-week's insight is still passed in as context, but the prompt no longer grades week-over-week adherence.
+- Verified: `npm run build` passes. Browser preview of `/cardio-analysis`: Z2 ↔ Z5 toggle confirmed with Z5 consensus band 167–180 bpm (lowest Z5 floor up to highest Z5 floor across methods). Backend pace filter and prompt change surface on next running-analysis cron run.
+
 ## [3.3] — 2026-04-22 — Current Events: one-story-per-paragraph rule (v3.3.0)
 
 First-day feedback on v3.2.0: paragraphs kept bundling unrelated stories ("Russia halts Kazakh oil; Spirit Airlines rescue advances" / "Dave Mason dies; Wembanyama concussion"). The v3.2.0 prompt's "merge before pad" rule encouraged Claude to combine thinly-related headlines into a single theme on slow-news days; the result read as grab-bag lists rather than coherent theme synthesis.
