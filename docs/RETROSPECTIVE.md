@@ -4,6 +4,24 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-24 — v3.6.0 Current Events: outlet blocklist per tab
+
+User flagged low-value outlets cluttering the Indonesia and International feeds: sports niches (Fox Sports, Cleveland Browns, Bleeding Green Nation, NBC Sport), a pop-science aggregator (phys.org), and Indonesian clickbait outlets (Lentera.co, Qoo Media, Monitorday, detikHot, Bolasport, asatunews.co.id). Added a per-tab blocklist at the RSS ingestion layer so those sources are dropped before Claude ever sees them.
+
+**Well:**
+- Right layer for the fix. Blocklisting at ingestion (in `googleNewsRss.ts`) rather than at the synthesis prompt means blocked outlets never waste context tokens, never count toward outletScore, and never appear in the UI source chips. One place, one pass, done.
+- Case-insensitive substring match catches spelling variants ("NBC Sport" vs "NBC Sports", "Bolasport.com" vs "Bolasports.com") without requiring exact names. This matters because Google News occasionally returns different formatted outlet names for the same publisher.
+- Scrubbing related outlets (not just primaries) protects the coverage score from inflation by blocked outlets. Without that, a story covered primarily by NYT but also picked up by phys.org would show coverage N with phys.org contributing to the count.
+
+**Wrong:**
+- User's list had "Lenterea.co" but the actual outlet name in Google News is "Lentera.co" (missing the extra 'e'). Flagged the likely typo and added both spellings so the blocklist is robust whether the source name appears as the literal form the user gave or the real one Google News uses. Should probably surface this kind of match uncertainty back to the user as a confirmation rather than silently correcting, but the real-feed evidence was strong enough to assume.
+
+**Next:**
+- If the blocklist grows past ~15 entries per locale, consider moving it to a Supabase table or env-driven config so the user can edit without a code change.
+- Consider the inverse: a per-locale allowlist of tier-1 outlets whose coverage adds an explicit score boost (distinct from just appearing in Google News's related bundle).
+
+---
+
 ## 2026-04-24 — v3.5.0 Current Events: signals line + neutral voice
 
 Two enhancements on user feedback after a few days of reading the v3.3.0 output: (1) surface quantitative rationale for why Jarvis picked these themes over others, and (2) strip personal-relevance framing from the synthesis prose ("this matters for Indonesian CEOs…" language was noisy). Both shipped as prompt changes plus a small `renderMarkdown` rule; no schema or cost change.
