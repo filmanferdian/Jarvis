@@ -4,6 +4,17 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.5] — 2026-04-24 — Current Events: signals line + neutral voice (v3.5.0)
+
+Each theme in the Indonesia and International tabs now shows a quantitative signals line under its title, and the synthesis prose drops personal-relevance framing entirely.
+
+- `src/lib/sync/newsSynthesis.ts`: new `fetchPriorThemes()` helper queries the last 6 rows of `news_synthesis`, extracts bold theme titles from `indonesia_synthesis` and `international_synthesis` columns, groups by `date + time_slot`, and injects as `<prior_themes_indonesia>` / `<prior_themes_international>` blocks in the prompt. Claude uses these to classify each new theme's recurrence deterministically against prior slots rather than guessing.
+- Signals line format, emitted as the second line of every theme: `_signals: coverage N · M articles · RECURRENCE_`. `coverage N` is the highest `outletScore` among items Claude bundled into that theme — read directly from the pre-ranked list, not recounted. `M articles` is distinct RSS items bundled. `RECURRENCE` is one of `new`, `2nd slot`, `3rd slot`, `ongoing 2 days`, `ongoing 3 days`, etc., cross-referenced against the prior-themes blocks.
+- Dropped Jarvis context injection from the news synthesis prompt. `buildJarvisContext({ pages: ['about_me', 'work', 'projects'] })` is no longer called here — the editorial lens (macro, policy, geopolitics, markets, business, AI/tech, science; skip human-interest/celebrity/sports) stays as a prompt-level rule but no longer carries personal priorities.
+- Voice rule tightened. Explicit ban on second-person language ("you", "your", "the reader") and personal-relevance framing ("this matters for Indonesian CEOs", "implications for your business"). Prose now reads as general-publication analyst copy — describes the story and its wider-world implications, not its implications for any specific reader.
+- `src/lib/renderMarkdown.ts`: new line-level rule matches `^_signals:...$_` and renders as a small muted monospace block (`text-jarvis-text-muted text-xs font-mono`), so the signals line reads as metadata under the theme title, not as prose.
+- Verified: Indonesia and International tabs render signals line in UI correctly; today's lighter news day shows `coverage 1` across most themes (accurate — Google News's related-bundle is thin today); `RECURRENCE` correctly identifies stories carrying over from prior slots as "2nd slot" or "3rd slot". Build clean, no schema change, no cost delta.
+
 ## [3.4] — 2026-04-23 — Cardio analysis: Z5 calculator, walk filter, weekly-mix review (v3.4.0)
 
 Three refinements to Cardio Analysis after v3.0.8 dropped the outdoor-only filter for treadmill runs.

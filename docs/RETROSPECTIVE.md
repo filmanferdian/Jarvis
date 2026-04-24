@@ -4,6 +4,27 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-24 — v3.5.0 Current Events: signals line + neutral voice
+
+Two enhancements on user feedback after a few days of reading the v3.3.0 output: (1) surface quantitative rationale for why Jarvis picked these themes over others, and (2) strip personal-relevance framing from the synthesis prose ("this matters for Indonesian CEOs…" language was noisy). Both shipped as prompt changes plus a small `renderMarkdown` rule; no schema or cost change.
+
+**Well:**
+- The `outletScore` signal was already being computed in `googleNewsRss.ts` as the ranking key, but was never surfaced to the reader. Exposing it as "coverage N" in the UI closed that loop — the same number that determines "why this theme leads" is now visible to the user, which is the honest way to answer their question.
+- Recurrence tracking is deterministic, not vibes. `fetchPriorThemes()` queries the last 6 stored slots, extracts the bold `**Title**` lines from each column, and hands Claude a structured prior-slot block to cross-reference. Claude classifies recurrence by comparing new-theme titles against that block. Verified: evening Hormuz story correctly tagged "ongoing 4 days" while one-off local stories tagged "new".
+- Dropping `buildJarvisContext` from this one prompt simplifies it materially — fewer tokens, no personal-priority bias leaking into selection. The news synthesis is one of the few Jarvis surfaces where general analyst framing is genuinely more useful than personalized framing.
+- UI rendering is subtle, not shouty. The signals line is a small muted monospace block under the bold title — reads as metadata, doesn't compete with the paragraph.
+
+**Wrong:**
+- First attempt at the signals definition asked Claude to "count unique outlets across the primary outlet plus the 'also:' list." Output showed "1 outlet" on almost every theme even when items had `also:` bundles — Claude was interpreting the instruction literally and not always counting the also-list correctly. Fixed by replacing the count-yourself instruction with "read the `outletScore=X` field directly from the pre-ranked list, don't recount." Claude recounting is an anti-pattern when the number is already deterministic.
+- Today's dev-test feed happened to be thin — most themes showed `coverage 1`, which doesn't showcase the signal's range. Verified on the 2026-04-22 Hormuz crisis data that the signal DOES differentiate (coverage 6 across WSJ/CNN/NYT/Fox/Al Jazeera/Bahasa outlets), but first-read users on a slow news day may wonder if the number ever moves.
+
+**Next:**
+- Watch across a busy news day to confirm coverage values span a realistic range (1 to 8+) and the spread is visible in the UI.
+- If the signal feels underused, consider surfacing the "discarded themes" too — a small footer line like "top 3 themes selected; 4 others below outletScore 3" — to make the selection rule even more transparent.
+- Apply the same "show the rationale" pattern to the Email tab when it carries more than one newsletter (currently the Email signals line is optional; may want to surface `N newsletters · RECURRENCE` when there's material to show).
+
+---
+
 ## 2026-04-23 — v3.4.0 Cardio analysis: Z5 calculator, walk filter, weekly-mix review
 
 Three small tweaks batched after real use of the v3.0.8 "include treadmill" change surfaced rough edges: the HR Zone Calculator only covered Z2 but VO2 max intervals need a Z5 target band; incline-walk sessions were flowing into the running log because `treadmill_running` is also what Garmin tags an incline-walk; and the weekly review was nitpicking day-of-week adherence when the actual training happens across a flexible week.

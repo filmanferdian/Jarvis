@@ -31,6 +31,12 @@ export function renderMarkdown(text: string): string {
     .replace(/(^\d+\.\s+.+$)\n{2,}(^\d+\.\s+)/gm, '$1\n$2')
     // Bold: **text** → <strong>
     .replace(/\*\*(.+?)\*\*/g, '<strong class="text-jarvis-text-primary">$1</strong>')
+    // Signals line: a whole line wrapped in underscores like "_signals: 5 outlets · 8 articles · new_"
+    // Rendered as a small muted monospace block so it reads as metadata, not prose.
+    .replace(
+      /^_(signals:.+?)_$/gim,
+      '<div class="text-jarvis-text-muted text-xs font-mono mt-0.5 mb-1">$1</div>',
+    )
     // Bullet list items: "- text" → <li>
     .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
     // Numbered list items: "1. text" → <li>
