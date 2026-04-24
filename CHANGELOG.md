@@ -4,6 +4,16 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.6] — 2026-04-24 — Current Events: outlet blocklist per tab (v3.6.0)
+
+Low-value outlets (sports niches and clickbait aggregators) were showing up in the Indonesia and International feeds, consuming a slot and dragging down the average relevance of what the synthesis drew from. Added a per-tab blocklist applied at RSS ingestion time.
+
+- `src/lib/sources/googleNewsRss.ts`: new `BLOCKED_OUTLETS` map keyed by locale. Items whose primary `source` matches are dropped entirely before ranking; related outlets matching the blocklist are scrubbed from `relatedOutlets` and do NOT count toward `outletScore` either, so the coverage signal now reflects only outlets actually worth surfacing. Matching is case-insensitive substring so variants (NBC Sport / NBC Sports, Bolasport.com / Bolasports.com) all catch.
+- International blocklist: `fox sports`, `cleveland browns`, `bleeding green nation`, `nbc sport`, `phys.org`.
+- Indonesia blocklist: `lentera.co`, `lenterea.co`, `qoo media`, `monitorday`, `detikhot`, `bolasport`, `asatunews.co.id`.
+- Verified on the 2026-04-24 afternoon slot: Lentera.co (previously appearing in sources) filtered out, no blocked outlet names in either tab's source chip list. 32 Indonesia + 35 International items retained after filtering.
+- No schema change, no cost change, no prompt change. Purely an ingestion-layer filter.
+
 ## [3.5] — 2026-04-24 — Current Events: signals line + neutral voice (v3.5.0)
 
 Each theme in the Indonesia and International tabs now shows a quantitative signals line under its title, and the synthesis prose drops personal-relevance framing entirely.
