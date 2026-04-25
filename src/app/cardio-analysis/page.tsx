@@ -16,6 +16,9 @@ interface AnalysisStatus {
 interface TriggerResult {
   weekStart: string;
   weekEnd: string;
+  garminFetched: number | null;
+  garminSynced: number | null;
+  garminSkipReason: string | null;
   activitiesFound: number;
   activitiesIngested: number;
   activitiesSkipped: number;
@@ -583,8 +586,16 @@ export default function CardioAnalysisPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
                 { label: 'Week', value: `${result.weekStart} → ${result.weekEnd}` },
-                { label: 'Activities found', value: String(result.activitiesFound) },
-                { label: 'Ingested', value: String(result.activitiesIngested) },
+                {
+                  label: 'Garmin sync',
+                  value: result.garminSkipReason
+                    ? 'Skipped'
+                    : result.garminFetched != null && result.garminSynced != null
+                      ? `${result.garminSynced}/${result.garminFetched} upserted`
+                      : '—',
+                },
+                { label: 'Activities found (this week)', value: String(result.activitiesFound) },
+                { label: 'Ingested to Notion', value: String(result.activitiesIngested) },
                 { label: 'Skipped (dup)', value: String(result.activitiesSkipped) },
                 { label: 'Analysis', value: result.analysisGenerated ? 'Generated' : 'Skipped' },
                 { label: 'Weekly Insights', value: result.weeklyInsightUpdated ? 'Updated' : 'Failed' },
@@ -596,6 +607,15 @@ export default function CardioAnalysisPage() {
                 </div>
               ))}
             </div>
+
+            {result.garminSkipReason && (
+              <div>
+                <p className="text-[12px] mb-1" style={{ color: 'var(--color-jarvis-warn)' }}>
+                  Garmin sync did not run:
+                </p>
+                <p className="text-[12px] text-jarvis-text-dim font-mono">{result.garminSkipReason}</p>
+              </div>
+            )}
 
             {result.errors.length > 0 && (
               <div>
