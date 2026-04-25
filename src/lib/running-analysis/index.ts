@@ -14,7 +14,7 @@
 import { supabase } from '@/lib/supabase';
 import { unwrapJsonb } from '@/lib/crypto';
 import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
-import { enrichActivity, EnrichedActivityData } from './garmin-enrich';
+import { enrichActivity, EnrichedActivityData, SegmentType } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext, PlanContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
@@ -185,17 +185,22 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
   const elevGain = raw.elevationGain as number | null;
   const elevGainM = elevGain ? Math.round(elevGain * 10) / 10 : null;
 
-  // Fastest km pace — find the full-km lap with fastest pace
+  // Fastest km pace — exclude warm-up / cool-down / interval-rest, prefer
+  // ≥ 900 m laps (real km splits) but fall back to any eligible lap if none.
   let fastestKmPace: string | null = null;
   if (enriched.splits.length > 0) {
-    const fullKmSplits = enriched.splits.filter((s) => s.distanceMeters >= 900);
-    if (fullKmSplits.length > 0) {
-      const fastestSplit = fullKmSplits.reduce((best, s) => {
+    const EXCLUDED: ReadonlySet<SegmentType> = new Set(['warm-up', 'cool-down', 'interval-rest']);
+    const eligible = enriched.splits.filter((s) => !EXCLUDED.has(s.segmentType));
+    const preferred = eligible.filter((s) => s.distanceMeters >= 900);
+    const pool = preferred.length > 0 ? preferred : eligible;
+    if (pool.length > 0) {
+      const fastestSplit = pool.reduce((best, s) => {
         const paceS = s.durationSeconds / s.distanceMeters;
         const bestPace = best.durationSeconds / best.distanceMeters;
         return paceS < bestPace ? s : best;
       });
-      fastestKmPace = `Km ${fastestSplit.lapIndex} -- ${fastestSplit.pacePerKm} /km`;
+      const km = (fastestSplit.distanceMeters / 1000).toFixed(2);
+      fastestKmPace = `L${fastestSplit.lapIndex} (${km} km) -- ${fastestSplit.pacePerKm} /km`;
     }
   }
 

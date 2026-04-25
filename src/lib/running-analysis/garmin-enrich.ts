@@ -12,6 +12,14 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+export type SegmentType =
+  | 'warm-up'
+  | 'main'
+  | 'tempo'
+  | 'interval-work'
+  | 'interval-rest'
+  | 'cool-down';
+
 export interface SplitData {
   lapIndex: number;
   distanceMeters: number;
@@ -27,6 +35,8 @@ export interface SplitData {
   vertRatioPct: number | null;
   elevGain: number | null;
   elevLoss: number | null;
+  /** Inferred from HR + pace heuristics; defaults to 'main' for uniform runs. */
+  segmentType: SegmentType;
 }
 
 export interface WeatherData {
@@ -158,6 +168,180 @@ function extractPerfCondition(
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Lap segment classification
+//
+// Free-form runs use manual lap presses to mark transitions (Z2 → tempo,
+// warm-up → interval → rest → ...). Garmin doesn't expose lap intent on
+// /splits, so we infer segment type from HR + pace relative to the run's
+// main-effort baseline.
+//
+// Design priorities:
+//  1. Backward compatible — uniform Z2 runs classify entirely as 'main'.
+//  2. Conservative — only escalate when multiple signals agree.
+//  3. Single pass; mutates in place; ordering matters (warm-up/cool-down
+//     first, then tempo trailing-window, then interval alternation).
+// ---------------------------------------------------------------------------
+
+const MIN_SEGMENT_DURATION_S = 60;
+const WARM_COOL_HR_DELTA = 15;          // bpm below median main HR
+const WARM_COOL_PACE_DELTA_S = 60;      // sec/km slower than median
+const WARM_COOL_MAX_DURATION_S = 12 * 60; // VO2 max warm-up jogs can run 8–10 min
+const TEMPO_HR_FLOOR = 155;             // Z3 cap → tempo entry
+const TEMPO_PACE_DELTA_S = 30;          // sec/km faster than median
+const INTERVAL_WORK_HR_FLOOR = 160;     // Z4 entry
+const INTERVAL_WORK_MAX_DURATION_S = 6 * 60;
+const INTERVAL_REST_HR_CEIL = 150;      // Z3 cap (rest is below this)
+const INTERVAL_REST_MAX_DURATION_S = 3 * 60;
+
+/** Convert "M:SS" pace string to seconds per km. Returns Infinity on bad input
+ *  so a missing pace can't accidentally win a min/median comparison. */
+function paceStringToSec(pace: string): number {
+  if (!pace || pace === '--:--') return Infinity;
+  const [m, s] = pace.split(':').map(Number);
+  if (!Number.isFinite(m) || !Number.isFinite(s)) return Infinity;
+  return m * 60 + s;
+}
+
+function median(values: number[]): number | null {
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length === 0) return null;
+  const sorted = [...finite].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+/** Median HR / pace from middle 60% of laps (trim 20% each end). Excludes
+ *  likely warm-up/cool-down so they can't drag the baseline. With ≤3 laps,
+ *  uses all so the baseline isn't empty. */
+function computeBaseline(splits: SplitData[]): { medHr: number | null; medPaceS: number | null } {
+  if (splits.length === 0) return { medHr: null, medPaceS: null };
+  const window = splits.length <= 3
+    ? splits
+    : splits.slice(Math.floor(splits.length * 0.2), splits.length - Math.floor(splits.length * 0.2));
+  return {
+    medHr: median(window.map((s) => s.avgHr ?? NaN)),
+    medPaceS: median(window.map((s) => paceStringToSec(s.pacePerKm))),
+  };
+}
+
+export function classifyLaps(splits: SplitData[]): SplitData[] {
+  // Initialize / reset to default
+  for (const s of splits) s.segmentType = 'main';
+
+  // Pure short run (1 lap or 0): nothing to classify.
+  if (splits.length < 2) return splits;
+
+  const { medHr, medPaceS } = computeBaseline(splits);
+  if (medHr == null || medPaceS == null || !Number.isFinite(medPaceS)) {
+    // No baseline — leave everything as 'main' (defensive default).
+    return splits;
+  }
+
+  // Step 1: Warm-up (lap 1 or 2, earliest qualifier only)
+  for (let i = 0; i < Math.min(2, splits.length); i++) {
+    const s = splits[i];
+    if (s.durationSeconds < MIN_SEGMENT_DURATION_S) continue;
+    if (s.durationSeconds >= WARM_COOL_MAX_DURATION_S) continue;
+    if (s.avgHr == null) continue;
+    const paceS = paceStringToSec(s.pacePerKm);
+    if (
+      s.avgHr < medHr - WARM_COOL_HR_DELTA &&
+      paceS > medPaceS + WARM_COOL_PACE_DELTA_S
+    ) {
+      s.segmentType = 'warm-up';
+      break;
+    }
+  }
+
+  // Step 2: Cool-down (last lap only)
+  const last = splits[splits.length - 1];
+  if (
+    last.segmentType === 'main' &&
+    last.durationSeconds >= MIN_SEGMENT_DURATION_S &&
+    last.durationSeconds < WARM_COOL_MAX_DURATION_S &&
+    last.avgHr != null &&
+    last.avgHr < medHr - WARM_COOL_HR_DELTA &&
+    paceStringToSec(last.pacePerKm) > medPaceS + WARM_COOL_PACE_DELTA_S
+  ) {
+    last.segmentType = 'cool-down';
+  }
+
+  // Step 3: Tempo (consecutive trailing laps before cool-down).
+  // Walk backwards, marking qualifiers as 'tempo' until a non-qualifier
+  // breaks the run.
+  let endIdx = splits.length - 1;
+  if (splits[endIdx].segmentType === 'cool-down') endIdx--;
+  for (let i = endIdx; i >= 0; i--) {
+    const s = splits[i];
+    if (s.segmentType !== 'main') break;
+    if (s.durationSeconds < MIN_SEGMENT_DURATION_S) break;
+    if (s.avgHr == null) break;
+    const paceS = paceStringToSec(s.pacePerKm);
+    if (s.avgHr >= TEMPO_HR_FLOOR && paceS <= medPaceS - TEMPO_PACE_DELTA_S) {
+      s.segmentType = 'tempo';
+    } else {
+      break;
+    }
+  }
+
+  // Step 4: Intervals — must alternate work/rest with ≥2 work laps.
+  // Two-pass: tag candidates, then verify alternation. If alternation fails,
+  // revert so a single fast lap inside a Z2 run isn't mis-labeled.
+  type Tag = 'work' | 'rest' | null;
+  // Pace check intentionally omitted from work detection: in a VO2 max
+  // session the rest laps drag the median pace toward work pace, so a
+  // "faster than median" comparison fails. HR floor + short duration +
+  // alternation are sufficient signals.
+  const tags: Tag[] = splits.map((s) => {
+    if (s.segmentType !== 'main') return null;
+    if (s.durationSeconds < MIN_SEGMENT_DURATION_S) return null;
+    if (s.avgHr == null) return null;
+    if (
+      s.avgHr >= INTERVAL_WORK_HR_FLOOR &&
+      s.durationSeconds < INTERVAL_WORK_MAX_DURATION_S
+    ) {
+      return 'work';
+    }
+    if (
+      s.avgHr < INTERVAL_REST_HR_CEIL &&
+      s.durationSeconds < INTERVAL_REST_MAX_DURATION_S
+    ) {
+      return 'rest';
+    }
+    return null;
+  });
+
+  const workIdxs = tags.flatMap((t, i) => (t === 'work' ? [i] : []));
+  if (workIdxs.length >= 2) {
+    let alternates = true;
+    for (let k = 0; k < workIdxs.length - 1; k++) {
+      const between = tags.slice(workIdxs[k] + 1, workIdxs[k + 1]);
+      if (between.length === 0 || between.length > 2 || !between.includes('rest')) {
+        alternates = false;
+        break;
+      }
+    }
+    if (alternates) {
+      for (let i = 0; i < splits.length; i++) {
+        if (tags[i] === 'work') {
+          splits[i].segmentType = 'interval-work';
+        } else if (
+          tags[i] === 'rest' &&
+          i > workIdxs[0] &&
+          i < workIdxs[workIdxs.length - 1]
+        ) {
+          splits[i].segmentType = 'interval-rest';
+        }
+      }
+    }
+  }
+
+  return splits;
+}
+
 export async function enrichActivity(activityId: string): Promise<EnrichedActivityData> {
   const client = await createGarminClient();
 
@@ -223,8 +407,10 @@ export async function enrichActivity(activityId: string): Promise<EnrichedActivi
           : null,
         elevGain: (lap.elevationGain as number) ?? null,
         elevLoss: (lap.elevationLoss as number) ?? null,
+        segmentType: 'main',
       });
     }
+    classifyLaps(splits);
   }
 
   // Parse weather — Garmin uses field names `temp` and `apparentTemp`
