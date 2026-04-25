@@ -17,6 +17,39 @@ function notionHeaders(apiKey: string) {
   };
 }
 
+/**
+ * Ensure the Runs DB has all expected properties. Idempotent — only PATCHes
+ * the schema when at least one expected column is missing. Notion's PATCH
+ * /databases endpoint accepts a `properties` map and adds missing keys
+ * without disturbing existing ones. Mirrors the pattern in weekly-insights-db.
+ */
+export async function ensureRunsDbSchema(apiKey: string): Promise<void> {
+  const res = await fetch(`${NOTION_API}/databases/${RUNS_DB_ID}`, {
+    headers: notionHeaders(apiKey),
+  });
+  if (!res.ok) return;
+  const db = await res.json();
+  const existing = new Set(Object.keys(db.properties ?? {}));
+
+  const required: Record<string, unknown> = {
+    'Session Profile': { rich_text: {} },
+    'Lap Profile': { rich_text: {} },
+  };
+
+  const missing: Record<string, unknown> = {};
+  for (const [name, def] of Object.entries(required)) {
+    if (!existing.has(name)) missing[name] = def;
+  }
+
+  if (Object.keys(missing).length === 0) return;
+
+  await fetch(`${NOTION_API}/databases/${RUNS_DB_ID}`, {
+    method: 'PATCH',
+    headers: notionHeaders(apiKey),
+    body: JSON.stringify({ properties: missing }),
+  });
+}
+
 export interface RunActivity {
   garminId: string;
   name: string;
