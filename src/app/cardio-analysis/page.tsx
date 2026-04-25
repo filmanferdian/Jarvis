@@ -1,9 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis,
-} from 'recharts';
 import { fetchAuth } from '@/lib/fetchAuth';
 import AppShell from '@/components/AppShell';
 import HRZoneCalculator from '@/components/HRZoneCalculator';
@@ -248,38 +245,6 @@ export default function CardioAnalysisPage() {
     loadHrv();
   }, [loadStatus, loadInsights, loadHrv]);
 
-  const zoneDistribution = useMemo(() => {
-    const mins = Array(ZONES.length).fill(0);
-    for (const r of recentRuns) {
-      const z = classifyZone(r.avgHr);
-      if (z < 0) continue;
-      const runMins = r.durationMins ?? parseDurationMins(r.durationFormatted);
-      mins[z] += runMins;
-    }
-    const total = mins.reduce((a, b) => a + b, 0);
-    return ZONES.map((z, i) => ({
-      ...z,
-      mins: mins[i],
-      pct: total > 0 ? mins[i] / total : 0,
-    }));
-  }, [recentRuns]);
-
-  const scatterData = useMemo(() => {
-    const hrvByDate = new Map(hrvTrend.map((p) => [p.date, p.value]));
-    return recentRuns
-      .map((r) => {
-        const hrv = hrvByDate.get(r.date);
-        if (hrv == null || r.trainingLoad == null) return null;
-        return {
-          date: r.date,
-          hrv,
-          load: r.trainingLoad,
-          distance: r.distanceKm,
-        };
-      })
-      .filter((x): x is { date: string; hrv: number; load: number; distance: number } => x !== null);
-  }, [recentRuns, hrvTrend]);
-
   const verdict = useMemo(() => buildVerdict(recentRuns, hrvTrend), [recentRuns, hrvTrend]);
 
   async function handleTrigger() {
@@ -340,118 +305,6 @@ export default function CardioAnalysisPage() {
             <p className="text-[14px] leading-relaxed text-jarvis-text-dim m-0 max-w-[720px]">
               {verdict.body}
             </p>
-          </div>
-        </div>
-
-        {/* Cardio grid: zones + scatter */}
-        <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] gap-5">
-          {/* Zones */}
-          <div
-            className="rounded-[14px] border p-5"
-            style={{
-              background: 'var(--color-jarvis-bg-card)',
-              borderColor: 'var(--color-jarvis-border)',
-            }}
-          >
-            <h2 className="text-[13px] font-medium text-jarvis-text-primary uppercase tracking-wider mb-1">
-              Zone distribution
-            </h2>
-            <p className="text-[12px] text-jarvis-text-faint mb-4">
-              Time-in-zone across the last {recentRuns.length} run{recentRuns.length === 1 ? '' : 's'} (classified by avg HR).
-            </p>
-            <div className="flex flex-col gap-2.5 mt-2.5">
-              {zoneDistribution.map((z) => (
-                <div
-                  key={z.key}
-                  className="grid items-center gap-2 sm:gap-3 text-[12.5px] grid-cols-[auto_1fr_auto]"
-                >
-                  <span className="font-mono text-[10.5px] text-jarvis-text-dim">
-                    {z.label} · {z.short}
-                  </span>
-                  <div
-                    className="h-2 rounded-full overflow-hidden"
-                    style={{ background: 'var(--color-jarvis-track)' }}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.max(z.pct * 100, z.mins > 0 ? 2 : 0)}%`,
-                        background: z.color,
-                      }}
-                    />
-                  </div>
-                  <span className="font-mono text-[11px] text-right text-jarvis-text-dim">
-                    {z.mins > 0 ? `${formatDuration(z.mins)} · ${Math.round(z.pct * 100)}%` : '—'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* HRV vs Load scatter */}
-          <div
-            className="rounded-[14px] border p-5"
-            style={{
-              background: 'var(--color-jarvis-bg-card)',
-              borderColor: 'var(--color-jarvis-border)',
-            }}
-          >
-            <h2 className="text-[13px] font-medium text-jarvis-text-primary uppercase tracking-wider mb-1">
-              HRV vs training load
-            </h2>
-            <p className="text-[12px] text-jarvis-text-faint mb-4">
-              Each dot is a run day — watch for HRV dropping as load climbs.
-            </p>
-            {scatterData.length > 0 ? (
-              <div style={{ width: '100%', height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 10, right: 10, bottom: 24, left: 0 }}>
-                    <CartesianGrid strokeDasharray="2 4" stroke="rgba(12,15,36,0.08)" />
-                    <XAxis
-                      type="number"
-                      dataKey="load"
-                      name="Load"
-                      tick={{ fill: 'rgba(12,15,36,0.38)', fontSize: 11 }}
-                      axisLine={{ stroke: 'rgba(12,15,36,0.08)' }}
-                      tickLine={false}
-                      label={{ value: 'Training load', position: 'insideBottom', offset: -12, fill: 'rgba(12,15,36,0.64)', fontSize: 11 }}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="hrv"
-                      name="HRV"
-                      tick={{ fill: 'rgba(12,15,36,0.38)', fontSize: 11 }}
-                      axisLine={{ stroke: 'rgba(12,15,36,0.08)' }}
-                      tickLine={false}
-                      label={{ value: 'HRV (7d)', angle: -90, position: 'insideLeft', fill: 'rgba(12,15,36,0.64)', fontSize: 11 }}
-                    />
-                    <ZAxis type="number" dataKey="distance" range={[40, 180]} name="Distance" />
-                    <Tooltip
-                      cursor={{ strokeDasharray: '2 4' }}
-                      contentStyle={{
-                        background: '#ffffff',
-                        border: '1px solid rgba(12,15,36,0.08)',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      formatter={(value, name) => {
-                        const v = typeof value === 'number' ? value.toFixed(1) : String(value ?? '');
-                        return [v, String(name ?? '')];
-                      }}
-                      labelFormatter={(_, payload) => {
-                        const d = payload?.[0]?.payload as { date?: string } | undefined;
-                        return d?.date ? formatShortDate(d.date) : '';
-                      }}
-                    />
-                    <Scatter data={scatterData} fill="#4a5dcf" fillOpacity={0.75} />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="text-[12px] text-jarvis-text-faint py-8 text-center">
-                No matched HRV + training-load days yet.
-              </p>
-            )}
           </div>
         </div>
 
