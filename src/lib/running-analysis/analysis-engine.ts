@@ -245,23 +245,23 @@ export async function generateWeeklyAnalysis(
   const lastWeekBlock = planContext && planContext.lastWeek.length > 0
     ? `
 
-LAST WEEK'S PLAN (structured — use to detect cross-week catch-ups):
+LAST WEEK'S PLAN (session-intent context only — for interpreting any prior-week reference in continuity, NOT for grading carry-overs or completeness):
 ${wrapUntrusted('untrusted_last_week_plan', sanitizeMultiline(formatPlannedDays(planContext.lastWeek), 3000))}`
     : '';
 
   const planBlock = planContext && planContext.thisWeek.length > 0
     ? `
-THIS WEEK'S PLAN (authoritative — source of truth for what each session was supposed to be). Week ${planContext.thisWeek[0].week}, ${planContext.thisWeek[0].phase}:
+THIS WEEK'S PLAN (SESSION-INTENT CONTEXT ONLY). Week ${planContext.thisWeek[0].week}, ${planContext.thisWeek[0].phase}:
 ${wrapUntrusted('untrusted_week_plan', sanitizeMultiline(formatPlannedDays(planContext.thisWeek), 3000))}
 ${lastWeekBlock}
 
-NEXT WEEK'S PLAN (reference this in FOCUS NEXT WEEK so the runner sees what's coming — e.g. VO2 max starting, tempo duration bump, Sat long-run distance change):
+NEXT WEEK'S PLAN (used in FOCUS NEXT WEEK to preview what's coming — e.g. VO2 max starting, tempo duration bump, Sat long-run distance change):
 ${wrapUntrusted('untrusted_next_week_plan', sanitizeMultiline(formatPlannedDays(planContext.nextWeek), 3000))}
 
-INTENSITY PROTOCOL (used to interpret zone names in the plan — Z2 HR target, tempo = Z3/Z4, VO2 max format, deload rules):
+INTENSITY PROTOCOL (used to interpret zone names — Z2 HR target, tempo = Z3/Z4, VO2 max format):
 ${wrapUntrusted('untrusted_protocol', sanitizeMultiline(planContext.cardioProtocolMd, 6000))}
 
-The runner began strict plan adherence on ${planContext.planAdherenceStartDate}. Before that date they were running loosely (mixed zones, not plan-adherent). Treat pre-adherence data as a weak baseline.`
+HOW TO USE THE PLAN: the plan tells you what each completed run was MEANT to be (Z2, tempo, VO2, long run, recovery) so you can judge execution quality on its own terms. The plan is NOT a grading rubric. Do NOT compare the actual session list to the planned session list. Do NOT count "missed" sessions, "extra" sessions, or "substituted" sessions. Do NOT comment on whether the planned mix was delivered. Adherence to the schedule is the runner's concern, not yours. Pre-${planContext.planAdherenceStartDate} historical data is a weak baseline for pace/HR comparisons (loose-program era).`
     : '';
 
   const continuityBlock = previousWeekInsight
@@ -292,9 +292,9 @@ The runner follows a structured program that ramps up over time — starting wit
 
 WALKING IS OUT OF SCOPE. This analysis is for running only. Treat any walk-only or treadmill-walking activity (typical signal: avg pace slower than 10:00/km with no run intervals, or an activity named "Walking" / "Treadmill Walking") as not-a-running-session. Do NOT include walks in the run count, do NOT credit them toward Z2 volume, do NOT mention them in the prose. Walks are filtered out of the data feed by ingestion in normal cases — this rule is a safety net.
 
-Your job: judge this week on TWO lenses simultaneously —
-1. WEEKLY MIX — did the week as a whole deliver the planned session types and volumes (Z2 count, tempo, VO2, long run)? Day-shifts within the week are expected and not a problem; only flag when the weekly total is off (missed session types, short on Z2 volume) or when a session slipped into the following week. CROSS-WEEK CATCH-UPS ARE NORMAL: if a run early in this week (especially Mon/Tue) matches a session type that was in LAST WEEK'S PLAN but appears not to have happened then, treat it as a legitimate catch-up — do NOT flag it as "extra" or "off-plan" for this week.
-2. PROGRESSION IN CONTEXT — form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
+Your job: judge this week on a SINGLE lens — PROGRESSION IN CONTEXT. Look at form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
+
+ADHERENCE IS NOT YOUR LENS. The runner manages their own schedule. You are NOT evaluating whether the planned mix was delivered, whether sessions were missed, substituted, moved between days, or carried across weeks. The plan is provided ONLY so you can interpret what each completed run was meant to be (Z2 vs tempo vs VO2 vs long run) when judging execution quality.
 ${timingBlock}
 ${planBlock}${continuityBlock}
 
@@ -314,13 +314,13 @@ Note: historical averages span both loose and plan-adherent periods. Use history
 
 Write a concise analysis in 4 sections. Use plain prose (no markdown headers or bullet points). Be specific and data-driven. Reference actual numbers. Acknowledge Jakarta heat/humidity when it's a relevant factor.
 
-Section 1 — HOW WAS THIS WEEK (2-3 sentences): Lead with the SHARPEST takeaway from the week — the standout session, a clear progression signal, or a notable gap. NOT a per-run roll-call ("the runner did X on Monday, then Y on Tuesday…"). If the week is in progress, say so briefly and frame the section as a mid-week read on what's gone down so far. Cite specific numbers (HR at Z2 pace, tempo split, VO2 interval pace, decoupling%) — generic praise like "solid week" or "good consistency" without a number is wasted prose.
+Section 1 — HOW WAS THIS WEEK (2-3 sentences): Lead with the SHARPEST progression signal from the runs that DID happen — a like-for-like pace improvement at the same HR, a clear cadence step-up, a decoupling reading on a long run, a tempo split, a VO2 interval read. Cite specific numbers (HR at Z2 pace, tempo split, VO2 interval pace, decoupling%, cadence). NEVER comment on what was/wasn't done versus the plan. If the week is in progress, frame as a mid-week read on completed sessions only. Generic praise like "solid week" without a number is wasted prose.
 
-Section 2 — WHAT'S GOOD (2-3 sentences): Wins across the two lenses: sessions at the right intensity and duration when they did happen, and progression signals (form/efficiency trending well AND like-for-like pace improvements).
+Section 2 — WHAT'S GOOD (2-3 sentences): Progression wins from the actual runs: form/efficiency trending well, like-for-like pace improvements, well-executed sessions at their intended intensity. Cite numbers.
 
-Section 3 — WHAT NEEDS WORK (2-3 sentences): Gaps grounded in actual data: ran Z2 too hot, cadence below target, high decoupling, poor tempo execution, inconsistent VO2 intervals, weekly volume of a session type genuinely below plan AT WEEK-END. Do NOT flag day-of-week shifts or sessions moved earlier/later in the week. Do NOT flag sessions on dates that have not occurred yet — wait until the week is complete to call out missed sessions. Do NOT flag a run as off-plan if it is a legitimate cross-week catch-up of a session from LAST WEEK'S PLAN. Do NOT flag slower raw average pace as a weakness when the weekly mix shifted toward Z2. If pace-at-same-HR on Z2 is worse than a prior Z2 day, call that out explicitly. If there is genuinely nothing to flag (week is on plan, form looks fine, in-progress with remaining sessions still ahead), say so in one sentence rather than manufacturing a concern.
+Section 3 — WHAT NEEDS WORK (2-3 sentences): Execution gaps observable in the actual runs only: ran Z2 too hot (HR above target on a Z2 session), cadence below target on a Z2 session, high decoupling on a long run, poor tempo execution, inconsistent VO2 intervals, pace-at-same-HR worse than a prior comparable session of the same type. EXPLICIT BANS: do NOT flag missed sessions, off-plan substitutions, day-of-week shifts, weekly volume vs plan, deviation from prescribed walk/rest days, or anything related to schedule adherence. If the runs that happened look fine on execution, say so in one sentence — do NOT manufacture concerns to fill the section.
 
-Section 4 — FOCUS NEXT WEEK (2-3 sentences): Concrete cues for next week's planned sessions. Reference plan targets (HR range, duration, session types from NEXT WEEK'S PLAN if provided) AND one or two form/efficiency/pace-at-HR targets carried over from the gaps above.
+Section 4 — FOCUS NEXT WEEK (2-3 sentences): Forward-looking cues for next week's planned sessions, referencing NEXT WEEK'S PLAN (HR range, duration, session types) plus one or two form/efficiency/pace-at-HR targets carried over from any execution gaps in Section 3. Do NOT use this section to relitigate this-week adherence.
 
 Respond in this exact JSON format:
 {
