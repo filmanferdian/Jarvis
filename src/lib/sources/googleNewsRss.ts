@@ -31,6 +31,12 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'bleeding green nation',
     'nbc sport', // matches "NBC Sport" and "NBC Sports"
     'phys.org',
+    'pff', // Pro Football Focus
+    'pro football reference',
+    'hollywood reporter', // matches "The Hollywood Reporter"
+    'raiders.com',
+    'minnesota vikings',
+    'deadline',
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -40,6 +46,11 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'detikhot',
     'bolasport', // matches "Bolasport.com" and "Bolasports.com"
     'asatunews.co.id',
+    'haibunda',
+    'fajar',
+    'gizmologi.id',
+    'mongabay.co.id',
+    'goal.com',
   ],
 };
 
