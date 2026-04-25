@@ -4,6 +4,20 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.9] — 2026-04-25 — Weekly running analysis: drop the adherence lens (v3.9.0)
+
+The v3.8.0 prompt fixed timing and walks, but the regenerated week-of-Apr-20 prose still led with "complete plan deviation" framing — scolding real running sessions on plan-coded walk days, missing cross-week catch-ups, and manufacturing concerns out of schedule comparison. The user's feedback was direct: "I don't want any feedback on deviation at all — that's less of my concern." This ship rips out the adherence lens entirely.
+
+- `src/lib/running-analysis/analysis-engine.ts`:
+  - Reduced the dual-lens framing ("WEEKLY MIX" + "PROGRESSION IN CONTEXT") to a single lens — PROGRESSION IN CONTEXT only. The model no longer evaluates whether the planned session mix was delivered.
+  - Added an explicit "ADHERENCE IS NOT YOUR LENS" rule directly under the lens framing: not evaluating missed/substituted/moved/carried-across-week sessions; the runner manages their own schedule.
+  - Repurposed the THIS WEEK / LAST WEEK plan blocks as session-intent context only — labeled as such, with a "HOW TO USE THE PLAN" rule that explicitly forbids using it as a grading rubric. The plan is now there ONLY so the model can interpret what each completed run was meant to be (Z2 vs tempo vs VO2 vs long run) when judging execution quality.
+  - Section 1 (HOW WAS THIS WEEK) rewritten to lead with the SHARPEST progression signal from runs that DID happen — like-for-like pace at HR, cadence step-up, decoupling on a long run, tempo split, VO2 interval read. No commentary on what was/wasn't done versus the plan.
+  - Section 3 (WHAT NEEDS WORK) rewritten to flag execution gaps in the actual runs only, with explicit bans on flagging missed sessions, off-plan substitutions, day-of-week shifts, weekly volume vs plan, or walk/rest-day deviation. If the runs that happened look fine, the model is told to say so in one sentence — not manufacture concerns.
+  - Section 4 (FOCUS NEXT WEEK) tightened to forbid relitigating this-week adherence in its setup; still references NEXT WEEK'S PLAN for forward-looking targets.
+  - Kept: TIMING block (in-progress vs complete week), WALKING IS OUT OF SCOPE rule, the continuity block referencing last week's synthesis prose.
+- No data-flow or schema changes. Plan loader still returns lastWeek/thisWeek/nextWeek; index.ts still threads today + planContext. Only the prompt's framing changed.
+
 ## [3.8] — 2026-04-25 — Weekly running analysis: timing-aware, carry-over-aware, walk-free (v3.8.0)
 
 ### Garmin sync: round avg_hr/calories before upsert (v3.8.1)
