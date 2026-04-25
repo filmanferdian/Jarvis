@@ -326,6 +326,36 @@ export async function createGarminClient(retries = GARMIN_LOGIN_RETRIES): Promis
 // Expected keys in raw_json when all endpoints are fetched
 const COMPLETE_RAW_KEYS = ['summary', 'bodyBattery', 'stress', 'hrv', 'trainingReadiness', 'trainingStatus', 'heartRate', 'sleep'];
 
+/** Build a `garmin_activities` upsert record from a raw Garmin activity object.
+ *  Centralizes type coercion — notably, integer columns (avg_hr, calories,
+ *  duration_seconds) MUST receive integers, not the fractional values Garmin
+ *  returns for running activities (e.g., averageHR=145.8969…). Postgres
+ *  rejects "131.3" → integer with code 22P02, silently breaking the upsert. */
+function buildActivityRecord(act: Record<string, unknown>) {
+  const speed = act.averageSpeed as number | null;
+  const hr = act.averageHR as number | null;
+  const cal = act.calories as number | null;
+  const dur = act.duration as number | null;
+  return {
+    activity_id: String(act.activityId),
+    activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
+    distance_meters: (act.distance as number) ?? null,
+    duration_seconds: dur != null ? Math.round(dur) : null,
+    avg_pace: speed
+      ? `${Math.floor(1000 / speed / 60)}:${String(Math.floor((1000 / speed) % 60)).padStart(2, '0')} /km`
+      : null,
+    avg_hr: hr != null ? Math.round(hr) : null,
+    calories: cal != null ? Math.round(cal) : null,
+    started_at: act.startTimeLocal
+      ? new Date(act.startTimeLocal as string + '+07:00').toISOString()
+      : act.startTimeGMT
+      ? new Date(act.startTimeGMT as string + 'Z').toISOString()
+      : null,
+    raw_json: wrapJsonb(act),
+    last_synced: new Date().toISOString(),
+  };
+}
+
 interface RawData {
   summary: Record<string, unknown>;
   bodyBattery: unknown[];
@@ -464,26 +494,14 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   // Sync recent activities
   let activitiesSynced = 0;
   if (activities.status === 'fulfilled' && Array.isArray(activities.value)) {
-    const actRecords = (activities.value as unknown as Record<string, unknown>[]).map((act) => ({
-      activity_id: String(act.activityId),
-      activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
-      distance_meters: (act.distance as number) ?? null,
-      duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
-      avg_pace: (act.averageSpeed as number)
-        ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
-        : null,
-      avg_hr: (act.averageHR as number) ?? null,
-      calories: (act.calories as number) ?? null,
-      started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-      raw_json: wrapJsonb(act),
-      last_synced: new Date().toISOString(),
-    }));
+    const actRecords = (activities.value as unknown as Record<string, unknown>[]).map(buildActivityRecord);
 
     for (const rec of actRecords) {
       const { error } = await supabase
         .from('garmin_activities')
         .upsert(rec, { onConflict: 'activity_id' });
       if (!error) activitiesSynced++;
+      else console.warn(`[garmin] upsert failed for activity ${rec.activity_id}: ${error.message}`);
     }
 
     // Auto-detect 10k run: find fastest run >=9.5km and record as health measurement
@@ -756,20 +774,7 @@ export async function syncRecentActivities(): Promise<{ fetched: number; synced:
 
   let synced = 0;
   if (Array.isArray(activities)) {
-    const actRecords = (activities as unknown as Record<string, unknown>[]).map((act) => ({
-      activity_id: String(act.activityId),
-      activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
-      distance_meters: (act.distance as number) ?? null,
-      duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
-      avg_pace: (act.averageSpeed as number)
-        ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
-        : null,
-      avg_hr: (act.averageHR as number) ?? null,
-      calories: (act.calories as number) ?? null,
-      started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-      raw_json: wrapJsonb(act),
-      last_synced: new Date().toISOString(),
-    }));
+    const actRecords = (activities as unknown as Record<string, unknown>[]).map(buildActivityRecord);
 
     for (const rec of actRecords) {
       const { error } = await supabase
@@ -1013,26 +1018,14 @@ export async function backfillDateRange(startDate: string, endDate: string, comp
 
         if (!Array.isArray(activities) || activities.length === 0) break;
 
-        const actRecords = (activities as unknown as Record<string, unknown>[]).map((act) => ({
-          activity_id: String(act.activityId),
-          activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
-          distance_meters: (act.distance as number) ?? null,
-          duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
-          avg_pace: (act.averageSpeed as number)
-            ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
-            : null,
-          avg_hr: (act.averageHR as number) ?? null,
-          calories: (act.calories as number) ?? null,
-          started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-          raw_json: wrapJsonb(act),
-          last_synced: new Date().toISOString(),
-        }));
+        const actRecords = (activities as unknown as Record<string, unknown>[]).map(buildActivityRecord);
 
         for (const rec of actRecords) {
           const { error } = await supabase
             .from('garmin_activities')
             .upsert(rec, { onConflict: 'activity_id' });
           if (!error) result.activities_synced++;
+          else console.warn(`[garmin] upsert failed for activity ${rec.activity_id}: ${error.message}`);
         }
 
         // Check if oldest activity in this page is before our target start
@@ -1199,26 +1192,14 @@ export async function backfillGarmin(force = false): Promise<BackfillResult & { 
       const allActivities = await client.getActivities(0, 100);
       await trackGarminCalls(1);
       if (Array.isArray(allActivities)) {
-        const actRecords = (allActivities as unknown as Record<string, unknown>[]).map((act) => ({
-          activity_id: String(act.activityId),
-          activity_type: (act.activityType as Record<string, unknown>)?.typeKey as string ?? String(act.activityType),
-          distance_meters: (act.distance as number) ?? null,
-          duration_seconds: (act.duration as number) ? Math.round(act.duration as number) : null,
-          avg_pace: (act.averageSpeed as number)
-            ? `${Math.floor(1000 / (act.averageSpeed as number) / 60)}:${String(Math.floor((1000 / (act.averageSpeed as number)) % 60)).padStart(2, '0')} /km`
-            : null,
-          avg_hr: (act.averageHR as number) ?? null,
-          calories: (act.calories as number) ?? null,
-          started_at: act.startTimeLocal ? new Date(act.startTimeLocal as string + '+07:00').toISOString() : act.startTimeGMT ? new Date(act.startTimeGMT as string + 'Z').toISOString() : null,
-          raw_json: wrapJsonb(act),
-          last_synced: new Date().toISOString(),
-        }));
+        const actRecords = (allActivities as unknown as Record<string, unknown>[]).map(buildActivityRecord);
 
         for (const rec of actRecords) {
           const { error } = await supabase
             .from('garmin_activities')
             .upsert(rec, { onConflict: 'activity_id' });
           if (!error) result.activities_synced++;
+          else console.warn(`[garmin] upsert failed for activity ${rec.activity_id}: ${error.message}`);
         }
       }
     } catch (err) {
