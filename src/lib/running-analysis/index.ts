@@ -348,15 +348,16 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
 
   const runs = (activities ?? []).filter((a) => {
     if (!isRun(a.activity_type)) return false;
-    // Exclude walks (pace slower than 10:00/km) — catches incline-walk sessions
-    // logged as treadmill_running / indoor_running. SKIP this filter when
-    // force_resync is set: user-driven re-ingestion is an explicit "trust me,
-    // pull this in" — necessary for VO2 max sessions whose interval rest gaps
-    // legitimately produce avg pace > 10:00/km.
-    if (options.forceResync) return true;
     if (!a.duration_seconds || !a.distance_meters) return true;
     const secPerKm = (a.duration_seconds / a.distance_meters) * 1000;
-    return secPerKm <= 600;
+    if (secPerKm <= 600) return true; // fast enough to be a real run
+    // Slow avg pace — could be an incline walk OR a VO2 max session whose
+    // interval-rest gaps drag the average above 10:00/km. Tiebreaker: real
+    // running (even with long rests between intervals) keeps avg HR ≥ 130;
+    // sustained walking stays below. Apr 21 VO2: 11:33/km @ 143 HR (kept).
+    // Apr 22 walk: 13:01/km @ 120 HR (dropped).
+    if (a.avg_hr != null && a.avg_hr >= 130) return true;
+    return false;
   });
   const activitiesFound = runs.length;
 

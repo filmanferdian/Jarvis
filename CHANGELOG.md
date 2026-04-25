@@ -6,6 +6,13 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Walk filter: HR tiebreaker for slow-paced VO2 max (v3.10.3)
+
+v3.10.2 escaped the walk filter via a `force_resync` bypass, but that path would also let real walks back in (Apr 22's archived "Treadmill Walking" would re-ingest on the next force_resync). Replaced with a smarter universal filter that uses avg HR as a tiebreaker on slow-paced activities. Real running — even with long rests between VO2 intervals — keeps avg HR ≥ 130; sustained walking sits at 120 or below.
+
+- `src/lib/running-analysis/index.ts`: rewrite the walk filter. Activities with avg pace ≤ 10:00/km always pass. Slower activities pass only if avg HR ≥ 130. Reverted v3.10.2's `forceResync` bypass — no longer needed and cleaner without it.
+- Verified against Supabase rows: Apr 21 VO2 (11:33/km @ 143 HR) passes; Apr 22 walk (13:01/km @ 120 HR) drops. Both have `activity_type: 'treadmill_running'` so HR is the only reliable separator.
+
 ### Skip walk filter on force_resync (v3.10.2)
 
 The v3.4.0 walk filter (drop activities with avg pace slower than 10:00/km) catches incline-walk sessions correctly but false-positives on VO2 max workouts whose long interval-rest gaps drag the avg pace above 10:00/km. Apr 21's VO2 session logged at 11:32/km got blocked at the Supabase query layer, so v3.10.0's force_resync of the week-of-Apr-20 couldn't write Session Profile / Lap Profile to it.
