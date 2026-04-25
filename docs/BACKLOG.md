@@ -1,31 +1,12 @@
 # Backlog
 
-Future features, pickup notes, and scope-later items. Mirrors the Notion Product backlog page. Newest entries at top.
+Future features, pickup notes, and scope-later items. Mirrors the Notion Product backlog page. Grouped by priority tier; newest-first within each tier.
 
 ---
 
-## 2026-04-25 — Lap segment classification: follow-ups (v3.7.2)
+## High priority
 
-**Context:** v3.7.2 added a heuristic lap classifier that infers segment types (warm-up / main / tempo / interval-work / interval-rest / cool-down) from HR + pace + duration. Three follow-ups were explicitly scoped out of the "light touch" implementation.
-
-**Items:**
-- **Working-portion form averages.** Activity-level cadence, GCT, vertical oscillation, and vertical ratio still come from `raw_json` (Garmin's whole-activity summary), so VO2 max sessions where warm-up/cool-down are inside the same activity will see those metrics diluted. Re-compute from `splits` filtered to `main + tempo + interval-work` segments. Should also surface a "Working portion: cadence X, GCT Y" line on the Notion run page distinct from the activity-level number.
-- **Per-segment decoupling for VO2 max.** `calcDecoupling` currently runs over the activity's full HR time-series with a fixed 3–5 min warmup exclusion. With segment labels available, a per-segment decoupling read would be more useful for interval workouts (e.g., decoupling within the tempo finish, decoupling across the 3 intervals as a set). Decide whether to surface as a new property or replace the activity-level number conditionally.
-- **Surface segment labels to Claude weekly analysis.** The analysis-engine prompt only sees per-run summaries today; doesn't see per-lap segment classification. Could enable richer "you nailed the tempo finish on Saturday" / "the third VO2 interval was 5 bpm hot" feedback. Pass `splits` (with `segmentType`) into `extractRunSummaries` and add a "structured segments" block to the weekly synthesis prompt.
-
----
-
-## 2026-04-25 — Per-record sync logging: extend pattern to other sync paths
-
-**Context:** v3.7.1 added `console.warn('[garmin] upsert failed for activity X: ...')` per failed record in `syncRecentActivities`. v3.8.1 propagated it to the 3 other Garmin sync sites (`syncGarmin`, `backfillGarmin`, `backfillDateRange`). The same silent-failure pattern likely lives in other sync paths — anywhere a `for ... of records` loop upserts and only counts successes.
-
-**Idea:** sweep `src/lib/sync/*.ts` and `src/app/api/sync/**` for `if (!error) X++;` patterns where the `else` branch is silent. Add per-record warning logs. Candidates likely include `emails.ts`, `googleCalendar.ts`, `outlookCalendar.ts`, `notionTasks.ts`, `notionContext.ts`, `contactScan.ts`. Cost: maybe 30 lines of code, big payoff in observability. The v3.8.1 root-cause investigation took ~5 minutes once the warning was visible — would have taken hours to find without it.
-
-**Out of scope until:** another sync silently misbehaves and surfaces as user pain, OR we want to be proactive about it.
-
----
-
-## 2026-04-25 — Walk filter: false positive on VO2 max sessions
+### 2026-04-25 — Walk filter: false positive on VO2 max sessions
 
 **Context:** The v3.4.0 ingest filter drops any activity with avg pace slower than 10:00/km, which works for steady incline-walk sessions but produces false positives on VO2-max interval workouts. Apr 21's VO2 session logged at 11:32/km because the long rest periods between intervals dragged the average pace up — pace alone can't distinguish "incline walk for 20 minutes" from "5x3min hard with full recovery between."
 
@@ -38,7 +19,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-23 — Cardio analysis: follow-ups (v3.4.0)
+### 2026-04-23 — Cardio analysis: follow-ups (v3.4.0)
 
 **Context:** v3.4.0 added Z5 calculator view, pace-based walk filter, and loosened weekly-review framing. A few items are out of scope for this ship.
 
@@ -49,20 +30,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-22 — Current Events tabs: follow-ups (v3.2.0)
-
-**Context:** v3.2.0 shipped Email / Indonesia / International tabs for Current Events. A few items were explicitly scoped out and should be picked up in follow-up ships once the core tab experience settles.
-
-**Items:**
-- **Voice read-out per tab.** Current voiceover field still points at the Email (legacy synthesis_text) only. The briefing-read-aloud flow should either read the currently-active tab or offer a per-tab listen button.
-- **Per-theme outlet click-through.** NewsItem carries the Google News article URL but it is not persisted in news_synthesis nor surfaced in the UI. Consider storing the top N URLs per tab and rendering outlet chips as links.
-- **Sanity-check International depth.** If Filman finds Google News International feels shallow versus what he consumes daily, swap Perplexity Sonar in for that tab only while keeping Google News RSS for Indonesia. Cost delta is under one dollar per month.
-- **Cross-slot fatigue watch.** We deliberately did not dedupe across morning/afternoon/evening (developing stories should re-surface). Monitor whether this feels coherent or redundant in practice; revisit if fatigue.
-- **Auto-login in dev.** Preview-server UI verification always has to pass the JARVIS_AUTH_TOKEN prompt. A NEXT_PUBLIC_DEV_AUTO_LOGIN flag that skips the gate when NODE_ENV=development would save a step every session.
-
----
-
-## 2026-04-22 — RLS hardening sweep (drop permissive `FOR ALL USING (true)` policies)
+### 2026-04-22 — RLS hardening sweep (drop permissive `FOR ALL USING (true)` policies)
 
 **Context:** v3.1.0 fixed the CRITICAL advisor by enabling RLS on `email_draft_blocklist`. A Supabase advisor sweep afterward showed ~25 other tables still carry permissive `FOR ALL USING (true)` policies (WARN level). These tables include sensitive ones: `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, `health_measurements`, `blood_work`, `okr_targets`, `api_usage`, `notion_tasks`, etc.
 
@@ -80,35 +48,24 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-20 — Tone regeneration endpoint for email drafts
+### 2026-04-19 — Migrate legacy `health_measurements.measurement_type` rows to canonical names
 
-**Context:** Stream 3 of the v3.0 Atmosphere migration shipped the tone-picker UI (Direct / Warm / Brief) in `EmailThread.tsx`, but the buttons only update local state — there is no server-side draft regeneration. Clicking a new tone does not produce a new draft.
+**Context:** `health_measurements` has historical rows under old names (`dead_hang`, `ohs_major_compensations`) from before the POST endpoint's `VALID_TYPES` was renamed to `dead_hang_seconds` / `overhead_squat_compensations`. v2.4.46 works around this with a canonicalization layer in `/api/health-fitness/okr`, but the DB still carries drift.
 
 **Scope:**
-- New route `POST /api/emails/drafts/regenerate` accepting `{ triage_id, tone }`.
-- Pulls the original email row + current draft from `email_triage`, re-prompts Claude with the ghostwriting style guide + the tone adjective, and overwrites `draft_snippet` in place (same provider-side Outlook/Gmail draft updated via Graph/Gmail API).
-- Surface a loading state on the clicked tone chip and re-render the draft bubble on response.
+- One-off SQL migration (`supabase/migration-NNN-normalize-measurement-types.sql`) that rewrites `measurement_type` for all known legacy aliases.
+- After the migration is applied in prod, remove `MEASUREMENT_TYPE_CANONICAL` from `src/app/api/health-fitness/okr/route.ts`.
+- Also audit `waist_circumference` / `blood_pressure_systolic/diastolic` — currently those are the canonical DB names but the OKR `key_result` is short (`waist_cm`, `bp_systolic`, `bp_diastolic`). Either rename in DB to match OKR keys, or leave the canonicalization layer in place for those specifically.
 
-**Why defer:** Kept Stream 3 as a pure UI/visual ship — no API surface change.
+**Why defer:** The canonicalization layer is cheap and ships work today. Only worth migrating the DB if another reader needs the same aliasing logic.
 
-**Effort estimate:** ~1.5 hours (route + Claude prompt + provider draft update).
+**Effort estimate:** ~30 min (migration + verify + remove shim).
 
 ---
 
-## 2026-04-20 — Store provider-side draft URL on email_triage rows
+## Medium priority
 
-**Context:** The v3.0 email thread's "Send as-is" and "Edit draft" buttons currently deep-link to the generic Gmail/Outlook drafts folder. The triage row doesn't carry the draft's provider URL, so we can't open the specific draft.
-
-**Scope:**
-- Migration: `supabase/migration-NNN-email-triage-draft-url.sql` adds a nullable `draft_url` column.
-- `src/lib/sync/emailTriage.ts` captures `webLink` (Graph) / draft ID (Gmail) during creation.
-- `/api/emails/triage` returns it; `EmailThread` uses it in place of the folder fallback.
-
-**Effort estimate:** ~45 min (migration + sync capture + thread link update).
-
----
-
-## 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
+### 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
 
 **Context:** Deferred from the Jarvis 3.0 "Atmosphere" migration (Wave 2 §9). The new `HealthInsights` component has a narrative-annotation slot per spec §8.3 — each metric gets a Claude-written sentence (e.g. "Yesterday's threshold intervals hit harder than the plan called for — your average HR in Z5 was 12bpm above target. I've moved tomorrow's threshold session to Wednesday."). Wave 2 ships with the slot accepting a `narrative` prop; this item wires up the server-side generator.
 
@@ -126,22 +83,32 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-19 — Migrate legacy `health_measurements.measurement_type` rows to canonical names
+### 2026-04-22 — Current Events tabs: follow-ups (v3.2.0)
 
-**Context:** `health_measurements` has historical rows under old names (`dead_hang`, `ohs_major_compensations`) from before the POST endpoint's `VALID_TYPES` was renamed to `dead_hang_seconds` / `overhead_squat_compensations`. v2.4.46 works around this with a canonicalization layer in `/api/health-fitness/okr`, but the DB still carries drift.
+**Context:** v3.2.0 shipped Email / Indonesia / International tabs for Current Events. A few items were explicitly scoped out and should be picked up in follow-up ships once the core tab experience settles.
 
-**Scope:**
-- One-off SQL migration (`supabase/migration-NNN-normalize-measurement-types.sql`) that rewrites `measurement_type` for all known legacy aliases.
-- After the migration is applied in prod, remove `MEASUREMENT_TYPE_CANONICAL` from `src/app/api/health-fitness/okr/route.ts`.
-- Also audit `waist_circumference` / `blood_pressure_systolic/diastolic` — currently those are the canonical DB names but the OKR `key_result` is short (`waist_cm`, `bp_systolic`, `bp_diastolic`). Either rename in DB to match OKR keys, or leave the canonicalization layer in place for those specifically.
-
-**Why defer:** The canonicalization layer is cheap and ships work today. Only worth migrating the DB if another reader needs the same aliasing logic.
-
-**Effort estimate:** ~30 min (migration + verify + remove shim).
+**Items:**
+- **Voice read-out per tab.** Current voiceover field still points at the Email (legacy synthesis_text) only. The briefing-read-aloud flow should either read the currently-active tab or offer a per-tab listen button.
+- **Per-theme outlet click-through.** NewsItem carries the Google News article URL but it is not persisted in news_synthesis nor surfaced in the UI. Consider storing the top N URLs per tab and rendering outlet chips as links.
+- **Sanity-check International depth.** If Filman finds Google News International feels shallow versus what he consumes daily, swap Perplexity Sonar in for that tab only while keeping Google News RSS for Indonesia. Cost delta is under one dollar per month.
+- **Cross-slot fatigue watch.** We deliberately did not dedupe across morning/afternoon/evening (developing stories should re-surface). Monitor whether this feels coherent or redundant in practice; revisit if fatigue.
+- **Auto-login in dev.** Preview-server UI verification always has to pass the JARVIS_AUTH_TOKEN prompt. A NEXT_PUBLIC_DEV_AUTO_LOGIN flag that skips the gate when NODE_ENV=development would save a step every session.
 
 ---
 
-## 2026-04-18 — Speed up slow cron endpoints (Email Synthesis, Running Analysis)
+### 2026-04-25 — Per-record sync logging: extend pattern to other sync paths
+
+**Context:** v3.7.1 added `console.warn('[garmin] upsert failed for activity X: ...')` per failed record in `syncRecentActivities`. v3.8.1 propagated it to the 3 other Garmin sync sites (`syncGarmin`, `backfillGarmin`, `backfillDateRange`). The same silent-failure pattern likely lives in other sync paths — anywhere a `for ... of records` loop upserts and only counts successes.
+
+**Idea:** sweep `src/lib/sync/*.ts` and `src/app/api/sync/**` for `if (!error) X++;` patterns where the `else` branch is silent. Add per-record warning logs. Candidates likely include `emails.ts`, `googleCalendar.ts`, `outlookCalendar.ts`, `notionTasks.ts`, `notionContext.ts`, `contactScan.ts`. Cost: maybe 30 lines of code, big payoff in observability. The v3.8.1 root-cause investigation took ~5 minutes once the warning was visible — would have taken hours to find without it.
+
+**Out of scope until:** another sync silently misbehaves and surfaces as user pain, OR we want to be proactive about it.
+
+---
+
+## Low priority
+
+### 2026-04-18 — Speed up slow cron endpoints (Email Synthesis, Running Analysis)
 
 **Context:** Raised during v2.4.42 cron-log-coverage work. Email Synthesis and Running Analysis routinely take 30-60s server-side because they do sequential Claude + Gmail/Garmin/Notion calls. v2.4.42 masked this by returning 202 early and running work via `after()`, but the underlying latency is unchanged.
 
@@ -156,7 +123,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-## 2026-04-18 — Attachment-aware email triage
+### 2026-04-18 — Attachment-aware email triage
 
 **Context:** Raised during v2.4.39 email-blocklist work. Jarvis currently does not open email attachments at all — only subject + body text + snippet are read. If an HR email says "see attached contract," Jarvis drafts based on the body alone.
 
@@ -175,5 +142,44 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 **Risk surface:** This is where malware/phishing becomes a real concern. Current defense is "don't touch attachments at all" — if we add this, we need a documented security review before shipping.
 
 **Effort estimate:** ~1 full session. One new lib module (attachmentReader.ts), changes to fetchWorkEmails in emailTriage.ts, new env var for max attachment size.
+
+---
+
+### 2026-04-20 — Store provider-side draft URL on email_triage rows
+
+**Context:** The v3.0 email thread's "Send as-is" and "Edit draft" buttons currently deep-link to the generic Gmail/Outlook drafts folder. The triage row doesn't carry the draft's provider URL, so we can't open the specific draft.
+
+**Scope:**
+- Migration: `supabase/migration-NNN-email-triage-draft-url.sql` adds a nullable `draft_url` column.
+- `src/lib/sync/emailTriage.ts` captures `webLink` (Graph) / draft ID (Gmail) during creation.
+- `/api/emails/triage` returns it; `EmailThread` uses it in place of the folder fallback.
+
+**Effort estimate:** ~45 min (migration + sync capture + thread link update).
+
+---
+
+### 2026-04-20 — Tone regeneration endpoint for email drafts
+
+**Context:** Stream 3 of the v3.0 Atmosphere migration shipped the tone-picker UI (Direct / Warm / Brief) in `EmailThread.tsx`, but the buttons only update local state — there is no server-side draft regeneration. Clicking a new tone does not produce a new draft.
+
+**Scope:**
+- New route `POST /api/emails/drafts/regenerate` accepting `{ triage_id, tone }`.
+- Pulls the original email row + current draft from `email_triage`, re-prompts Claude with the ghostwriting style guide + the tone adjective, and overwrites `draft_snippet` in place (same provider-side Outlook/Gmail draft updated via Graph/Gmail API).
+- Surface a loading state on the clicked tone chip and re-render the draft bubble on response.
+
+**Why defer:** Kept Stream 3 as a pure UI/visual ship — no API surface change.
+
+**Effort estimate:** ~1.5 hours (route + Claude prompt + provider draft update).
+
+---
+
+### 2026-04-25 — Lap segment classification: follow-ups (v3.7.2)
+
+**Context:** v3.7.2 added a heuristic lap classifier that infers segment types (warm-up / main / tempo / interval-work / interval-rest / cool-down) from HR + pace + duration. Three follow-ups were explicitly scoped out of the "light touch" implementation.
+
+**Items:**
+- **Working-portion form averages.** Activity-level cadence, GCT, vertical oscillation, and vertical ratio still come from `raw_json` (Garmin's whole-activity summary), so VO2 max sessions where warm-up/cool-down are inside the same activity will see those metrics diluted. Re-compute from `splits` filtered to `main + tempo + interval-work` segments. Should also surface a "Working portion: cadence X, GCT Y" line on the Notion run page distinct from the activity-level number.
+- **Per-segment decoupling for VO2 max.** `calcDecoupling` currently runs over the activity's full HR time-series with a fixed 3–5 min warmup exclusion. With segment labels available, a per-segment decoupling read would be more useful for interval workouts (e.g., decoupling within the tempo finish, decoupling across the 3 intervals as a set). Decide whether to surface as a new property or replace the activity-level number conditionally.
+- **Surface segment labels to Claude weekly analysis.** The analysis-engine prompt only sees per-run summaries today; doesn't see per-lap segment classification. Could enable richer "you nailed the tempo finish on Saturday" / "the third VO2 interval was 5 bpm hot" feedback. Pass `splits` (with `segmentType`) into `extractRunSummaries` and add a "structured segments" block to the weekly synthesis prompt.
 
 ---
