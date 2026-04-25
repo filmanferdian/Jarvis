@@ -6,6 +6,16 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.8] — 2026-04-25 — Weekly running analysis: timing-aware, carry-over-aware, walk-free (v3.8.0)
 
+### Garmin sync: round avg_hr/calories before upsert (v3.8.1)
+
+Five running activities had been silently failing to upsert on every sync since the table was created. Postgres rejected the fractional `averageHR` values Garmin returns for outdoor running activities (e.g., `145.8969…`) into the `integer` column with code `22P02` ("invalid input syntax for type integer"). Walking, strength, and treadmill activities all return integer `averageHR`, which is why those upserted fine and only the 5 outdoor runs in the 20-activity window were stale. v3.7.1's per-record warning made the failure visible; v3.8.1 fixes it.
+
+- New helper `buildActivityRecord(act)` in `src/lib/sync/garmin.ts` centralizes the type coercion. Rounds `avg_hr` and `calories` defensively (`duration_seconds` was already rounded). Replaces 4 duplicated copies of the activity-record-building code in `syncGarmin`, `syncRecentActivities`, `backfillGarmin`, and `backfillDateRange`.
+- Adds the missing per-record upsert warning to the 3 sites that didn't have it (only `syncRecentActivities` had it via v3.7.1). All sync paths now log upsert failures consistently.
+- Verified locally: upserting `avg_hr: 131.3` returned 400 with code `22P02`; upserting `Math.round(131.3) = 131` succeeds. Production sync after deploy confirmed all 5 previously-stale running activities updated successfully.
+
+
+
 The weekly cardio analysis prose was over-strict during in-progress weeks: it would flag Sunday's run as "missed" while Sunday hadn't happened yet, and would treat a Monday catch-up of last week's missed Sunday session as an off-plan extra. The "How Was This Week" section also defaulted to a per-run roll-call ("the runner did X on Monday, then Y on Tuesday…") instead of leading with the sharpest takeaway. Three changes to the synthesis prompt and inputs.
 
 - `src/lib/running-analysis/plan-loader.ts`: `loadWeekSchedule` now also returns `lastWeek: PlannedDay[]` (Mon–Sun before the analyzed week). New `WeekSchedule` shape is `{ lastWeek, thisWeek, nextWeek }`. The Supabase query already runs against `program_schedule` by date range — extending the lower bound was a one-line change.
@@ -19,6 +29,27 @@ The weekly cardio analysis prose was over-strict during in-progress weeks: it wo
 - No schema change, no migration, no cost delta. Weekly insight prose updates on next regeneration (Saturday cron, or manual trigger via the Trigger Analysis button on /cardio-analysis).
 
 ## [3.7] — 2026-04-25 — Cardio Analysis: drop low-signal panels (v3.7.0)
+
+### Run analysis: classify laps by segment type for manual-lap workflows (v3.7.2)
+
+User started using the Garmin lap button to mark transitions inside a single run — Z2 base → press lap → tempo finish on long runs; warm-up jog → press lap → 4-min Z4 interval → press lap → 1–2 min rest → … on VO2 max sessions. The Notion per-lap table previously labeled every lap as just `lapIndex` under "Per-Km Splits" — wrong when laps are no longer ~1km. Fastest Km also didn't know to skip warm-up / cool-down / interval-rest segments. Light-touch implementation: backward compatible (uniform Z2 runs classify entirely as 'main' and render as before), no decoupling math change.
+
+- New `SegmentType` union in `src/lib/running-analysis/garmin-enrich.ts`: `warm-up | main | tempo | interval-work | interval-rest | cool-down`. Defaults to 'main'.
+- New `classifyLaps()` heuristic detection from HR + pace + duration relative to a baseline (median of middle 60% of laps). Conservative: interval detection requires ≥2 work laps with proper alternation against rest laps, so a single fast lap can't be mis-labeled. Warm-up / cool-down detection bounded to first/last laps with HR significantly below median main HR AND pace significantly slower than median.
+- `src/lib/running-analysis/notion-runs-db.ts`: heading "Per-Km Splits" → "Lap Splits". First-column label now shows lap distance + segment label, e.g., `L7 · 1.00 km (tempo)` or `L4 · 0.85 km (int 2)`. Interval reps numbered in render order.
+- `src/lib/running-analysis/index.ts`: Fastest Km picker excludes `warm-up`, `cool-down`, `interval-rest`; prefers ≥900 m laps but falls back to any eligible lap if none qualify. Format updated to `L7 (1.00 km) -- 7:03 /km` so non-1km segments are explicit.
+- Decoupling math unchanged (its 3–5min warmup exclusion is independent and adequate). Activity-level form averages (cadence, GCT, vert ratio) still pulled from raw_json — flagged as follow-up for VO2 max sessions where they get diluted by warm-up/cool-down inside the run.
+- Verified by dry-running the classifier across 6 scenarios (Apr 25 real long run, hypothetical VO2 max, long run with manual tempo press, uniform Z2, single 5km lap, accidental fast lap). Then re-rendered Apr 25 in production: classifier correctly detected the natural tempo finish on L7-L8 purely from HR + pace, no manual press needed.
+
+### Cardio analysis: surface Garmin sync count + errors on result (v3.7.1)
+
+The cardio page button was silently swallowing Garmin sync failures — `syncRecentActivities` errors were caught and logged to stderr but the result returned to the UI looked identical to a successful run with no new activities. This caused today's Apr 25 run to appear "missing" when in fact the sync had simply not upserted anything. The fix surfaces both the count of activities Garmin returned and the count successfully upserted to Supabase, plus pushes a descriptive entry into the existing errors[] array whenever the sync was skipped, partial, or returned 0 activities.
+
+- `src/lib/sync/garmin.ts`: `syncRecentActivities` now returns `{ fetched, synced }` instead of just `{ synced }`. Logs both counts on entry/exit. Per-activity upsert errors also emit a `console.warn` line — directly enabled the v3.8.1 root-cause investigation an hour later.
+- `src/lib/running-analysis/index.ts`: `RunningAnalysisResult` gains three fields — `garminFetched`, `garminSynced`, `garminSkipReason`. Step 0's try/catch now pushes into `errors[]` whenever the sync was skipped, partial, or returned 0 activities.
+- `src/app/cardio-analysis/page.tsx`: Result panel adds a "Garmin sync" cell ("N/M upserted" or "Skipped") and renders `garminSkipReason` as a warning row when present.
+
+
 
 Removed two panels from `/cardio-analysis` that weren't pulling their weight: "Zone distribution" (time-in-zone bars across the recent runs) and "HRV vs training load" (scatter of run days). Both surfaced data already covered better elsewhere — zone breakdowns live per-run in the runs table, and HRV trend has its own dedicated view — so the cards added visual weight without informing decisions.
 
