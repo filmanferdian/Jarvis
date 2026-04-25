@@ -22,6 +22,7 @@ export interface PlannedDay {
 }
 
 export interface WeekSchedule {
+  lastWeek: PlannedDay[];
   thisWeek: PlannedDay[];
   nextWeek: PlannedDay[];
 }
@@ -56,28 +57,31 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().split('T')[0];
 }
 
-/** Query Supabase program_schedule for this week + next week. */
+/** Query Supabase program_schedule for last week + this week + next week. */
 export async function loadWeekSchedule(weekStart: string, weekEnd: string): Promise<WeekSchedule> {
+  const lastEnd = addDays(weekStart, -1);
+  const lastStart = addDays(lastEnd, -6);
   const nextStart = addDays(weekEnd, 1);
   const nextEnd = addDays(nextStart, 6);
 
   const { data, error } = await supabase
     .from('program_schedule')
     .select('date, day_of_week, week, phase, day_type, cardio, training, deload')
-    .gte('date', weekStart)
+    .gte('date', lastStart)
     .lte('date', nextEnd)
     .order('date', { ascending: true });
 
   if (error || !data) {
     console.warn('[plan-loader] program_schedule query failed:', error?.message);
-    return { thisWeek: [], nextWeek: [] };
+    return { lastWeek: [], thisWeek: [], nextWeek: [] };
   }
 
   const rows = data as ScheduleRow[];
+  const lastWeek = rows.filter((r) => r.date >= lastStart && r.date <= lastEnd).map(toPlannedDay);
   const thisWeek = rows.filter((r) => r.date >= weekStart && r.date <= weekEnd).map(toPlannedDay);
   const nextWeek = rows.filter((r) => r.date >= nextStart && r.date <= nextEnd).map(toPlannedDay);
 
-  return { thisWeek, nextWeek };
+  return { lastWeek, thisWeek, nextWeek };
 }
 
 // --- Notion cardio protocol loader ---

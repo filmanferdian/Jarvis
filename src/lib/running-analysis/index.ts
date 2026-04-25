@@ -435,7 +435,7 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
       }),
       loadWeekSchedule(weekStart, weekEnd).catch((err) => {
         console.warn('[running-analysis] loadWeekSchedule failed:', err);
-        return { thisWeek: [], nextWeek: [] };
+        return { lastWeek: [], thisWeek: [], nextWeek: [] };
       }),
       loadCardioProtocol(notionApiKey).catch((err) => {
         console.warn('[running-analysis] loadCardioProtocol failed:', err);
@@ -446,6 +446,7 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
     const planContext: PlanContext | null =
       weekSchedule.thisWeek.length > 0 || cardioProtocolMd.length > 0
         ? {
+            lastWeek: weekSchedule.lastWeek,
             thisWeek: weekSchedule.thisWeek,
             nextWeek: weekSchedule.nextWeek,
             cardioProtocolMd,
@@ -453,6 +454,7 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
           }
         : null;
 
+    const today = getWibNow().toISOString().split('T')[0];
     const analysis = await generateWeeklyAnalysis(
       weekStart,
       weekEnd,
@@ -460,6 +462,7 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
       historicalContext,
       previousWeekInsight,
       planContext,
+      today,
     );
     analysisGenerated = true;
 
