@@ -45,6 +45,10 @@ export interface RunActivity {
   weather: string | null;
   perfCondition: number | null;
   decouplingPct: number | null;
+  /** One-line authoritative session-type label, derived from segment composition. */
+  sessionProfile: string | null;
+  /** Compact JSON of laps for the analysis prompt. See garmin-enrich.serializeLapsForProperty. */
+  lapProfileJson: string | null;
   // HR zones (time in seconds)
   hrZ1s: number | null;
   hrZ2s: number | null;
@@ -323,6 +327,8 @@ function buildProperties(run: RunActivity): Record<string, unknown> {
   if (run.distanceKm != null) props['Distance (km)'] = { number: run.distanceKm };
   if (run.durationFormatted) props['Duration'] = { rich_text: richText(run.durationFormatted) };
   if (run.avgPacePerKm) props['Avg Pace'] = { rich_text: richText(run.avgPacePerKm) };
+  if (run.sessionProfile) props['Session Profile'] = { rich_text: richText(run.sessionProfile) };
+  if (run.lapProfileJson) props['Lap Profile'] = { rich_text: richText(run.lapProfileJson) };
   if (run.avgHr != null) props['Avg HR'] = { number: run.avgHr };
   if (run.maxHr != null) props['Max HR'] = { number: run.maxHr };
   if (run.calories != null) props['Calories'] = { number: run.calories };

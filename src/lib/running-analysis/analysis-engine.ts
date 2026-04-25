@@ -12,6 +12,7 @@
 import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 import type { PlannedDay } from './plan-loader';
 import type { WeeklyInsightEntry } from './weekly-insights-db';
+import { parseLapsFromProperty, type LapData } from './garmin-enrich';
 
 export interface PlanContext {
   lastWeek: PlannedDay[];
@@ -40,6 +41,10 @@ export interface WeeklyRunSummary {
   cadenceSpm: number | null;
   avgPowerW: number | null;
   elevGainM: number | null;
+  /** Authoritative session-type label from segment composition. */
+  sessionProfile: string | null;
+  /** Per-lap structured data parsed from the Notion Lap Profile property. */
+  laps: LapData[];
 }
 
 export interface HistoricalContext {
@@ -132,6 +137,8 @@ export function extractRunSummaries(pages: Record<string, unknown>[]): WeeklyRun
     cadenceSpm: extractPropNumber(page, 'Cadence (spm)'),
     avgPowerW: extractPropNumber(page, 'Avg Power (W)'),
     elevGainM: extractPropNumber(page, 'Elev Gain (m)'),
+    sessionProfile: extractPropText(page, 'Session Profile'),
+    laps: parseLapsFromProperty(extractPropText(page, 'Lap Profile')),
   }));
 }
 
@@ -210,16 +217,31 @@ export async function generateWeeklyAnalysis(
     const plannedLine = planned ? ` | planned: ${planned.cardio}` : '';
     const lines = [
       `Run ${i + 1} (${r.date}${plannedLine}): ${r.distanceKm}km in ${r.durationFormatted} @ ${r.avgPacePerKm}/km`,
+      `  Session profile: ${r.sessionProfile ?? 'unclassified (treat as Z2 base unless lap data says otherwise)'}`,
       r.avgHr != null ? `  HR: avg ${r.avgHr} / max ${r.maxHr}` : null,
       r.trainingLoad != null ? `  Training load: ${r.trainingLoad}` : null,
       r.trainingEffect ? `  Training effect: ${r.trainingEffect}` : null,
       r.perfCondition != null ? `  Perf condition: ${r.perfCondition > 0 ? '+' : ''}${r.perfCondition}` : null,
       r.decouplingPct != null ? `  Decoupling: ${r.decouplingPct}%` : null,
       r.vo2Max != null ? `  VO2 Max: ${r.vo2Max}` : null,
-      r.cadenceSpm != null ? `  Cadence: ${r.cadenceSpm} spm` : null,
+      r.cadenceSpm != null ? `  Cadence: ${r.cadenceSpm} spm (activity-level avg, may be diluted by warm-up/rest)` : null,
       r.avgPowerW != null ? `  Power: ${r.avgPowerW}W` : null,
       r.weather ? `  Weather: ${r.weather}, ${r.tempC}°C, ${r.humidityPct}% humidity` : null,
     ].filter(Boolean);
+
+    if (r.laps.length > 0) {
+      lines.push('  Laps:');
+      const lapsToShow = r.laps.slice(0, 30); // defensive cap
+      for (const l of lapsToShow) {
+        const distKm = (l.d / 1000).toFixed(2);
+        const durMin = Math.floor(l.du / 60);
+        const durSec = String(l.du % 60).padStart(2, '0');
+        const paceStr = l.p != null ? `${Math.floor(l.p / 60)}:${String(l.p % 60).padStart(2, '0')}/km` : '—';
+        const hrStr = l.hr != null ? `HR ${l.hr}` : 'HR —';
+        lines.push(`    L${l.i} [${l.t}] ${distKm}km in ${durMin}:${durSec} @ ${paceStr}, ${hrStr}`);
+      }
+    }
+
     return lines.join('\n');
   }).join('\n\n');
 
@@ -295,6 +317,14 @@ WALKING IS OUT OF SCOPE. This analysis is for running only. Treat any walk-only 
 Your job: judge this week on a SINGLE lens — PROGRESSION IN CONTEXT. Look at form & efficiency (cadence, decoupling, HR drift, stride, GCT, vertical ratio, training effect, VO2 Max) AND like-for-like pace (pace at a given HR on Z2 days, tempo pace on tempo days, VO2 interval pace on VO2 days). Never compare raw weekly average pace across mixed session types.
 
 ADHERENCE IS NOT YOUR LENS. The runner manages their own schedule. You are NOT evaluating whether the planned mix was delivered, whether sessions were missed, substituted, moved between days, or carried across weeks. The plan is provided ONLY so you can interpret what each completed run was meant to be (Z2 vs tempo vs VO2 vs long run) when judging execution quality.
+
+USE THE LAP-LEVEL DATA. Each run carries a Session profile (one-line classification) and a per-lap breakdown (one row per lap with segment type, pace, HR, duration). The Session profile is the AUTHORITATIVE label for what kind of session each run was — if it says "VO2 max intervals: 4×4min @ Z5", trust it. Do NOT infer session type from activity-level avg pace or avg cadence; those are diluted by warm-up, cool-down, and rest segments in any structured workout, and will mislead you.
+
+When citing numbers, prefer LAP-level data over activity-level when the lap data is more telling:
+- VO2 max sessions: cite work-interval pace + HR + their consistency (drift across reps), not the activity-level average. Example: "intervals 1–2 hit 4:25/km @ 178 HR cleanly; the third dropped to 4:38 @ 168 — fade in the back half" beats "avg pace 11:32/km @ 145 HR".
+- Tempo / long-run hybrids: cite the tempo segment(s) explicitly. Example: "tempo finish at 5:30/km @ 158 HR" beats "avg pace 7:10/km".
+- Long runs: comment on decoupling between earlier and later main laps when the lap HR/pace shows drift. The activity-level Decoupling % is one signal; lap-by-lap progression is more granular.
+- Z2 base runs: cite pace-at-HR like-for-like vs prior comparable Z2 runs (compare main laps only, ignore warm-up/cool-down).
 ${timingBlock}
 ${planBlock}${continuityBlock}
 
