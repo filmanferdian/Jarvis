@@ -4,6 +4,24 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-25 — v3.10.5 — RLS hardening sweep (drop permissive policies on 28 tables)
+
+Closed an anon-key exposure across 28 `public` tables. Each carried a `FOR ALL USING (true)` policy that gave anon/publishable-key holders full read+write — including on highly sensitive tables like `google_tokens`, `microsoft_tokens`, `garmin_tokens`. The app uses service-role server-side and bypasses RLS regardless, so app behavior is unchanged.
+
+**Well:**
+- Pulled the actual policy names from `pg_policy` rather than guessing — 28 tables had four different policy-name conventions across the migration history (`Allow all`, `Allow all for authenticated`, `Allow all for service role`, `service role full access`, plus per-table `<table>_all`). A guess-based migration would have left several policies in place.
+- Re-ran the security advisor immediately after applying. The permissive WARNs collapsed to INFO-level `rls_enabled_no_policy` entries (the desired posture). Confirmed the change at the lint level, not just the SQL level.
+- The backlog estimated ~25 tables; the real number was 28. Querying first instead of trusting the estimate caught three tables that would otherwise have been missed.
+
+**Wrong:**
+- Nothing material. The CI guard script (a follow-up that fails on ERROR-level lints) was kept out of scope per the plan; it was easy to feel completionist about it but it's a separate ship.
+
+**Next:**
+- CI guard for advisor lints — its own ship, low priority.
+- This sweep didn't add any anon-key policies. If a future flow needs anon-key access (e.g. a public-facing form), a per-table `INSERT WITH CHECK` policy is the right shape — not another `FOR ALL USING (true)`.
+
+---
+
 ## 2026-04-25 — v3.10.4 — Normalize legacy health_measurements rows
 
 Cleared two-row drift in `health_measurements` from before the POST endpoint's `VALID_TYPES` was renamed (`dead_hang` → `dead_hang_seconds`, `ohs_major_compensations` → `overhead_squat_compensations`). Pruned the corresponding shim entries from the OKR canonicalization layer.

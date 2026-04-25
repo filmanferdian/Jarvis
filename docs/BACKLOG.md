@@ -30,24 +30,6 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-### 2026-04-22 — RLS hardening sweep (drop permissive `FOR ALL USING (true)` policies)
-
-**Context:** v3.1.0 fixed the CRITICAL advisor by enabling RLS on `email_draft_blocklist`. A Supabase advisor sweep afterward showed ~25 other tables still carry permissive `FOR ALL USING (true)` policies (WARN level). These tables include sensitive ones: `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, `health_measurements`, `blood_work`, `okr_targets`, `api_usage`, `notion_tasks`, etc.
-
-**Why it matters:** The app only writes via the service-role key, which bypasses RLS regardless. But a permissive `USING (true)` policy means ANY client with the anon/publishable key could also read/write — that's a real exposure on sensitive tables, not just a linter nit.
-
-**Scope:**
-- Drop the `FOR ALL USING (true)` policies on all ~25 flagged tables. Leave RLS enabled. No policy → only service-role can access (same pattern as `cron_run_log` and now `email_draft_blocklist`).
-- Single migration, one `DROP POLICY` per table. No DDL beyond that.
-- Verify with advisor re-run: WARN count should drop to zero.
-- Add a pre-commit / CI hint: a tiny script that pings `get_advisors` and fails if any ERROR-level lint exists.
-
-**Why defer:** User only asked to fix the CRITICAL issue. This is a broader hardening pass that deserves its own ship + retrospective entry, not a bundled afterthought.
-
-**Effort estimate:** ~30 min for the migration + advisor re-check. Plus ~1 hour if the CI guard script is in scope.
-
----
-
 ## Medium priority
 
 ### 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
