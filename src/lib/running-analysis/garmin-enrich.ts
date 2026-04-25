@@ -342,6 +342,111 @@ export function classifyLaps(splits: SplitData[]): SplitData[] {
   return splits;
 }
 
+// ---------------------------------------------------------------------------
+// Session profile + lap serialization
+//
+// Once classifyLaps() has labelled the splits, we derive two strings that get
+// persisted as Notion Runs DB properties so the weekly-analysis prompt can
+// read them without re-fetching Garmin:
+//   - Session Profile: a one-line authoritative session-type label.
+//   - Lap Profile JSON: a compact per-lap JSON for the prompt's runsDetail.
+// ---------------------------------------------------------------------------
+
+const SEGMENT_CODE: Record<SegmentType, string> = {
+  'warm-up': 'w',
+  'main': 'm',
+  'tempo': 't',
+  'interval-work': 'iw',
+  'interval-rest': 'ir',
+  'cool-down': 'c',
+};
+
+const SEGMENT_FROM_CODE: Record<string, SegmentType> = Object.fromEntries(
+  Object.entries(SEGMENT_CODE).map(([k, v]) => [v, k as SegmentType]),
+);
+
+/** One-line session type classification from segment composition. */
+export function summarizeSegments(splits: SplitData[]): string {
+  if (splits.length === 0) return '';
+
+  const work = splits.filter((s) => s.segmentType === 'interval-work');
+  const rest = splits.filter((s) => s.segmentType === 'interval-rest');
+  const tempo = splits.filter((s) => s.segmentType === 'tempo');
+  const main = splits.filter((s) => s.segmentType === 'main');
+
+  if (work.length >= 2) {
+    const avgWorkMin = Math.round(
+      work.reduce((s, w) => s + w.durationSeconds, 0) / work.length / 60,
+    );
+    const avgRestMin = rest.length > 0
+      ? Math.round(rest.reduce((s, r) => s + r.durationSeconds, 0) / rest.length / 60)
+      : null;
+    const avgWorkHr = (() => {
+      const hrs = work.map((w) => w.avgHr).filter((h): h is number => h != null);
+      return hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null;
+    })();
+    const hrPart = avgWorkHr ? ` @ ${avgWorkHr} HR` : '';
+    const restPart = avgRestMin ? `, ~${avgRestMin}min recovery` : '';
+    return `VO2 max intervals: ${work.length}×${avgWorkMin}min${hrPart}${restPart}`;
+  }
+
+  if (tempo.length >= 1) {
+    const tempoMin = Math.round(tempo.reduce((s, t) => s + t.durationSeconds, 0) / 60);
+    const baseMin = Math.round(main.reduce((s, m) => s + m.durationSeconds, 0) / 60);
+    return baseMin > 0
+      ? `Z2 base ${baseMin}min + ${tempoMin}min tempo finish`
+      : `Tempo session: ${tempoMin}min`;
+  }
+
+  const mainMin = Math.round(main.reduce((s, m) => s + m.durationSeconds, 0) / 60);
+  return mainMin > 0 ? `Z2 base ~${mainMin}min` : '';
+}
+
+/** Compact JSON serialization of laps for storage in a Notion rich_text property.
+ *  Shape per lap: {i, t, d, du, hr, p}. Codes for `t`: w|m|t|iw|ir|c. */
+export function serializeLapsForProperty(splits: SplitData[]): string {
+  if (splits.length === 0) return '';
+  const compact = splits.map((s) => ({
+    i: s.lapIndex,
+    t: SEGMENT_CODE[s.segmentType],
+    d: Math.round(s.distanceMeters),
+    du: Math.round(s.durationSeconds),
+    hr: s.avgHr ?? null,
+    p: paceStringToSec(s.pacePerKm) === Infinity ? null : Math.round(paceStringToSec(s.pacePerKm)),
+  }));
+  return JSON.stringify(compact);
+}
+
+export interface LapData {
+  i: number;
+  t: SegmentType;
+  d: number;
+  du: number;
+  hr: number | null;
+  p: number | null;
+}
+
+/** Parse the compact JSON back into typed laps. Returns [] on any error. */
+export function parseLapsFromProperty(json: string | null | undefined): LapData[] {
+  if (!json) return [];
+  try {
+    const arr = JSON.parse(json) as Array<{ i: number; t: string; d: number; du: number; hr: number | null; p: number | null }>;
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => ({
+        i: x.i,
+        t: SEGMENT_FROM_CODE[x.t] ?? 'main',
+        d: x.d,
+        du: x.du,
+        hr: x.hr,
+        p: x.p,
+      }))
+      .filter((x): x is LapData => Number.isFinite(x.i) && Number.isFinite(x.d) && Number.isFinite(x.du));
+  } catch {
+    return [];
+  }
+}
+
 export async function enrichActivity(activityId: string): Promise<EnrichedActivityData> {
   const client = await createGarminClient();
 

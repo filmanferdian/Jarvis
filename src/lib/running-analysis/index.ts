@@ -14,7 +14,7 @@
 import { supabase } from '@/lib/supabase';
 import { unwrapJsonb } from '@/lib/crypto';
 import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
-import { enrichActivity, EnrichedActivityData, SegmentType } from './garmin-enrich';
+import { enrichActivity, EnrichedActivityData, SegmentType, summarizeSegments, serializeLapsForProperty } from './garmin-enrich';
 import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext, PlanContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
@@ -236,6 +236,8 @@ function extractRunActivity(row: GarminActivityRow, enriched: EnrichedActivityDa
     weather: enriched.weather.description,
     perfCondition: enriched.perfCondition,
     decouplingPct: enriched.decouplingPct,
+    sessionProfile: summarizeSegments(enriched.splits) || null,
+    lapProfileJson: serializeLapsForProperty(enriched.splits) || null,
     hrZ1s: getZone(1),
     hrZ2s: getZone(2),
     hrZ3s: getZone(3),

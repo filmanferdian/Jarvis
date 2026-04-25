@@ -4,6 +4,21 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
+
+After v3.9.0 dropped the adherence lens, the prose still couldn't recognize VO2 max sessions because the prompt only saw activity-level averages — Apr 21's intervals read as "poor execution at 11:32/km" because the model had no way to know that 11:32 average was a 4×4min @ Z5 work + 2min recovery structure. The classifier from v3.7.2 already labels every lap as warm-up/main/tempo/interval-work/interval-rest/cool-down from HR floor + duration + alternation; the labels just never reached the analysis prompt. This ship plumbs them through.
+
+- `src/lib/running-analysis/garmin-enrich.ts`: three new helpers alongside `classifyLaps()`. `summarizeSegments(splits)` derives a one-line authoritative session-type label from segment composition (e.g., `VO2 max intervals: 4×4min @ 178 HR, ~2min recovery`, `Z2 base 30min + 8min tempo finish`, `Z2 base ~45min`). `serializeLapsForProperty(splits)` JSON-encodes a compact per-lap shape (`{i, t, d, du, hr, p}` with single-letter segment-type codes). `parseLapsFromProperty(json)` is the inverse.
+- `src/lib/running-analysis/notion-runs-db.ts`: `RunActivity` extended with `sessionProfile` and `lapProfileJson`. `buildProperties()` writes them as two new rich_text properties on the Notion Runs DB row: `Session Profile` and `Lap Profile`. Both are populated at ingest from the already-classified splits — no extra Garmin fetch.
+- `src/lib/running-analysis/index.ts`: `extractRunActivity()` calls the two helpers and stuffs the strings into the activity object.
+- `src/lib/running-analysis/analysis-engine.ts`:
+  - `WeeklyRunSummary` extended with `sessionProfile: string | null` and `laps: LapData[]`.
+  - `extractRunSummaries()` parses both new properties from the Notion page.
+  - The `runsDetail` block now appends a Session profile line plus a `Laps:` table under each run with one row per lap (segment type, distance, duration, pace, HR), capped at 30 laps defensively.
+  - New prompt rules under the existing TIMING / WALKING / ADHERENCE blocks: Session profile is the AUTHORITATIVE session-type label (do NOT infer from avg pace or avg cadence — both are diluted by warm-up/cool-down/rest segments in any structured workout). Cite lap-level numbers over activity-level when the lap data is more telling — work-interval pace + HR + drift across reps for VO2 max, tempo split for hybrid runs, decoupling between early/late main laps for long runs.
+- Backfill: no separate script needed. `POST /api/running-analysis` with `force_resync: true` re-ingests the week's runs and patches the Notion pages with the new properties via the existing `patchRunPage()` flow.
+- No Supabase schema change. No UI change. Costs unchanged (no extra Garmin or Anthropic calls per run; just denser prompt input).
+
 ## [3.9] — 2026-04-25 — Weekly running analysis: drop the adherence lens (v3.9.0)
 
 The v3.8.0 prompt fixed timing and walks, but the regenerated week-of-Apr-20 prose still led with "complete plan deviation" framing — scolding real running sessions on plan-coded walk days, missing cross-week catch-ups, and manufacturing concerns out of schedule comparison. The user's feedback was direct: "I don't want any feedback on deviation at all — that's less of my concern." This ship rips out the adherence lens entirely.
