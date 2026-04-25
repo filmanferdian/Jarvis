@@ -12,6 +12,7 @@ interface HRDefaults {
   restingHR: number;
   lthr: number;
   maxHR: number;
+  maxHrSource: 'measured' | 'formula';
 }
 
 interface ZoneMethod {
@@ -130,17 +131,41 @@ function computeZones(age: number, rhr: number, lthr: number, maxHR: number, mod
   ];
 }
 
-function InputField({ label, value, onChange, suffix }: {
-  label: string; value: number; onChange: (v: number) => void; suffix?: string;
+function InputField({ label, value, onChange, onCommit, suffix, badge }: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  onCommit?: (v: number) => void;
+  suffix?: string;
+  badge?: { text: string; tone: 'measured' | 'formula' };
 }) {
   return (
     <div>
-      <label className="block text-[11px] text-jarvis-text-dim uppercase tracking-wider mb-1">{label}</label>
+      <div className="flex items-center gap-1.5 mb-1">
+        <label className="block text-[11px] text-jarvis-text-dim uppercase tracking-wider">{label}</label>
+        {badge && (
+          <span
+            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium"
+            style={{
+              background: badge.tone === 'measured' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)',
+              color: badge.tone === 'measured' ? '#22c55e' : '#f59e0b',
+            }}
+          >
+            {badge.text}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-1">
         <input
           type="number"
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
+          onBlur={(e) => onCommit?.(Number(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur();
+            }
+          }}
           className="w-20 px-2 py-1.5 rounded-md bg-jarvis-bg-main border border-jarvis-border text-jarvis-text-primary text-[13px] font-mono focus:outline-none focus:border-jarvis-accent"
         />
         {suffix && <span className="text-[11px] text-jarvis-text-dim">{suffix}</span>}
@@ -167,6 +192,8 @@ export default function HRZoneCalculator() {
   const [rhr, setRhr] = useState(52);
   const [lthr, setLthr] = useState(164);
   const [maxHR, setMaxHR] = useState(185);
+  const [maxHrSource, setMaxHrSource] = useState<'measured' | 'formula'>('formula');
+  const [savingMaxHr, setSavingMaxHr] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<ZoneMode>('z2');
 
@@ -177,10 +204,37 @@ export default function HRZoneCalculator() {
         setRhr(d.restingHR);
         setLthr(d.lthr);
         setMaxHR(d.maxHR);
+        setMaxHrSource(d.maxHrSource);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
   }, []);
+
+  async function persistMaxHr(value: number) {
+    if (!Number.isFinite(value) || value <= 0) return;
+    if (maxHrSource === 'measured' && value === maxHR) return;
+    if (maxHrSource === 'formula' && value === 220 - age) return;
+    setSavingMaxHr(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch('/api/health/measurements', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          measurement_type: 'max_hr',
+          value,
+          date: today,
+          source: 'manual',
+        }),
+      });
+      if (res.ok) setMaxHrSource('measured');
+    } catch {
+      // Best-effort persistence; UI value still reflects the user's input.
+    } finally {
+      setSavingMaxHr(false);
+    }
+  }
 
   const zones = useMemo(() => computeZones(age, rhr, lthr, maxHR, mode), [age, rhr, lthr, maxHR, mode]);
 
@@ -249,11 +303,34 @@ export default function HRZoneCalculator() {
 
       {/* Inputs */}
       <div className="flex flex-wrap gap-4">
-        <InputField label="Age" value={age} onChange={(v) => { setAge(v); setMaxHR(220 - v); }} suffix="yrs" />
+        <InputField
+          label="Age"
+          value={age}
+          onChange={(v) => {
+            setAge(v);
+            if (maxHrSource === 'formula') setMaxHR(220 - v);
+          }}
+          suffix="yrs"
+        />
         <InputField label="Resting HR" value={rhr} onChange={setRhr} suffix="bpm" />
         <InputField label="LTHR" value={lthr} onChange={setLthr} suffix="bpm" />
-        <InputField label="Max HR" value={maxHR} onChange={setMaxHR} suffix="bpm" />
+        <InputField
+          label="Max HR"
+          value={maxHR}
+          onChange={setMaxHR}
+          onCommit={persistMaxHr}
+          suffix={savingMaxHr ? 'saving…' : 'bpm'}
+          badge={{
+            text: maxHrSource === 'measured' ? 'measured' : 'formula',
+            tone: maxHrSource,
+          }}
+        />
       </div>
+      {maxHrSource === 'formula' && (
+        <p className="text-[11px] text-jarvis-text-faint -mt-2">
+          Max HR is using the age-based 220 − age estimate. Enter a tested max from a race or Garmin lab test to tighten the Z5 consensus band.
+        </p>
+      )}
 
       {/* Chart */}
       <div className="w-full" style={{ height: 280 }}>

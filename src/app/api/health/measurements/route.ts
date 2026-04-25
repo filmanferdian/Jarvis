@@ -11,6 +11,7 @@ const VALID_TYPES = [
   'dead_hang_seconds',
   'overhead_squat_compensations',
   'run_10k_seconds',
+  'max_hr',
 ];
 
 const DEFAULT_UNITS: Record<string, string> = {
@@ -22,6 +23,7 @@ const DEFAULT_UNITS: Record<string, string> = {
   dead_hang_seconds: 'seconds',
   overhead_squat_compensations: 'count',
   run_10k_seconds: 'seconds',
+  max_hr: 'bpm',
 };
 
 function extractNumber(val: unknown): number {
