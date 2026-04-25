@@ -48,21 +48,6 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
-### 2026-04-19 — Migrate legacy `health_measurements.measurement_type` rows to canonical names
-
-**Context:** `health_measurements` has historical rows under old names (`dead_hang`, `ohs_major_compensations`) from before the POST endpoint's `VALID_TYPES` was renamed to `dead_hang_seconds` / `overhead_squat_compensations`. v2.4.46 works around this with a canonicalization layer in `/api/health-fitness/okr`, but the DB still carries drift.
-
-**Scope:**
-- One-off SQL migration (`supabase/migration-NNN-normalize-measurement-types.sql`) that rewrites `measurement_type` for all known legacy aliases.
-- After the migration is applied in prod, remove `MEASUREMENT_TYPE_CANONICAL` from `src/app/api/health-fitness/okr/route.ts`.
-- Also audit `waist_circumference` / `blood_pressure_systolic/diastolic` — currently those are the canonical DB names but the OKR `key_result` is short (`waist_cm`, `bp_systolic`, `bp_diastolic`). Either rename in DB to match OKR keys, or leave the canonicalization layer in place for those specifically.
-
-**Why defer:** The canonicalization layer is cheap and ships work today. Only worth migrating the DB if another reader needs the same aliasing logic.
-
-**Effort estimate:** ~30 min (migration + verify + remove shim).
-
----
-
 ## Medium priority
 
 ### 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)

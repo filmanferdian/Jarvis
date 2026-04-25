@@ -6,6 +6,13 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Normalize legacy health_measurements rows (v3.10.4)
+
+Drift from before the POST endpoint's `VALID_TYPES` was renamed left two `health_measurements` rows under old names (`dead_hang`, `ohs_major_compensations`). The OKR canonicalization shim was masking them. Migrated those rows to the canonical names (`dead_hang_seconds`, `overhead_squat_compensations`) and pruned the corresponding shim entries.
+
+- `supabase/migration-026-normalize-measurement-types.sql`: rewrites `measurement_type` for the two legacy aliases. Two rows total, no UNIQUE collisions.
+- `src/app/api/health-fitness/okr/route.ts`: removes `dead_hang` and `ohs_major_compensations` from `MEASUREMENT_TYPE_CANONICAL`. The remaining three entries (`waist_circumference`, `blood_pressure_systolic`, `blood_pressure_diastolic`) are NOT drift — they are the canonical DB names; the shim translates them to OKR's shorter `key_result` form. Comment rewritten to clarify the shim's actual purpose.
+
 ### Walk filter: HR tiebreaker for slow-paced VO2 max (v3.10.3)
 
 v3.10.2 escaped the walk filter via a `force_resync` bypass, but that path would also let real walks back in (Apr 22's archived "Treadmill Walking" would re-ingest on the next force_resync). Replaced with a smarter universal filter that uses avg HR as a tiebreaker on slow-paced activities. Real running — even with long rests between VO2 intervals — keeps avg HR ≥ 130; sustained walking sits at 120 or below.

@@ -145,12 +145,10 @@ export const GET = withAuth(async () => {
       .select('measurement_type, value, date')
       .order('date', { ascending: false });
 
-    // Map DB measurement_type (incl. legacy aliases) to canonical OKR key_result.
-    // Legacy aliases exist because the POST route's VALID_TYPES changed over
-    // time; historical rows still carry the old names.
+    // Map DB measurement_type to OKR key_result. The DB stores canonical names
+    // enforced by VALID_TYPES in /api/health/measurements; the OKR layer uses
+    // shorter keys for readability, so this shim translates between them.
     const MEASUREMENT_TYPE_CANONICAL: Record<string, string> = {
-      dead_hang: 'dead_hang_seconds',
-      ohs_major_compensations: 'overhead_squat_compensations',
       waist_circumference: 'waist_cm',
       blood_pressure_systolic: 'bp_systolic',
       blood_pressure_diastolic: 'bp_diastolic',

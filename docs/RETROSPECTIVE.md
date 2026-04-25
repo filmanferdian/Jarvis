@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-25 — v3.10.4 — Normalize legacy health_measurements rows
+
+Cleared two-row drift in `health_measurements` from before the POST endpoint's `VALID_TYPES` was renamed (`dead_hang` → `dead_hang_seconds`, `ohs_major_compensations` → `overhead_squat_compensations`). Pruned the corresponding shim entries from the OKR canonicalization layer.
+
+**Well:**
+- Verified the unique-constraint shape (`UNIQUE (date, measurement_type, source)`) and the actual row dates before writing the migration. The legacy rows happened to share dates only with each other, so the rename was collision-free — but the check is what made that knowable up front rather than at apply time.
+- Caught the over-broad scope. The original backlog read suggested migrating ALL five entries in `MEASUREMENT_TYPE_CANONICAL`, but reading the POST route's `VALID_TYPES` revealed three of them are the canonical DB names (the OKR keys are short forms by design). Renaming those would have broken `VALID_TYPES`, `DEFAULT_UNITS`, `health-fitness/insights`, and `/trends`. Trimmed scope to the two genuine drift entries.
+
+**Wrong:**
+- Nothing material. One small thing: the original shim's comment said "legacy aliases" for all 5 entries, which is what made the backlog item over-scope itself in the first place. Comment is now rewritten.
+
+**Next:**
+- Item #6 (RLS hardening sweep) is the next high-priority DB hygiene ship — same session.
+
+---
+
 ## 2026-04-25 — v3.7.1 / v3.7.2 / v3.8.1 — Cardio observability, lap classification, integer-cast fix
 
 Three patches in one session, each enabling the next. User reported the cardio "Trigger Analysis" button couldn't pull the morning's run. Investigation found three layered problems: (1) the button silently swallowed sync failures, (2) the per-lap Notion table assumed every lap = 1km but the user had started using manual lap markers, and (3) running activities had been silently failing to upsert to Supabase since the table was created. Each fix unlocked visibility into the next.
