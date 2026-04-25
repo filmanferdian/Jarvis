@@ -3,6 +3,8 @@
  * Handles redundancy check (by Garmin ID) and page creation.
  */
 
+import type { SegmentType } from './garmin-enrich';
+
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 const RUNS_DB_ID = '061105bb-bd86-464b-b344-c86d89c771ca';
@@ -65,7 +67,30 @@ export interface RunActivity {
     vertRatioPct: number | null;
     elevGain: number | null;
     elevLoss: number | null;
+    segmentType: SegmentType;
   }[];
+}
+
+function segmentLabel(type: SegmentType, intervalCounter: number | null): string | null {
+  switch (type) {
+    case 'warm-up': return 'warm-up';
+    case 'cool-down': return 'cool-down';
+    case 'tempo': return 'tempo';
+    case 'interval-rest': return 'rest';
+    case 'interval-work': return intervalCounter != null ? `int ${intervalCounter}` : 'int';
+    case 'main':
+    default: return null;
+  }
+}
+
+function formatLapCell(
+  split: { lapIndex: number; distanceMeters: number; segmentType: SegmentType },
+  intervalCounter: number | null,
+): string {
+  const km = (split.distanceMeters / 1000).toFixed(2);
+  const label = segmentLabel(split.segmentType, intervalCounter);
+  const base = `L${split.lapIndex} · ${km} km`;
+  return label ? `${base} (${label})` : base;
 }
 
 /** Check which Garmin IDs already exist in the Runs DB */
@@ -119,13 +144,13 @@ function hrZoneStr(seconds: number | null): string {
 function buildPageContent(run: RunActivity): object[] {
   const blocks: object[] = [];
 
-  // Per-Km Splits table
+  // Lap Splits table
   if (run.splits.length > 0) {
     blocks.push({
       object: 'block',
       type: 'heading_3',
       heading_3: {
-        rich_text: [{ type: 'text', text: { content: 'Per-Km Splits' } }],
+        rich_text: [{ type: 'text', text: { content: 'Lap Splits' } }],
       },
     });
 
@@ -137,7 +162,7 @@ function buildPageContent(run: RunActivity): object[] {
         type: 'table_row',
         table_row: {
           cells: [
-            cell('Km'), cell('Pace'), cell('Avg HR'), cell('Max HR'),
+            cell('Lap'), cell('Pace'), cell('Avg HR'), cell('Max HR'),
             cell('Cadence'), cell('Stride (cm)'), cell('GCT (ms)'),
             cell('Power (W)'), cell('Vert Osc (cm)'), cell('Vert Ratio'),
             cell('Elev +/- (m)'),
@@ -146,7 +171,9 @@ function buildPageContent(run: RunActivity): object[] {
       },
     ];
 
+    let intervalSeq = 0;
     for (const split of run.splits) {
+      const intervalCounter = split.segmentType === 'interval-work' ? ++intervalSeq : null;
       const elevStr = (split.elevGain != null || split.elevLoss != null)
         ? `+${Math.round(split.elevGain ?? 0)} / -${Math.round(split.elevLoss ?? 0)}`
         : '—';
@@ -155,7 +182,7 @@ function buildPageContent(run: RunActivity): object[] {
         type: 'table_row',
         table_row: {
           cells: [
-            cell(String(split.lapIndex)),
+            cell(formatLapCell(split, intervalCounter)),
             cell(split.pacePerKm),
             cell(split.avgHr != null ? String(split.avgHr) : '—'),
             cell(split.maxHr != null ? String(split.maxHr) : '—'),
