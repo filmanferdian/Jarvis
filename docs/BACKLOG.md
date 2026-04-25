@@ -4,6 +4,27 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ---
 
+## 2026-04-25 — Lap segment classification: follow-ups (v3.7.2)
+
+**Context:** v3.7.2 added a heuristic lap classifier that infers segment types (warm-up / main / tempo / interval-work / interval-rest / cool-down) from HR + pace + duration. Three follow-ups were explicitly scoped out of the "light touch" implementation.
+
+**Items:**
+- **Working-portion form averages.** Activity-level cadence, GCT, vertical oscillation, and vertical ratio still come from `raw_json` (Garmin's whole-activity summary), so VO2 max sessions where warm-up/cool-down are inside the same activity will see those metrics diluted. Re-compute from `splits` filtered to `main + tempo + interval-work` segments. Should also surface a "Working portion: cadence X, GCT Y" line on the Notion run page distinct from the activity-level number.
+- **Per-segment decoupling for VO2 max.** `calcDecoupling` currently runs over the activity's full HR time-series with a fixed 3–5 min warmup exclusion. With segment labels available, a per-segment decoupling read would be more useful for interval workouts (e.g., decoupling within the tempo finish, decoupling across the 3 intervals as a set). Decide whether to surface as a new property or replace the activity-level number conditionally.
+- **Surface segment labels to Claude weekly analysis.** The analysis-engine prompt only sees per-run summaries today; doesn't see per-lap segment classification. Could enable richer "you nailed the tempo finish on Saturday" / "the third VO2 interval was 5 bpm hot" feedback. Pass `splits` (with `segmentType`) into `extractRunSummaries` and add a "structured segments" block to the weekly synthesis prompt.
+
+---
+
+## 2026-04-25 — Per-record sync logging: extend pattern to other sync paths
+
+**Context:** v3.7.1 added `console.warn('[garmin] upsert failed for activity X: ...')` per failed record in `syncRecentActivities`. v3.8.1 propagated it to the 3 other Garmin sync sites (`syncGarmin`, `backfillGarmin`, `backfillDateRange`). The same silent-failure pattern likely lives in other sync paths — anywhere a `for ... of records` loop upserts and only counts successes.
+
+**Idea:** sweep `src/lib/sync/*.ts` and `src/app/api/sync/**` for `if (!error) X++;` patterns where the `else` branch is silent. Add per-record warning logs. Candidates likely include `emails.ts`, `googleCalendar.ts`, `outlookCalendar.ts`, `notionTasks.ts`, `notionContext.ts`, `contactScan.ts`. Cost: maybe 30 lines of code, big payoff in observability. The v3.8.1 root-cause investigation took ~5 minutes once the warning was visible — would have taken hours to find without it.
+
+**Out of scope until:** another sync silently misbehaves and surfaces as user pain, OR we want to be proactive about it.
+
+---
+
 ## 2026-04-25 — Walk filter: false positive on VO2 max sessions
 
 **Context:** The v3.4.0 ingest filter drops any activity with avg pace slower than 10:00/km, which works for steady incline-walk sessions but produces false positives on VO2-max interval workouts. Apr 21's VO2 session logged at 11:32/km because the long rest periods between intervals dragged the average pace up — pace alone can't distinguish "incline walk for 20 minutes" from "5x3min hard with full recovery between."

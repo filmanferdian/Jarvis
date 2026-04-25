@@ -4,6 +4,27 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-25 — v3.7.1 / v3.7.2 / v3.8.1 — Cardio observability, lap classification, integer-cast fix
+
+Three patches in one session, each enabling the next. User reported the cardio "Trigger Analysis" button couldn't pull the morning's run. Investigation found three layered problems: (1) the button silently swallowed sync failures, (2) the per-lap Notion table assumed every lap = 1km but the user had started using manual lap markers, and (3) running activities had been silently failing to upsert to Supabase since the table was created. Each fix unlocked visibility into the next.
+
+**Well:**
+- v3.7.1's per-record upsert warning (`[garmin] upsert failed for activity X: ...`) made the v3.8.1 bug obvious within an hour. Without it, the integer-cast failure could have run forever — every previous sync had reported "synced 5 activities" with no indication of failure. The lesson: if a `for ... of` loop in a sync path can silently skip records on error, log the error per-record. Not just the count.
+- The lap classifier was designed test-first: dry-ran 6 scenarios in pure JS before committing the implementation. Caught a bug where the original heuristic (require pace below median for interval-work detection) failed for VO2 max sessions because rest laps drag the median pace toward work pace. Switched to HR-floor + duration + alternation, no pace check. Verified end-to-end after deploy by re-rendering the Apr 25 run, where the classifier correctly detected the natural tempo finish on L7-L8 purely from HR + pace, no manual press needed.
+- Helper extraction (`buildActivityRecord`) deduplicated 4 identical activity-record builders in `garmin.ts`. Net diff was 40 lines added, 59 removed. The integer-rounding fix only had to be made in one place — and the missing per-record warning was added to the 3 sites that didn't have it (only `syncRecentActivities` had it from v3.7.1).
+
+**Wrong:**
+- The original CLAUDE.md "Versioning Discipline" rule says ship-stream bumps patch (`3.7.0 → 3.7.1`) — followed correctly. But the docs-of-record (CHANGELOG / RETROSPECTIVE / BACKLOG / Notion) were deferred to a consolidating `/ship` pass at the end. That kept the individual ships fast but meant docs were out of date for ~3 hours. Acceptable tradeoff; not a regression.
+- During the v3.8.1 reproduction I overwrote one row's `raw_json` with test data (`{foo: 'bar', test: true}`). Realized only after running it. The next production sync after deploy restored real data automatically — but the right defensive move would have been to test against a stub activity_id, not a real one.
+
+**Next:**
+- Plumb the same per-record warning pattern to other sync loops (`emails`, `calendar`, `notionTasks`) — anywhere a for-loop upserts batches and only counts successes. Same silent-failure risk.
+- VO2 max activity-level form averages (cadence, GCT, vert ratio) still get diluted by warm-up/cool-down inside the run. Re-compute these from `splits` filtered to `main + interval-work + tempo` segments. Backlog item.
+- Per-segment decoupling for VO2 max sessions. Currently activity-level only with a fixed 3–5 min warmup exclusion. With segment classification now available, a per-segment decoupling read would be more useful for interval workouts. Backlog item.
+- Surface segment labels into the Claude weekly-analysis prompt. The classifier knows which laps were "tempo" or "interval-work", but the analysis-engine prompt only sees per-run summaries. Could lead to richer "you nailed the tempo finish on Saturday" type feedback. Backlog item.
+
+---
+
 ## 2026-04-24 — v3.6.0 Current Events: outlet blocklist per tab
 
 User flagged low-value outlets cluttering the Indonesia and International feeds: sports niches (Fox Sports, Cleveland Browns, Bleeding Green Nation, NBC Sport), a pop-science aggregator (phys.org), and Indonesian clickbait outlets (Lentera.co, Qoo Media, Monitorday, detikHot, Bolasport, asatunews.co.id). Added a per-tab blocklist at the RSS ingestion layer so those sources are dropped before Claude ever sees them.
