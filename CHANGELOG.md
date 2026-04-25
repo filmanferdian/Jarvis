@@ -6,6 +6,13 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Skip walk filter on force_resync (v3.10.2)
+
+The v3.4.0 walk filter (drop activities with avg pace slower than 10:00/km) catches incline-walk sessions correctly but false-positives on VO2 max workouts whose long interval-rest gaps drag the avg pace above 10:00/km. Apr 21's VO2 session logged at 11:32/km got blocked at the Supabase query layer, so v3.10.0's force_resync of the week-of-Apr-20 couldn't write Session Profile / Lap Profile to it.
+
+- `src/lib/running-analysis/index.ts`: the walk filter now skips when `options.forceResync === true`. User-driven re-ingestion is an explicit "trust me, pull this in" — once the splits go through `enrichActivity` + `classifyLaps`, real walks tag as `main` only and surface as a `Z2 base` Session Profile (not harmful), while real VO2 sessions surface their interval structure correctly.
+- The walk filter still applies on the default ingest path (Saturday cron, non-force-resync) — no change to the v3.4.0 guarantee.
+
 ### Ensure Runs DB schema before ingest writes (v3.10.1)
 
 v3.10.0 added two new properties (`Session Profile`, `Lap Profile`) to `RunActivity` and `buildProperties()`, but Notion's API rejects writes to property keys that don't exist in the database schema with a `validation_error`. Without a schema-ensure step, the first force_resync after deploy would 400 on every page write.

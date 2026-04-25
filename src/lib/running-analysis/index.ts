@@ -349,7 +349,11 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
   const runs = (activities ?? []).filter((a) => {
     if (!isRun(a.activity_type)) return false;
     // Exclude walks (pace slower than 10:00/km) — catches incline-walk sessions
-    // logged as treadmill_running / indoor_running.
+    // logged as treadmill_running / indoor_running. SKIP this filter when
+    // force_resync is set: user-driven re-ingestion is an explicit "trust me,
+    // pull this in" — necessary for VO2 max sessions whose interval rest gaps
+    // legitimately produce avg pace > 10:00/km.
+    if (options.forceResync) return true;
     if (!a.duration_seconds || !a.distance_meters) return true;
     const secPerKm = (a.duration_seconds / a.distance_meters) * 1000;
     return secPerKm <= 600;
