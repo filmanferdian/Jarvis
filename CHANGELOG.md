@@ -4,6 +4,20 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.8] — 2026-04-25 — Weekly running analysis: timing-aware, carry-over-aware, walk-free (v3.8.0)
+
+The weekly cardio analysis prose was over-strict during in-progress weeks: it would flag Sunday's run as "missed" while Sunday hadn't happened yet, and would treat a Monday catch-up of last week's missed Sunday session as an off-plan extra. The "How Was This Week" section also defaulted to a per-run roll-call ("the runner did X on Monday, then Y on Tuesday…") instead of leading with the sharpest takeaway. Three changes to the synthesis prompt and inputs.
+
+- `src/lib/running-analysis/plan-loader.ts`: `loadWeekSchedule` now also returns `lastWeek: PlannedDay[]` (Mon–Sun before the analyzed week). New `WeekSchedule` shape is `{ lastWeek, thisWeek, nextWeek }`. The Supabase query already runs against `program_schedule` by date range — extending the lower bound was a one-line change.
+- `src/lib/running-analysis/analysis-engine.ts`:
+  - `PlanContext` now carries `lastWeek` so the LAST WEEK'S PLAN block can be embedded in the prompt as structured input. The model uses it to detect cross-week catch-ups (a run early this week whose session type was in last week's plan but apparently missed there → recognize as a legitimate carry-over, do NOT flag as off-plan).
+  - `generateWeeklyAnalysis` takes a new `today` parameter (WIB date string). A TIMING block at the top of the prompt declares whether the week is COMPLETE (today > weekEnd) or IN PROGRESS with N days remaining. When in progress, the model is explicitly forbidden from flagging sessions on dates that have not occurred yet.
+  - Section 1 rewritten: lead with the SHARPEST takeaway (standout session, clear progression signal, or notable gap), cite specific numbers, NOT a per-run roll-call. If the week is in progress, frame as a mid-week read.
+  - Section 3 rewritten: do not flag day-of-week shifts, do not flag sessions on not-yet-occurred dates, do not flag legitimate cross-week catch-ups, and if there is genuinely nothing to flag, say so in one sentence rather than manufacturing a concern.
+  - New top-level rule: WALKING IS OUT OF SCOPE. Walks are filtered out at ingestion (v3.4.0 pace > 10:00/km filter), but the prompt now also tells the model to ignore any walk-only or treadmill-walking activity if one slipped through — do not include in run count, Z2 volume, or prose.
+- `src/lib/running-analysis/index.ts`: passes `today = getWibNow()` into `generateWeeklyAnalysis`, and threads `lastWeek` from the schedule loader into `PlanContext`.
+- No schema change, no migration, no cost delta. Weekly insight prose updates on next regeneration (Saturday cron, or manual trigger via the Trigger Analysis button on /cardio-analysis).
+
 ## [3.7] — 2026-04-25 — Cardio Analysis: drop low-signal panels (v3.7.0)
 
 Removed two panels from `/cardio-analysis` that weren't pulling their weight: "Zone distribution" (time-in-zone bars across the recent runs) and "HRV vs training load" (scatter of run days). Both surfaced data already covered better elsewhere — zone breakdowns live per-run in the runs table, and HRV trend has its own dedicated view — so the cards added visual weight without informing decisions.
