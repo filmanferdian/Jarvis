@@ -744,11 +744,15 @@ async function updateHealthKpis(daily: Record<string, unknown>): Promise<void> {
 }
 
 /** Lightweight activity-only sync: fetches last 20 activities from Garmin and upserts to Supabase.
- *  Does NOT prune old records or sync daily metrics. Safe to call from running analysis pipeline. */
-export async function syncRecentActivities(): Promise<{ synced: number }> {
+ *  Does NOT prune old records or sync daily metrics. Safe to call from running analysis pipeline.
+ *  Returns `fetched` (count returned by Garmin API) and `synced` (count successfully upserted to Supabase) */
+export async function syncRecentActivities(): Promise<{ fetched: number; synced: number }> {
   const client = await createGarminClient();
   const activities = await client.getActivities(0, 20);
   await trackGarminCalls(1);
+
+  const fetched = Array.isArray(activities) ? activities.length : 0;
+  console.log(`[garmin] syncRecentActivities: fetched ${fetched} activities from Garmin`);
 
   let synced = 0;
   if (Array.isArray(activities)) {
@@ -772,11 +776,13 @@ export async function syncRecentActivities(): Promise<{ synced: number }> {
         .from('garmin_activities')
         .upsert(rec, { onConflict: 'activity_id' });
       if (!error) synced++;
+      else console.warn(`[garmin] upsert failed for activity ${rec.activity_id}: ${error.message}`);
     }
   }
 
+  console.log(`[garmin] syncRecentActivities: synced ${synced}/${fetched} activities to Supabase`);
   await saveCachedTokens(client);
-  return { synced };
+  return { fetched, synced };
 }
 
 const RETENTION_DAYS = 56;

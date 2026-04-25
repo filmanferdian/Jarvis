@@ -249,6 +249,12 @@ export interface RunningAnalysisOptions {
 export interface RunningAnalysisResult {
   weekStart: string;
   weekEnd: string;
+  /** How many activities Garmin returned via getActivities(0, 20). null = sync was skipped or failed before fetching. */
+  garminFetched: number | null;
+  /** How many activities were upserted into Supabase. null = sync was skipped or failed. */
+  garminSynced: number | null;
+  /** Reason the Garmin sync was skipped (circuit-breaker) or the error message if it threw. null on success. */
+  garminSkipReason: string | null;
   activitiesFound: number;
   activitiesIngested: number;
   activitiesSkipped: number;
@@ -278,20 +284,34 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
   let analysisGenerated = false;
   let weeklyInsightUpdated = false;
   let dashboardUpdated = false;
+  let garminFetched: number | null = null;
+  let garminSynced: number | null = null;
+  let garminSkipReason: string | null = null;
 
   // --- Step 0: Sync fresh Garmin data so today's activities are available ---
   try {
     const blockStatus = await isGarminBlocked();
     if (blockStatus.blocked) {
+      garminSkipReason = `circuit-breaker: ${blockStatus.reason}`;
       console.log(`[running-analysis] Garmin sync skipped: ${blockStatus.reason}`);
+      errors.push(`Garmin sync skipped: ${blockStatus.reason}`);
     } else {
       console.log('[running-analysis] Syncing recent Garmin activities…');
       const syncResult = await syncRecentActivities();
-      console.log(`[running-analysis] Garmin activity sync done: ${syncResult.synced} activities upserted`);
+      garminFetched = syncResult.fetched;
+      garminSynced = syncResult.synced;
+      console.log(`[running-analysis] Garmin activity sync done: fetched ${syncResult.fetched}, upserted ${syncResult.synced}`);
+      if (syncResult.fetched === 0) {
+        errors.push('Garmin returned 0 activities — token may need refresh');
+      } else if (syncResult.synced < syncResult.fetched) {
+        errors.push(`Garmin sync partial: ${syncResult.synced}/${syncResult.fetched} upserted`);
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    garminSkipReason = `error: ${msg}`;
     console.warn('[running-analysis] Garmin sync failed (continuing with existing data):', msg);
+    errors.push(`Garmin sync failed: ${msg}`);
   }
 
   // --- Step 1: Query Supabase for outdoor runs in this week ---
@@ -476,6 +496,9 @@ export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): 
   return {
     weekStart,
     weekEnd,
+    garminFetched,
+    garminSynced,
+    garminSkipReason,
     activitiesFound,
     activitiesIngested,
     activitiesSkipped,
