@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.7] — 2026-04-25 — Cardio Analysis: drop low-signal panels (v3.7.0)
+
+Removed two panels from `/cardio-analysis` that weren't pulling their weight: "Zone distribution" (time-in-zone bars across the recent runs) and "HRV vs training load" (scatter of run days). Both surfaced data already covered better elsewhere — zone breakdowns live per-run in the runs table, and HRV trend has its own dedicated view — so the cards added visual weight without informing decisions.
+
+- `src/app/cardio-analysis/page.tsx`: deleted the grid block holding both cards, the `zoneDistribution` and `scatterData` `useMemo` hooks that fed them, and the now-unused `recharts` import (`ScatterChart`, `Scatter`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer`, `ZAxis`).
+- Page now flows: Jarvis verdict → HR Zone Calculator → Weekly Insights → recent runs table. Tighter, less scrolling, no decision lost.
+- No schema change, no API change, no cost change.
+
 ## [3.6] — 2026-04-24 — Current Events: outlet blocklist per tab (v3.6.0)
 
 Low-value outlets (sports niches and clickbait aggregators) were showing up in the Indonesia and International feeds, consuming a slot and dragging down the average relevance of what the synthesis drew from. Added a per-tab blocklist applied at RSS ingestion time.
