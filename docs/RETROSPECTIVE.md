@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-25 — v3.10.6 — Persist measured max HR + close two stale backlog items
+
+Picked up the only High-priority backlog item that wasn't already shipped: surface a UI nudge to enter a tested max HR and persist it once entered. Two adjacent High-priority entries were closed as already-solved during this work — the walk-filter VO2 false-positive (v3.10.3 HR tiebreaker) and the "preview weekly analysis" button (the existing "Run Analysis" button on /cardio-analysis already does this).
+
+**Well:**
+- Reused the existing `health_measurements` pipeline rather than introducing a new column or table. Adding `max_hr` to `VALID_TYPES` was a 2-line change; the rest fell out of the existing pattern. No migration needed at all.
+- Reading the page source first surfaced two backlog items that were already done. Net delivered work was one feature, but three High-priority backlog entries closed.
+- Verified end-to-end in the browser preview: badge flipped from amber `formula` to green `measured` after commit, value persisted across reload, and the nudge banner conditionally rendered correctly. Tested the actual HTTP path (POST /api/health/measurements → GET /api/cardio/hr-zones returns measured) directly when a synthetic-event React-controlled-input quirk made the UI test inconclusive.
+- Cleaned up the test row (max_hr=188) from prod after verification so Filman starts from a clean slate when he enters his real value.
+
+**Wrong:**
+- The first preview server attempt failed because the worktree was missing `.env.local` — known CLAUDE.md gotcha #2. Copied from the parent repo. Worth investing 15 minutes in a `bin/sync-worktree-env.sh` symlink helper at some point so this doesn't repeat.
+
+**Next:**
+- Preview-server auto-login flag (NEXT_PUBLIC_DEV_AUTO_LOGIN) is on the backlog as a Medium-priority follow-up; would have saved a step in this session too.
+- High-priority section of the backlog is now empty. Next session should pull from Medium tier or surface new items.
+
+---
+
 ## 2026-04-25 — v3.10.5 — RLS hardening sweep (drop permissive policies on 28 tables)
 
 Closed an anon-key exposure across 28 `public` tables. Each carried a `FOR ALL USING (true)` policy that gave anon/publishable-key holders full read+write — including on highly sensitive tables like `google_tokens`, `microsoft_tokens`, `garmin_tokens`. The app uses service-role server-side and bypasses RLS regardless, so app behavior is unchanged.

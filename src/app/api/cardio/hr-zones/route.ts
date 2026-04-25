@@ -4,7 +4,27 @@ import { supabase } from '@/lib/supabase';
 
 export const GET = withAuth(async () => {
   const age = 35;
-  const maxHR = 220 - age;
+
+  // Prefer a measured max HR if the user has recorded one via
+  // /api/health/measurements (measurement_type='max_hr'). Fall back to the
+  // age-based 220-age formula. The Z5 consensus band tightens meaningfully
+  // when a measured max replaces the formula.
+  let maxHR = 220 - age;
+  let maxHrSource: 'measured' | 'formula' = 'formula';
+  try {
+    const { data } = await supabase
+      .from('health_measurements')
+      .select('value, date')
+      .eq('measurement_type', 'max_hr')
+      .order('date', { ascending: false })
+      .limit(1);
+    if (data && data.length > 0) {
+      maxHR = Math.round(Number(data[0].value));
+      maxHrSource = 'measured';
+    }
+  } catch {
+    // Use formula fallback
+  }
 
   // Fetch 4-week average resting HR from Garmin
   let restingHR = 52; // fallback
@@ -40,5 +60,5 @@ export const GET = withAuth(async () => {
     // Use fallback
   }
 
-  return NextResponse.json({ age, restingHR, lthr, maxHR });
+  return NextResponse.json({ age, restingHR, lthr, maxHR, maxHrSource });
 });

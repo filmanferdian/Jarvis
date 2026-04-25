@@ -6,27 +6,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
-### 2026-04-25 — Walk filter: false positive on VO2 max sessions
-
-**Context:** The v3.4.0 ingest filter drops any activity with avg pace slower than 10:00/km, which works for steady incline-walk sessions but produces false positives on VO2-max interval workouts. Apr 21's VO2 session logged at 11:32/km because the long rest periods between intervals dragged the average pace up — pace alone can't distinguish "incline walk for 20 minutes" from "5x3min hard with full recovery between."
-
-**Idea:** revisit detection after the next VO2 max session. Possible signals to layer in:
-- Activity name match (Garmin auto-names VO2 / interval workouts predictably).
-- Max HR or HR zone distribution: a real VO2 session spends meaningful time in Z4/Z5; an incline walk lives in Z2.
-- Interval count from splits (a workout with many short fast splits separated by slower ones is structurally different from a flat slow session).
-
-**Out of scope until:** at least one more VO2 max run is on file so we can compare its avg pace + zone profile against the Apr 21 sample.
-
----
-
-### 2026-04-23 — Cardio analysis: follow-ups (v3.4.0)
-
-**Context:** v3.4.0 added Z5 calculator view, pace-based walk filter, and loosened weekly-review framing. A few items are out of scope for this ship.
-
-**Items:**
-- ~~**Backfill: prune historical incline-walk entries.**~~ Done 2026-04-25 — `scripts/archive-walk-runs.mjs` archived the Apr 22 row and regenerated the week-of-Apr-20 weekly insight. Script is reusable for any future cleanup pass.
-- **Max-HR input for Z5 band accuracy.** Z5 bands lean heavily on the age-based `maxHR = 220 − age` fallback when a measured max HR is not yet synced. Once a true max from a race or Garmin test is known, the Z5 consensus band will tighten meaningfully. Worth prompting the user to enter a tested max HR once they have one.
-- **Weekly-review observability.** The prompt change is invisible until the next Saturday cron fires. Add a "preview weekly analysis" button on `/cardio-analysis` that re-runs the analysis for the current partial week on demand, so prompt iterations can be tested without waiting for Saturday.
+_Empty — all items shipped._
 
 ---
 

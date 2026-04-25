@@ -6,6 +6,15 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Persist measured max HR (v3.10.6)
+
+The HR Zone Calculator's Max HR field has always been editable, but the value reset to the `220 − age` formula on every page load because nothing was persisted. The v3.4.0 retrospective noted that Z5 bands lean heavily on the age-based fallback until a real max is known. This ship persists the measured value through the existing `health_measurements` pipeline and adds a source indicator + nudge so it's obvious when the formula is in use.
+
+- `src/app/api/health/measurements/route.ts`: adds `max_hr` to `VALID_TYPES` and `DEFAULT_UNITS` (unit: `bpm`).
+- `src/app/api/cardio/hr-zones/route.ts`: queries the latest `health_measurements` row with `measurement_type = 'max_hr'` and prefers it over `220 − age`. Returns a new `maxHrSource: 'measured' | 'formula'` field.
+- `src/components/HRZoneCalculator.tsx`: shows a small badge next to the Max HR field — amber `formula` or green `measured` — and renders a one-line nudge under the inputs when source is `formula`. The Max HR field commits on blur (or Enter) by POSTing a `max_hr` health_measurements row; on commit the badge flips to `measured` and the nudge disappears. Editing Age now only auto-recalculates Max HR while still on the formula — once a measured value exists, age changes leave it alone.
+- The walk filter VO2-max false-positive backlog entry is closed in this ship as already-solved by v3.10.3 (HR tiebreaker on slow-paced activities). The "Preview weekly analysis" sub-item is closed as already-solved by the existing `/cardio-analysis` "Run Analysis" button.
+
 ### RLS hardening: drop permissive policies on 28 tables (v3.10.5)
 
 Closed a real exposure: 28 `public` tables — including `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, `health_measurements`, `blood_work`, `okr_targets` — carried `FOR ALL USING (true)` policies. Anyone holding the anon/publishable key could read or write them. The app uses the service-role key server-side, which bypasses RLS regardless, so dropping the policies is behaviorally equivalent for the app but locks out anon-key access entirely. Same pattern as `cron_run_log` and `email_draft_blocklist`.
