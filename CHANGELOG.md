@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### RLS hardening: drop permissive policies on 28 tables (v3.10.5)
+
+Closed a real exposure: 28 `public` tables — including `google_tokens`, `microsoft_tokens`, `garmin_tokens`, `weight_log`, `health_measurements`, `blood_work`, `okr_targets` — carried `FOR ALL USING (true)` policies. Anyone holding the anon/publishable key could read or write them. The app uses the service-role key server-side, which bypasses RLS regardless, so dropping the policies is behaviorally equivalent for the app but locks out anon-key access entirely. Same pattern as `cron_run_log` and `email_draft_blocklist`.
+
+- `supabase/migration-027-drop-permissive-policies.sql`: 28 `DROP POLICY IF EXISTS` statements. RLS stays enabled on every table.
+- Verified via Supabase: `pg_policy` query for permissive `USING (true)` policies returns zero rows. Security advisor's WARN-level lints for this class are clear; tables now show INFO-level `rls_enabled_no_policy` (the desired posture — service-role-only access).
+- CI guard (script that pings `get_advisors` and fails on ERROR-level lints) deferred to its own ship.
+
 ### Normalize legacy health_measurements rows (v3.10.4)
 
 Drift from before the POST endpoint's `VALID_TYPES` was renamed left two `health_measurements` rows under old names (`dead_hang`, `ohs_major_compensations`). The OKR canonicalization shim was masking them. Migrated those rows to the canonical names (`dead_hang_seconds`, `overhead_squat_compensations`) and pruned the corresponding shim entries.
