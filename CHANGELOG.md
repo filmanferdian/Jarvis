@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Current Events outlet blocklist additions (v3.10.7)
+
+Ten additional low-signal outlets cluttering the Indonesia and International feeds are now dropped at the RSS ingestion layer.
+
+- Indonesia: Haibunda, Fajar, Gizmologi.id, Mongabay.co.id, Goal.com.
+- International: PFF (Pro Football Focus), Pro Football Reference, The Hollywood Reporter, Raiders.com, Minnesota Vikings, Deadline.
+- `src/lib/sources/googleNewsRss.ts`: appends to the per-locale `BLOCKED_OUTLETS` lists. Same case-insensitive substring matching as v3.6.0.
+
 ### Persist measured max HR (v3.10.6)
 
 The HR Zone Calculator's Max HR field has always been editable, but the value reset to the `220 − age` formula on every page load because nothing was persisted. The v3.4.0 retrospective noted that Z5 bands lean heavily on the age-based fallback until a real max is known. This ship persists the measured value through the existing `health_measurements` pipeline and adds a source indicator + nudge so it's obvious when the formula is in use.
