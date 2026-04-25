@@ -6,6 +6,15 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
 
+### Ensure Runs DB schema before ingest writes (v3.10.1)
+
+v3.10.0 added two new properties (`Session Profile`, `Lap Profile`) to `RunActivity` and `buildProperties()`, but Notion's API rejects writes to property keys that don't exist in the database schema with a `validation_error`. Without a schema-ensure step, the first force_resync after deploy would 400 on every page write.
+
+- `src/lib/running-analysis/notion-runs-db.ts`: new exported `ensureRunsDbSchema(apiKey)` — GETs the Runs DB definition, computes the set of missing required columns (currently the two new rich_text fields), and PATCHes the database with just the missing keys. Idempotent: when both columns exist it short-circuits without a PATCH. Mirrors the pattern in `weekly-insights-db.ts:ensureDbSchema`.
+- `src/lib/running-analysis/index.ts`: `runRunningAnalysis()` calls `ensureRunsDbSchema` once at the top of the orchestrator, before any page write. Wrapped in try/catch so a transient Notion failure doesn't block the analysis run.
+
+## [3.10] — 2026-04-25 — Weekly running analysis: lap-level granularity (v3.10.0)
+
 After v3.9.0 dropped the adherence lens, the prose still couldn't recognize VO2 max sessions because the prompt only saw activity-level averages — Apr 21's intervals read as "poor execution at 11:32/km" because the model had no way to know that 11:32 average was a 4×4min @ Z5 work + 2min recovery structure. The classifier from v3.7.2 already labels every lap as warm-up/main/tempo/interval-work/interval-rest/cool-down from HR floor + duration + alternation; the labels just never reached the analysis prompt. This ship plumbs them through.
 
 - `src/lib/running-analysis/garmin-enrich.ts`: three new helpers alongside `classifyLaps()`. `summarizeSegments(splits)` derives a one-line authoritative session-type label from segment composition (e.g., `VO2 max intervals: 4×4min @ 178 HR, ~2min recovery`, `Z2 base 30min + 8min tempo finish`, `Z2 base ~45min`). `serializeLapsForProperty(splits)` JSON-encodes a compact per-lap shape (`{i, t, d, du, hr, p}` with single-letter segment-type codes). `parseLapsFromProperty(json)` is the inverse.

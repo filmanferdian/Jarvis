@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { unwrapJsonb } from '@/lib/crypto';
 import { syncRecentActivities, isGarminBlocked } from '@/lib/sync/garmin';
 import { enrichActivity, EnrichedActivityData, SegmentType, summarizeSegments, serializeLapsForProperty } from './garmin-enrich';
-import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, RunActivity } from './notion-runs-db';
+import { getExistingGarminIds, createRunPage, patchRunPage, patchDecouplingOnly, findRunPageByGarminId, getRunsForPeriod, ensureRunsDbSchema, RunActivity } from './notion-runs-db';
 import { extractRunSummaries, generateWeeklyAnalysis, HistoricalContext, PlanContext } from './analysis-engine';
 import { upsertWeeklyInsight } from './weekly-insights-db';
 import { updateRunningLogDashboard } from './dashboard-update';
@@ -275,6 +275,15 @@ export interface RunningAnalysisResult {
 export async function runRunningAnalysis(options: RunningAnalysisOptions = {}): Promise<RunningAnalysisResult> {
   const notionApiKey = process.env.NOTION_API_KEY;
   if (!notionApiKey) throw new Error('NOTION_API_KEY not configured');
+
+  // Ensure the Runs DB has the columns we need for ingest writes (Session
+  // Profile, Lap Profile). Idempotent — no-op once present. Safe to run on
+  // every invocation; the GET is ~50ms.
+  try {
+    await ensureRunsDbSchema(notionApiKey);
+  } catch (err) {
+    console.warn('[running-analysis] ensureRunsDbSchema failed (continuing):', err);
+  }
 
   // Determine week range
   let weekRange: { weekStart: string; weekEnd: string };
