@@ -37,6 +37,9 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'raiders.com',
     'minnesota vikings',
     'deadline',
+    'pats pulpit',
+    'steelers.com',
+    'nba.com',
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -51,6 +54,12 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'gizmologi.id',
     'mongabay.co.id',
     'goal.com',
+    'detiksport',
+    'haloindonesia.co.id',
+    'detikhealth',
+    'tribunwow.com',
+    'radar tulungagung',
+    'patrolmedia.co.id',
   ],
 };
 
