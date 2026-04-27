@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.12] — 2026-04-27 — Current Events outlet blocklist expansion (v3.12.0)
+
+Five more low-signal outlets dropped at the RSS ingestion layer.
+
+- Indonesia: Urbanvibes.id, Zonautara.com, Disway Malang, Tribratanews Polda Jabar (both spellings — user wrote "Tribatranews"; correct outlet name is "Tribratanews").
+- International: One Mile at a Time.
+- `src/lib/sources/googleNewsRss.ts`: appends to the per-locale `BLOCKED_OUTLETS` lists.
+
 ## [3.11] — 2026-04-26 — Current Events outlet blocklist expansion (v3.11.0)
 
 Nine more low-signal outlets dropped at the RSS ingestion layer for the Current Events card.
