@@ -40,6 +40,7 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'pats pulpit',
     'steelers.com',
     'nba.com',
+    'one mile at a time',
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -60,6 +61,11 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'tribunwow.com',
     'radar tulungagung',
     'patrolmedia.co.id',
+    'urbanvibes.id',
+    'zonautara.com',
+    'disway malang',
+    'tribratanews polda jabar', // user wrote "Tribatranews"; correct spelling is "Tribratanews"
+    'tribatranews polda jabar', // keep the as-written spelling too in case that variant ever appears
   ],
 };
 
