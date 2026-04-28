@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.13] — 2026-04-28 — Disable Jarvis email drafting (v3.13.0)
+
+Jarvis was generating reply drafts for "needs response" work emails on every triage cycle and pushing them into Outlook. Filman never used the drafts and didn't have a fix in mind for their quality, so the feature is now disabled to stop burning Claude tokens (~2k tokens per batch of 3 emails, run 3× daily).
+
+- `src/lib/sync/emailTriage.ts`: orchestrator skips Step 4 (Claude `generateDraftReplies`) and Step 5 (Outlook `createDrafts`). Classification (Step 3) still runs so the "Needs response" card on the dashboard stays populated. Helper functions and blocklist code intentionally left in place — re-enabling is a one-block revert per the inline comment.
+- No schema changes. The `draft_*` columns on `email_triage` and the `email_draft_blocklist` table become dormant; UI shows zero drafted emails because the triage cron now reports `draftsCreated: 0`.
+- Synthesis pipeline (daily butler voiceover) is untouched.
+
 ## [3.12] — 2026-04-27 — Current Events outlet blocklist expansion (v3.12.0)
 
 Five more low-signal outlets dropped at the RSS ingestion layer.
