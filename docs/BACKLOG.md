@@ -12,6 +12,22 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-04-28 — Email triage: Phase C cleanup (drop dormant draft schema)
+
+**Context:** v3.13.0 disabled email drafting at the orchestrator level but left the helper functions, `email_draft_blocklist` table, and `email_triage.draft_*` columns intact for easy re-enable. If Filman doesn't reactivate drafting within ~3 months, the dormant pieces become pure noise.
+
+**Scope:**
+- Drop `email_draft_blocklist` table (new migration).
+- Drop `draft_created`, `draft_id`, `draft_snippet`, `draft_skipped_reason` columns from `email_triage`.
+- Delete `generateDraftReplies`, `createDrafts`, `loadBlocklist`, `matchBlocklist` from `src/lib/sync/emailTriage.ts`.
+- Delete `/api/emails/blocklist/route.ts` and `/api/emails/style-analysis/route.ts`.
+- Remove `ghostwriting` from `src/lib/sync/notionContext.ts` page map and from `src/lib/context.ts` exports.
+- Archive the Notion `ghostwriting` page (32dc674aecec817198f2ead59e09873c) or repurpose it.
+- Remove `draft_snippet` rendering from `EmailCard.tsx` (lines 108–112) and the "drafted" count from the summary line.
+- Remove drafted-email KPI from `KpiRow.tsx` if present.
+
+**Trigger:** Revisit ~2026-07-28 (3 months post-disable). If drafting is still off, ship Phase C.
+
 ### 2026-04-20 — Health metric narrative API (`POST /api/health/narrate`)
 
 **Context:** Deferred from the Jarvis 3.0 "Atmosphere" migration (Wave 2 §9). The new `HealthInsights` component has a narrative-annotation slot per spec §8.3 — each metric gets a Claude-written sentence (e.g. "Yesterday's threshold intervals hit harder than the plan called for — your average HR in Z5 was 12bpm above target. I've moved tomorrow's threshold session to Wednesday."). Wave 2 ships with the slot accepting a `narrative` prop; this item wires up the server-side generator.

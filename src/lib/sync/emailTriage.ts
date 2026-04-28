@@ -480,37 +480,26 @@ export async function triageWorkEmails(): Promise<TriageResult> {
   // 3. Classify
   const classified = await classifyEmails(newEmails);
 
-  // 4. Split need_response into draftable vs blocked (skip drafts for blocklisted senders)
   const needResponseEmails = classified.filter((e) => e.category === 'need_response');
-  const blocklist = await loadBlocklist();
+
+  // 4 & 5. Draft generation + Outlook draft creation are DISABLED (v3.13.0).
+  // Filman wasn't using the auto-drafts and they cost ~2k Claude tokens per batch.
+  // Classification still runs so the "Needs response" card stays populated.
+  // To re-enable: restore the blocklist split + generateDraftReplies + createDrafts calls below.
+  // The helper functions (generateDraftReplies, createDrafts, loadBlocklist, matchBlocklist) are
+  // intentionally kept in this file so re-enabling is a one-block revert.
+  const draftTexts = new Map<string, string>();
+  const draftIds = new Map<string, string>();
   const draftSkippedReasons = new Map<string, string>();
-  const draftableEmails: ClassifiedEmail[] = [];
-  for (const email of needResponseEmails) {
-    const match = matchBlocklist(email.from, blocklist);
-    if (match) {
-      draftSkippedReasons.set(
-        email.messageId,
-        match.reason || `Blocked sender: ${match.pattern}`,
-      );
-    } else {
-      draftableEmails.push(email);
-    }
-  }
 
-  const draftTexts = await generateDraftReplies(draftableEmails);
-
-  // 5. Create drafts via email APIs (only for non-blocked emails)
-  const { created: draftIds, errors: draftErrors } = await createDrafts(draftableEmails, draftTexts);
-  errors.push(...draftErrors);
-
-  // 6. Store all results
+  // 6. Store all results (drafting fields stay null/false)
   await storeTriageResults(classified, draftTexts, draftIds, draftSkippedReasons, triageDate);
 
   return {
     totalEmails: allEmails.length,
     newEmails: newEmails.length,
     needResponse: needResponseEmails.length,
-    draftsCreated: draftIds.size,
+    draftsCreated: 0,
     errors: errors.length > 0 ? errors : [],
   };
 }

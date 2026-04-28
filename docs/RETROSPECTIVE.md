@@ -4,6 +4,24 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-28 — v3.13.0 — Disable Jarvis email drafting
+
+Filman flagged that the auto-drafted email replies weren't useful and didn't have a fix in mind for their quality, so the feature is now disabled to stop burning Claude tokens. Triage classification stays on so the "Needs response" dashboard card keeps working — only the draft-generation step (Step 4) and the Outlook draft push (Step 5) are short-circuited inside `triageWorkEmails()`.
+
+**Well:**
+- Investigated before editing. The first exploration agent flagged `/api/emails/synthesize` as a "kill candidate" but the route name was misleading — it's the daily butler-voiceover summary, not draft generation. Verified by reading the route and pulling out the right surgery line. Saved a near-miss kill.
+- Picked the lightest viable change. The user said they didn't have an idea to fix drafts yet, which means re-enabling later is plausible. Short-circuited at the orchestrator level with a one-line comment that says how to revert, instead of deleting helper functions, schema, or routes. Net diff was +20/-23 lines across three files.
+- Caught the version-bump ambiguity. Initial change used `/ship-stream` rules (patch bump → 3.12.1) but the user invoked `/ship` (minor bump → 3.13.0). Fixed both `package.json` and the inline code comment before committing.
+
+**Wrong:**
+- The first turn of the session returned "No response requested" instead of acting on the user's request. They had to ask "where are we?" to get me unstuck. The kickoff message had a literal "DON" cut off mid-word — should have inferred the intent and asked one clarifying question instead of treating it as a no-op.
+
+**Next:**
+- The `email_draft_blocklist` table and `email_triage.draft_*` columns are now dormant data. If Filman doesn't re-enable drafting within ~3 months, schedule a Phase C cleanup (drop table + columns + archive the Notion `ghostwriting` page).
+- The `ghostwriting` Notion context page is no longer fetched by any code path. Worth archiving or repurposing once we're confident drafting stays off.
+
+---
+
 ## 2026-04-25 — v3.10.6 — Persist measured max HR + close two stale backlog items
 
 Picked up the only High-priority backlog item that wasn't already shipped: surface a UI nudge to enter a tested max HR and persist it once entered. Two adjacent High-priority entries were closed as already-solved during this work — the walk-filter VO2 false-positive (v3.10.3 HR tiebreaker) and the "preview weekly analysis" button (the existing "Run Analysis" button on /cardio-analysis already does this).
