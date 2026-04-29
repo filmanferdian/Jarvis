@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-04-29 — v3.14.0 — Schedule strip: highlight currently-active event
+
+The "Today's Schedule" card's blue overlay was a title-based heuristic — anything titled "deep work" or "focus" got the accent. Replaced with a time-based check (`start_time <= now < end_time`) so the highlight follows the clock.
+
+**Well:**
+- Asked two clarifying questions before editing instead of guessing: (1) replace deep-work styling vs. layer both, (2) add a 1-min ticker or accept the 5-min polling lag. Saved a likely-wrong second pass. User picked replace + no ticker, exactly the simpler path.
+- Investigated before assuming. The screenshot's "Focus" highlight looked like an active-event indicator, but a single read of `ScheduleStrip.tsx` showed it was actually `title.toLowerCase().includes('focus')`. Naming the actual logic up front prevented a "make the highlight follow the clock" change that would have layered on top of a hidden heuristic instead of replacing it.
+- Surgical diff. Single component, ~10 lines net. No timezone math needed since both sides of the comparison are absolute UTC milliseconds — `Date.now()` and `new Date(iso).getTime()` are directly comparable.
+
+**Wrong:**
+- Couldn't visually verify the highlight on the live dashboard — it's auth-gated and the dev preview only reaches the auth screen. Fell back to the production build for type validation, which catches compile errors but not the actual visual outcome. Acceptable for a one-component CSS-class swap, but worth noting that any non-trivial dashboard UI change has this verification gap.
+
+**Next:**
+- The `usePolling` 5-min cadence means the highlight can lag up to 5 min when an event ends. If that lag becomes annoying in practice, add a 1-min `setInterval` ticker in `ScheduleStrip` that just bumps a state variable to force re-evaluation of `isActive` — no extra network calls.
+
+---
+
 ## 2026-04-28 — v3.13.0 — Disable Jarvis email drafting
 
 Filman flagged that the auto-drafted email replies weren't useful and didn't have a fix in mind for their quality, so the feature is now disabled to stop burning Claude tokens. Triage classification stays on so the "Needs response" dashboard card keeps working — only the draft-generation step (Step 4) and the Outlook draft push (Step 5) are short-circuited inside `triageWorkEmails()`.
