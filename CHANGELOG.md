@@ -4,6 +4,13 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.14] — 2026-04-29 — Schedule strip: highlight currently-active event (v3.14.0)
+
+The dashboard's "Today's Schedule" blue overlay was driven by a title-based heuristic — any event whose title contained "deep work" or "focus" got the accent treatment. Replaced with a time-based check so the highlight tracks the clock instead of the wording.
+
+- `src/components/ScheduleStrip.tsx`: removed `isDeepWork()` (title substring match). Added `isActive(event)` returning true when `start_time <= now < end_time`. All-day events and events without an `end_time` are excluded. Polling cadence unchanged at 5 min — highlight can lag up to that long when an event ends, which is acceptable for this surface.
+- No backend or schema changes.
+
 ## [3.13] — 2026-04-28 — Disable Jarvis email drafting (v3.13.0)
 
 Jarvis was generating reply drafts for "needs response" work emails on every triage cycle and pushing them into Outlook. Filman never used the drafts and didn't have a fix in mind for their quality, so the feature is now disabled to stop burning Claude tokens (~2k tokens per batch of 3 emails, run 3× daily).

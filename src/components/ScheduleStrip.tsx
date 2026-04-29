@@ -34,9 +34,13 @@ export default function ScheduleStrip() {
       timeZone: 'Asia/Jakarta',
     });
 
-  const isDeepWork = (title: string) =>
-    title.toLowerCase().includes('deep work') ||
-    title.toLowerCase().includes('focus');
+  const now = Date.now();
+  const isActive = (event: CalendarEvent) => {
+    if (event.is_all_day || !event.end_time) return false;
+    const start = new Date(event.start_time).getTime();
+    const end = new Date(event.end_time).getTime();
+    return start <= now && now < end;
+  };
 
   if (loading) {
     return (
@@ -59,11 +63,13 @@ export default function ScheduleStrip() {
         <p className="text-base text-jarvis-text-dim">No events today.</p>
       ) : (
         <div className="space-y-2">
-          {events.map((event) => (
+          {events.map((event) => {
+            const active = isActive(event);
+            return (
             <div
               key={event.id}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
-                isDeepWork(event.title)
+                active
                   ? 'bg-jarvis-accent/5 border border-jarvis-accent/20'
                   : 'hover:bg-jarvis-bg-card'
               }`}
@@ -73,14 +79,12 @@ export default function ScheduleStrip() {
               </span>
               <div
                 className={`w-1 h-6 rounded-full ${
-                  isDeepWork(event.title)
-                    ? 'bg-jarvis-accent'
-                    : 'bg-jarvis-text-dim'
+                  active ? 'bg-jarvis-accent' : 'bg-jarvis-text-dim'
                 }`}
               />
               <span
                 className={`text-base ${
-                  isDeepWork(event.title)
+                  active
                     ? 'text-jarvis-accent'
                     : 'text-jarvis-text-secondary'
                 }`}
@@ -93,7 +97,8 @@ export default function ScheduleStrip() {
                 </span>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
