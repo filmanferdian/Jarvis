@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.14] — 2026-04-29 — Schedule strip: highlight currently-active event (v3.14.0)
 
+### Current Events outlet blocklist additions (v3.14.1)
+
+Six more low-signal outlets dropped at the RSS ingestion layer.
+
+- Indonesia: Portal Kabupaten Banjar, Perhutani, celebrity.okezone.com, Pontianak Post, Antara News Kalteng.
+- International: NHL.com.
+- `src/lib/sources/googleNewsRss.ts`: appends to the per-locale `BLOCKED_OUTLETS` lists.
+
 The dashboard's "Today's Schedule" blue overlay was driven by a title-based heuristic — any event whose title contained "deep work" or "focus" got the accent treatment. Replaced with a time-based check so the highlight tracks the clock instead of the wording.
 
 - `src/components/ScheduleStrip.tsx`: removed `isDeepWork()` (title substring match). Added `isActive(event)` returning true when `start_time <= now < end_time`. All-day events and events without an `end_time` are excluded. Polling cadence unchanged at 5 min — highlight can lag up to that long when an event ends, which is acceptable for this surface.
