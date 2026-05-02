@@ -54,6 +54,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **XSS defense**: Claude-generated markdown is HTML-escaped before any regex substitutions in `src/lib/renderMarkdown.ts`. Do NOT add regex substitutions that produce HTML tags from user-controlled capture groups without re-escaping.
 - **OAuth state**: `/api/auth/google` and `/api/auth/microsoft` generate signed state tokens via `src/lib/oauthState.ts`; callbacks reject mismatched state. Always use `buildAuthUrl(state)` (never the no-arg form) when adding new OAuth integrations.
 - **API error responses**: route every non-trivial catch through `safeError()` from `src/lib/errors.ts`. Never return `err.message` / `String(err)` / Supabase `error.message` to the client — log server-side, return a generic message.
+- **Session cookie**: any write to the `jarvis_session` cookie (login, logout, future refresh) MUST spread `SESSION_COOKIE_OPTS` from `src/lib/auth.ts` so `httpOnly`, `sameSite`, `secure`, and `path` cannot drift apart (mismatched attributes prevent the browser from clearing the cookie).
 
 ## Versioning Discipline
 - Version lives in `package.json` (single source of truth). `src/lib/version.ts` reads from it automatically.

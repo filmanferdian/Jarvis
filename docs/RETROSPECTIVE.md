@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-02 — v3.15.0 — Security pass: error leak fix, prompt sanitize, cookie centralize
+
+A read-only security scan across auth, secrets, prompt injection, XSS/CSRF, input validation, crypto, headers, and SSRF surfaced eight findings. Implemented the cheapest, highest-value subset: A (route raw errors through `safeError`), D (sanitize email source labels in news prompt), G (centralize session cookie attributes).
+
+**Well:**
+- Scope discipline. Tackled three small things together instead of trying to fix all eight findings in one ship. Build clean, diff under 80 lines, easy to review.
+- Surfaced UX implications before approval. Calling out that `Gmail(work@x.com): invalid_grant` would become `Gmail(work@x.com): reconnect required` let the user weigh signal loss against leak risk before the change shipped.
+- Centralized cookie opts as a constant with a CLAUDE.md note. Future auth cookie writes can't drift.
+
+**Wrong:**
+- Couldn't smoke-test login/logout end-to-end because the local dev preview lacks `JARVIS_AUTH_TOKEN`. Same gap noted in the v3.14 retro. Build catches type errors, not behavioral regressions on auth-gated routes.
+
+**Next:**
+- Five findings remain from the scan: rate limiter coverage on expensive endpoints (B), zod schemas + body caps on weight/contacts/kpis (C), session expiration tightening (E), Origin/Referer check in middleware (F), login brute-force backoff. B + C are next on the list when there's budget.
+
+---
+
 ## 2026-04-29 — v3.14.0 — Schedule strip: highlight currently-active event
 
 The "Today's Schedule" card's blue overlay was a title-based heuristic — anything titled "deep work" or "focus" got the accent. Replaced with a time-based check (`start_time <= now < end_time`) so the highlight follows the clock.

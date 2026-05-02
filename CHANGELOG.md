@@ -4,6 +4,18 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.15] — 2026-05-02 — Security pass: error leak fix, prompt sanitize, cookie centralize (v3.15.0)
+
+Three small security improvements identified in a full-codebase scan. No user-facing UX change for the happy path; failure messages now generic.
+
+- `src/app/api/emails/style-analysis/route.ts`: per-account error strings now categorized server-side ("reconnect required" vs "temporary failure"). Outer 500 catch routed through `safeError()`. Raw provider error text no longer leaks to the client; full error still logged server-side.
+- `src/app/api/health/blood-work/route.ts`: per-marker save failures return generic "save failed" instead of Supabase `error.message`. Outer catch routed through `safeError()`.
+- `src/lib/sync/newsSynthesis.ts`: `emailSources`, `idnSources`, `intlSources` sanitized via `sanitizeInline` before joining into the news prompt and persisting. Closes a low-likelihood prompt-injection edge where a sender could craft a `From` header with control chars or tag fragments.
+- `src/lib/auth.ts`: added `SESSION_COOKIE_OPTS` and `SESSION_COOKIE_MAX_AGE` constants. Login and logout now spread them so `httpOnly`, `sameSite`, `secure`, and `path` can no longer drift apart (mismatched attributes would prevent the browser from clearing the cookie).
+- `CLAUDE.md`: documented the cookie convention under the Security posture section.
+
+No schema changes. No new endpoints.
+
 ## [3.14] — 2026-04-29 — Schedule strip: highlight currently-active event (v3.14.0)
 
 ### Current Events outlet blocklist additions (v3.14.1)

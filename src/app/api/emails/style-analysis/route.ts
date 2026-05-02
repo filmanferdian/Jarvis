@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { safeError } from '@/lib/errors';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import {
   getValidAccessToken as getMicrosoftToken,
@@ -13,6 +14,17 @@ import {
 } from '@/lib/google';
 
 export const maxDuration = 120;
+
+// Map raw provider errors to coarse categories so the client never sees the
+// underlying error text. Auth failures are the actionable case (user must
+// reconnect); everything else is a transient backend problem.
+function categorizeProviderError(err: unknown): 'reconnect required' | 'temporary failure' {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/invalid_grant|unauthor|401|403|token|refresh|expired/i.test(msg)) {
+    return 'reconnect required';
+  }
+  return 'temporary failure';
+}
 
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
@@ -34,7 +46,8 @@ export const GET = withAuth(async (_req: NextRequest) => {
         const emails = await fetchOutlookSent(msToken);
         allSent.push(...emails);
       } catch (err) {
-        errors.push(`Outlook: ${err instanceof Error ? err.message : String(err)}`);
+        console.error('[style-analysis] Outlook fetch failed:', err);
+        errors.push(`Outlook: ${categorizeProviderError(err)}`);
       }
     })();
 
@@ -47,7 +60,8 @@ export const GET = withAuth(async (_req: NextRequest) => {
           const emails = await fetchGmailSent(gToken, account.email);
           allSent.push(...emails);
         } catch (err) {
-          errors.push(`Gmail(${account.email}): ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`[style-analysis] Gmail fetch failed for ${account.email}:`, err);
+          errors.push(`Gmail(${account.email}): ${categorizeProviderError(err)}`);
         }
       }
     })();
@@ -136,11 +150,6 @@ ${emailList}`;
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[API Error] Failed to analyze email style:', message);
-    return NextResponse.json(
-      { error: message },
-      { status: 500 },
-    );
+    return safeError('Failed to analyze email style', err);
   }
 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { safeError } from '@/lib/errors';
 
 interface BloodMarker {
   name: string;
@@ -55,7 +56,14 @@ export const POST = withAuth(async (req: NextRequest) => {
         notes: notes || null,
       });
 
-      results.push({ name: marker.name, saved: !error, error: error?.message });
+      if (error) {
+        console.error(`[blood-work] insert failed for marker=${marker.name}:`, error);
+      }
+      results.push({
+        name: marker.name,
+        saved: !error,
+        error: error ? 'save failed' : undefined,
+      });
     }
 
     return NextResponse.json({
@@ -66,10 +74,6 @@ export const POST = withAuth(async (req: NextRequest) => {
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    console.error('Blood work save error:', err);
-    return NextResponse.json(
-      { error: 'Failed to save blood work' },
-      { status: 500 },
-    );
+    return safeError('Failed to save blood work', err);
   }
 });

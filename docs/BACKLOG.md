@@ -12,6 +12,19 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-02 — Security: remaining findings from v3.15.0 scan
+
+**Context:** Full security scan in v3.15.0 surfaced eight findings; only A + D + G shipped. Five remain.
+
+**Scope:**
+- **B (rate limits):** add limiter coverage to `/api/sync/emails`, `/api/briefing/*`, `/api/contacts/scan`, `/api/cron/*`. The cron endpoints are constant-time-secret-checked but allow unlimited guesses.
+- **C (input validation):** add zod schemas + body-size caps to POST handlers in `src/app/api/health/weight/route.ts`, `src/app/api/contacts/store/route.ts`, `src/app/api/kpis/route.ts`. The `contacts` array is currently unbounded.
+- **E (session hardening):** tighten 7-day session to 24h, optionally add a server-side session table for revocation on logout. Currently logout clears the cookie but the token would still be valid if leaked.
+- **F (CSRF defense in depth):** add Origin/Referer check in `src/middleware.ts` for state-changing methods. SameSite=strict already mitigates, this is belt-and-suspenders.
+- **Login brute-force:** per-IP exponential backoff on `/api/auth/login` beyond the existing 5/min cap. Token entropy is high so this is low priority.
+
+**Trigger:** Pick up B + C as the next batch when there's appetite for another security ship.
+
 ### 2026-04-28 — Email triage: Phase C cleanup (drop dormant draft schema)
 
 **Context:** v3.13.0 disabled email drafting at the orchestrator level but left the helper functions, `email_draft_blocklist` table, and `email_triage.draft_*` columns intact for easy re-enable. If Filman doesn't reactivate drafting within ~3 months, the dormant pieces become pure noise.
