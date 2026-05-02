@@ -224,9 +224,11 @@ export async function syncNews(): Promise<NewsSyncResult> {
 
   const [newsEmails, idnItems, intlItems] = await Promise.all([emailsPromise, idnPromise, intlPromise]);
 
-  const emailSources = [...new Set(newsEmails.map(getSourceLabel))];
-  const idnSources = [...new Set(idnItems.slice(0, RSS_TOP_N).map((i) => i.source).filter(Boolean))];
-  const intlSources = [...new Set(intlItems.slice(0, RSS_TOP_N).map((i) => i.source).filter(Boolean))];
+  // Source labels come from sender headers (untrusted). Sanitize before
+  // embedding in the prompt or persisting.
+  const emailSources = [...new Set(newsEmails.map((e) => sanitizeInline(getSourceLabel(e), 60)))].filter(Boolean);
+  const idnSources = [...new Set(idnItems.slice(0, RSS_TOP_N).map((i) => sanitizeInline(i.source, 60)).filter(Boolean))];
+  const intlSources = [...new Set(intlItems.slice(0, RSS_TOP_N).map((i) => sanitizeInline(i.source, 60)).filter(Boolean))];
 
   // --- Build unified prompt ---
   const MAX_BODY_LENGTH = 3000;

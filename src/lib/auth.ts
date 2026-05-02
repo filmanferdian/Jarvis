@@ -4,6 +4,17 @@ import { assertServerEnv } from './env';
 
 const COOKIE_NAME = 'jarvis_session';
 
+// Single source of truth for session cookie attributes. Login and logout MUST
+// use this so `httpOnly`, `sameSite`, `secure`, and `path` cannot drift apart
+// (mismatched attributes prevent the browser from clearing the cookie).
+export const SESSION_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  path: '/',
+};
+export const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
+
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { COOKIE_NAME } from '@/lib/auth';
+import { COOKIE_NAME, SESSION_COOKIE_OPTS, SESSION_COOKIE_MAX_AGE } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,11 +25,8 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ ok: true });
     response.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60, // 7 days (M1)
+      ...SESSION_COOKIE_OPTS,
+      maxAge: SESSION_COOKIE_MAX_AGE,
     });
 
     return response;
