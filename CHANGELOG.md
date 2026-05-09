@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.16] — 2026-05-09 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening (v3.16.0)
 
+### Email triage list dedup (v3.16.1)
+
+The `/emails` page was rendering duplicate rows for the same physical email when it surfaced under multiple `(message_id, source)` tuples (forwarded copy, sync re-import). Tab counts also drifted from the visible list.
+
+- `src/app/api/emails/triage/route.ts`: collapse rows by `(sender_lower, subject, minute-bucket)` after the Supabase fetch, preferring the row with a draft and then the most recent `created_at`. `summary`, `needResponse`, and `otherEmails` are recomputed from the deduped set.
+- `src/app/emails/page.tsx`: normalize `from_address` (trim + lowercase) in `groupNeedsResponse` and the selected-thread lookup. Other-tab list now keys rows by the same `(sender, subject, minute)` identity used server-side, so React keys stay unique even if a duplicate slips through.
+- No schema or cron changes.
+
 The integrations dashboard surfaced raw OAuth refresh tracebacks and a generic "Internal server error" for Notion Tasks, with no recovery path other than knowing to hit `/api/auth/google` manually. This pass turns each failure mode into either auto-recovery or a clear, actionable Reconnect link.
 
 - `src/lib/google.ts`, `src/lib/microsoft.ts`: refresh now parses the OAuth error body, detects `invalid_grant` (also `interaction_required` / `consent_required` / `login_required` for Microsoft), flips `needs_reauth=true` on the token row, and throws a typed `NEEDS_REAUTH:<provider>:<id>` sentinel instead of a leaky 400-with-body error.

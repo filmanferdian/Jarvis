@@ -23,7 +23,32 @@ export const GET = withAuth(async (_req: NextRequest) => {
     return NextResponse.json({ error: 'Failed to load email triage' }, { status: 500 });
   }
 
-  const rows = data || [];
+  const rawRows = data || [];
+
+  // Dedupe rows that represent the same physical email surfacing under multiple
+  // (message_id, source) tuples. Same sender + same subject + same minute is
+  // treated as the same email; keep the row most likely to be useful.
+  const dedupMap = new Map<string, typeof rawRows[number]>();
+  for (const r of rawRows) {
+    const fromKey = (r.from_address || '').trim().toLowerCase();
+    const subjKey = (r.subject || '').trim();
+    const minuteKey = Math.floor(new Date(r.received_at).getTime() / 60000);
+    const key = `${fromKey}|${subjKey}|${minuteKey}`;
+    const existing = dedupMap.get(key);
+    if (!existing) {
+      dedupMap.set(key, r);
+      continue;
+    }
+    // Prefer row with a draft, then the most recently created row.
+    const existingScore =
+      (existing.draft_created ? 1 : 0) * 1e13 + new Date(existing.created_at).getTime();
+    const candidateScore =
+      (r.draft_created ? 1 : 0) * 1e13 + new Date(r.created_at).getTime();
+    if (candidateScore > existingScore) {
+      dedupMap.set(key, r);
+    }
+  }
+  const rows = Array.from(dedupMap.values());
 
   const summary = {
     total: rows.length,

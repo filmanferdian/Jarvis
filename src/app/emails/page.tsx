@@ -170,7 +170,7 @@ export default function EmailTriagePage() {
     }
     if (tab === 'other') {
       return data.otherEmails.map((e) => ({
-        key: `${e.from_address}__${e.received_at}`,
+        key: `${(e.from_address || '').trim().toLowerCase()}|${(e.subject || '').trim()}|${Math.floor(new Date(e.received_at).getTime() / 60000)}`,
         from_name: e.from_name,
         from_address: e.from_address,
         subject: e.subject,
@@ -196,7 +196,9 @@ export default function EmailTriagePage() {
 
   const selectedThread: Thread | null = useMemo(() => {
     if (!data || tab !== 'needs' || !selected) return null;
-    const msgs = data.needResponse.filter((e) => e.from_address === selected);
+    const msgs = data.needResponse.filter(
+      (e) => (e.from_address || '').trim().toLowerCase() === selected,
+    );
     if (msgs.length === 0) return null;
     const sorted = [...msgs].sort(
       (a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime(),
@@ -507,9 +509,10 @@ function OtherEmailDetail({ row }: { row: ListRow }) {
 function groupNeedsResponse(emails: TriageEmail[]): ListRow[] {
   const byAddr = new Map<string, ListRow>();
   for (const e of emails) {
-    const existing = byAddr.get(e.from_address);
+    const addrKey = (e.from_address || '').trim().toLowerCase();
+    const existing = byAddr.get(addrKey);
     const row: ListRow = {
-      key: e.from_address,
+      key: addrKey,
       from_name: e.from_name,
       from_address: e.from_address,
       subject: e.subject,
@@ -520,7 +523,7 @@ function groupNeedsResponse(emails: TriageEmail[]): ListRow[] {
       draftSkipped: !e.draft_created && !!e.draft_skipped_reason,
     };
     if (!existing || new Date(e.received_at) > new Date(existing.receivedAt)) {
-      byAddr.set(e.from_address, row);
+      byAddr.set(addrKey, row);
     }
   }
   return Array.from(byAddr.values()).sort(
