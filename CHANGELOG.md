@@ -6,6 +6,16 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.15] — 2026-05-02 — Security pass: error leak fix, prompt sanitize, cookie centralize (v3.15.0)
 
+### Contacts: editable cards + correct "In Notion" tab (v3.15.1)
+
+Two gaps on `/contacts` blocked real usage. After "Sync to Notion", a contact's status flipped to `synced` but the "In Notion" tab only matched `existing`, so freshly synced contacts vanished from every tab until the next scan re-detected them. The PATCH endpoint at `src/app/api/contacts/update/route.ts` already supported editing name/company/phone, but the UI rendered no edit affordance.
+
+- `src/app/contacts/page.tsx`: "In Notion" tab filter now matches `status === 'existing' || status === 'synced'`. Tab count sums both. Each card has an Edit button that swaps into Name/Company/Phone inputs with Save/Cancel; only one card edits at a time.
+- `src/app/api/contacts/update/route.ts`: after the local Supabase update, looks up `notion_page_id`; if present, propagates the same fields to the Notion page. Notion failures logged but don't fail the request.
+- `src/lib/sync/contactScan.ts`: new exported `updateNotionContactFields(pageId, { name?, company?, phone? })`. Only patches keys passed in, so omitted fields aren't cleared.
+
+No schema changes.
+
 Three small security improvements identified in a full-codebase scan. No user-facing UX change for the happy path; failure messages now generic.
 
 - `src/app/api/emails/style-analysis/route.ts`: per-account error strings now categorized server-side ("reconnect required" vs "temporary failure"). Outer 500 catch routed through `safeError()`. Raw provider error text no longer leaks to the client; full error still logged server-side.
