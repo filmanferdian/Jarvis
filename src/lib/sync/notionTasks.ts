@@ -159,20 +159,47 @@ export async function syncNotionTasks(): Promise<SyncResult> {
     })
     .filter((t) => t.status !== 'Done' && t.status !== 'Archived');
 
-  if (tasks.length > 0) {
-    const { error: dbError } = await supabase
-      .from('notion_tasks')
-      .upsert(tasks, { onConflict: 'notion_page_id' });
+  // Dedupe by notion_page_id to avoid 21000 affecting-row-twice errors
+  const tasksByPageId = new Map<string, typeof tasks[number]>();
+  for (const t of tasks) tasksByPageId.set(t.notion_page_id, t);
+  const dedupedTasks = Array.from(tasksByPageId.values());
 
-    if (dbError) {
-      console.error('[notion-tasks] Upsert error:', JSON.stringify(dbError));
-      throw new Error(`Supabase upsert failed: ${dbError.message || JSON.stringify(dbError)}`);
+  // Chunked upsert: if a chunk fails, retry rows individually so one bad row
+  // doesn't kill the whole sync. Log the offending row for diagnosis.
+  let upsertFailures = 0;
+  if (dedupedTasks.length > 0) {
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < dedupedTasks.length; i += CHUNK_SIZE) {
+      const chunk = dedupedTasks.slice(i, i + CHUNK_SIZE);
+      const { error: chunkErr } = await supabase
+        .from('notion_tasks')
+        .upsert(chunk, { onConflict: 'notion_page_id' });
+
+      if (!chunkErr) continue;
+
+      console.error('[notion-tasks] Chunk upsert error, retrying per-row:', JSON.stringify(chunkErr));
+      for (const row of chunk) {
+        const { error: rowErr } = await supabase
+          .from('notion_tasks')
+          .upsert(row, { onConflict: 'notion_page_id' });
+        if (rowErr) {
+          upsertFailures += 1;
+          console.error(
+            '[notion-tasks] Row upsert failed:',
+            JSON.stringify({ row, error: rowErr }),
+          );
+        }
+      }
     }
+  }
+
+  if (upsertFailures > 0) {
+    console.warn(`[notion-tasks] ${upsertFailures} row(s) failed to upsert (see prior logs)`);
   }
 
   // Clean up: remove tasks from Supabase that no longer exist in Notion
   // (deleted or moved to Done/Archived in Notion)
-  const activePageIds = tasks.map((t) => t.notion_page_id);
+  const activePageIds = dedupedTasks.map((t) => t.notion_page_id);
   const { data: localTasks } = await supabase
     .from('notion_tasks')
     .select('notion_page_id');
@@ -198,7 +225,7 @@ export async function syncNotionTasks(): Promise<SyncResult> {
   }
 
   return {
-    synced: tasks.length,
+    synced: dedupedTasks.length - upsertFailures,
     deleted: deletedCount,
     total_in_notion: allPages.length,
     timestamp: now,

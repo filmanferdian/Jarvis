@@ -25,17 +25,31 @@ interface AccountHealth {
   last_error: string | null;
   elapsed_minutes: number;
   status: 'ok' | 'warning' | 'error';
+  needs_reauth?: boolean;
+  reauth_url?: string;
 }
 
 export const GET = withAuth(async () => {
   try {
-    const [syncRes, accountRes] = await Promise.all([
+    const [syncRes, accountRes, googleTokensRes, msTokensRes] = await Promise.all([
       supabase.from('sync_status').select('*').order('sync_type'),
       supabase.from('sync_account_status').select('*'),
+      supabase.from('google_tokens').select('email, needs_reauth'),
+      supabase.from('microsoft_tokens').select('id, needs_reauth'),
     ]);
 
     const syncRows = syncRes.data || [];
     const accountRows = accountRes.data || [];
+
+    // Build a map: account_key (e.g. "google:foo@bar.com" / "outlook:foo@x.com") -> needs_reauth
+    const reauthByAccountKey = new Map<string, boolean>();
+    for (const row of (googleTokensRes.data || []) as { email: string; needs_reauth: boolean }[]) {
+      if (row.email) reauthByAccountKey.set(`google:${row.email}`, !!row.needs_reauth);
+    }
+    // Microsoft is single-account (id='default'); the account_key in sync_account_status
+    // is "outlook:<email>" — flag every outlook:* row when default token needs reauth.
+    const msNeedsReauth = ((msTokensRes.data || []) as { id: string; needs_reauth: boolean }[])
+      .some((r) => r.id === 'default' && r.needs_reauth);
 
     const accountsBySyncType = new Map<string, AccountHealth[]>();
     const now = Date.now();
@@ -56,6 +70,19 @@ export const GET = withAuth(async () => {
         status = 'ok';
       }
 
+      const isGoogle = row.account_key.startsWith('google:');
+      const isOutlook = row.account_key.startsWith('outlook:');
+      const needsReauth = isGoogle
+        ? !!reauthByAccountKey.get(row.account_key)
+        : isOutlook
+          ? msNeedsReauth
+          : false;
+      const reauthUrl = isGoogle
+        ? '/api/auth/google'
+        : isOutlook
+          ? '/api/auth/microsoft'
+          : undefined;
+
       const entry: AccountHealth = {
         account_key: row.account_key,
         last_synced_at: row.last_synced_at,
@@ -63,6 +90,8 @@ export const GET = withAuth(async () => {
         last_error: row.last_error,
         elapsed_minutes: Math.round(elapsed / 60_000),
         status,
+        needs_reauth: needsReauth,
+        reauth_url: needsReauth ? reauthUrl : undefined,
       };
 
       if (!accountsBySyncType.has(row.sync_type)) {

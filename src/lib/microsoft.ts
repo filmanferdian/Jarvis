@@ -101,6 +101,23 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenResponse
   return res.json();
 }
 
+// Microsoft returns these error codes when the refresh_token is revoked,
+// the user changed password, MFA was enforced, or consent expired. All
+// require user re-auth via /api/auth/microsoft.
+const MS_REAUTH_ERRORS = new Set([
+  'invalid_grant',
+  'interaction_required',
+  'consent_required',
+  'login_required',
+]);
+
+class InvalidGrantError extends Error {
+  constructor(public oauthError: string) {
+    super(`microsoft_invalid_grant:${oauthError}`);
+    this.name = 'InvalidGrantError';
+  }
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
   const body = new URLSearchParams({
     client_id: getClientId(),
@@ -117,8 +134,18 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Token refresh failed: ${res.status} ${err}`);
+    const errText = await res.text();
+    let oauthError: string | null = null;
+    try {
+      const parsed = JSON.parse(errText);
+      if (parsed && typeof parsed.error === 'string') oauthError = parsed.error;
+    } catch {
+      // non-JSON — fall through to generic error
+    }
+    if (oauthError && MS_REAUTH_ERRORS.has(oauthError)) {
+      throw new InvalidGrantError(oauthError);
+    }
+    throw new Error(`Token refresh failed: ${res.status} ${errText}`);
   }
 
   return res.json();
@@ -147,7 +174,20 @@ export async function getValidAccessToken(): Promise<string> {
   }
 
   // Refresh the token
-  const tokens = await refreshAccessToken(storedRefresh);
+  let tokens: TokenResponse;
+  try {
+    tokens = await refreshAccessToken(storedRefresh);
+  } catch (err) {
+    if (err instanceof InvalidGrantError) {
+      await supabase
+        .from('microsoft_tokens')
+        .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+        .eq('id', 'default');
+      throw new Error('NEEDS_REAUTH:microsoft:default');
+    }
+    throw err;
+  }
+
   const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
   await supabase.from('microsoft_tokens').upsert({
@@ -156,6 +196,7 @@ export async function getValidAccessToken(): Promise<string> {
     refresh_token: encrypt(tokens.refresh_token || storedRefresh), // keep old if not returned
     expires_at: newExpiresAt,
     scope: tokens.scope,
+    needs_reauth: false,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
 

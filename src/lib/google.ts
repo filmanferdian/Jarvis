@@ -90,6 +90,13 @@ export async function getUserEmail(accessToken: string): Promise<string> {
   return info.email;
 }
 
+class InvalidGrantError extends Error {
+  constructor(public oauthError: string) {
+    super(`google_invalid_grant:${oauthError}`);
+    this.name = 'InvalidGrantError';
+  }
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
   const body = new URLSearchParams({
     client_id: getClientId(),
@@ -105,8 +112,18 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Google token refresh failed: ${res.status} ${err}`);
+    const errText = await res.text();
+    let oauthError: string | null = null;
+    try {
+      const parsed = JSON.parse(errText);
+      if (parsed && typeof parsed.error === 'string') oauthError = parsed.error;
+    } catch {
+      // non-JSON body — fall through to generic error
+    }
+    if (oauthError === 'invalid_grant') {
+      throw new InvalidGrantError(oauthError);
+    }
+    throw new Error(`Google token refresh failed: ${res.status} ${errText}`);
   }
 
   return res.json();
@@ -135,7 +152,22 @@ export async function getValidAccessToken(accountId: string): Promise<string> {
   }
 
   // Refresh
-  const tokens = await refreshAccessToken(storedRefresh);
+  let tokens: TokenResponse;
+  try {
+    tokens = await refreshAccessToken(storedRefresh);
+  } catch (err) {
+    if (err instanceof InvalidGrantError) {
+      // Refresh token is revoked or expired. Mark account so dashboard
+      // can render a Reconnect CTA. User must re-auth via /api/auth/google.
+      await supabase
+        .from('google_tokens')
+        .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+        .eq('id', accountId);
+      throw new Error(`NEEDS_REAUTH:google:${accountId}`);
+    }
+    throw err;
+  }
+
   const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
   await supabase.from('google_tokens').upsert({
@@ -145,6 +177,7 @@ export async function getValidAccessToken(accountId: string): Promise<string> {
     refresh_token: encrypt(tokens.refresh_token || storedRefresh),
     expires_at: newExpiresAt,
     scope: tokens.scope || data.scope,
+    needs_reauth: false,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'id' });
 

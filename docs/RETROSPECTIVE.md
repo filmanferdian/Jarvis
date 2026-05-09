@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-09 — v3.16.0 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening
+
+The integrations dashboard had stockpiled five different failure modes (Google invalid_grant on two accounts, Outlook NO_TOKENS, Notion Tasks 500, notion-context 8d stale). Triaged into user-action vs code-fix and shipped the code-fix pass.
+
+**Well:**
+- Asked scope up front via AskUserQuestion (re-auth + code, just code, just re-auth) instead of guessing. User picked "both," and the work split cleanly: the user re-auths the OAuth accounts, the code makes the next failure self-explanatory.
+- The notion-tasks chunked upsert with per-row retry is a generic improvement: I don't know the exact 500 cause yet, but the next run will log the offending row + Postgres error code, which beats waiting for the user to grep generic error messages.
+- Migration was additive (`ADD COLUMN IF NOT EXISTS … DEFAULT false`), so applying it before the code deployed didn't break anything.
+
+**Wrong:**
+- Couldn't fully verify the Reconnect CTA locally (no `JARVIS_AUTH_TOKEN` in the worktree's `.env.local`, same gap as the v3.14/v3.15 retros). Build is clean and the page renders, but actual `needs_reauth=true` rendering needs production data.
+- The original `[notion-tasks] Upsert error: Internal server error` message turned out to be `safeError`-flattened from a real error, which masked the root cause. Should have made cron error logging less aggressive at the wrapper layer earlier.
+
+**Next:**
+- After the next `/api/cron/notion-tasks` run on Railway, paste the `[notion-tasks] Row upsert failed: {…}` log so we can apply a targeted fix (likely a status check-constraint mismatch or a length issue).
+- Consider a "Run now" button on the integrations dashboard so manual resyncs don't depend on cron-job.org being healthy. Filed in BACKLOG.
+- Local dev `.env.local` for the auth token remains the recurring gap. Worth documenting the minimum env to make `/utilities` exercisable locally.
+
+---
+
 ## 2026-05-02 — v3.15.0 — Security pass: error leak fix, prompt sanitize, cookie centralize
 
 A read-only security scan across auth, secrets, prompt injection, XSS/CSRF, input validation, crypto, headers, and SSRF surfaced eight findings. Implemented the cheapest, highest-value subset: A (route raw errors through `safeError`), D (sanitize email source labels in news prompt), G (centralize session cookie attributes).

@@ -12,6 +12,17 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-09 — Integrations: "Run now" button + targeted Notion Tasks fix
+
+**Context:** v3.16.0 added Reconnect CTAs and chunked Notion Tasks upserts, but two follow-ups remain.
+
+**Scope:**
+- Add `POST /api/utilities/run-sync` (auth: `withAuth`) that takes a `sync_type` and invokes the matching cron handler in-process. Wire one button per integration card on `/utilities`. Removes dependency on cron-job.org for ad-hoc resyncs (notion-context staleness was the proximate cause).
+- After the next Railway run, capture the `[notion-tasks] Row upsert failed: {row, error}` log and apply a precise fix in `src/lib/sync/notionTasks.ts` (likely status check-constraint or length).
+- Document the minimum local `.env.local` so the integrations dashboard is exercisable in `npm run dev`.
+
+**Trigger:** Pick up after the user pastes the Notion Tasks log line.
+
 ### 2026-05-02 — Security: remaining findings from v3.15.0 scan
 
 **Context:** Full security scan in v3.15.0 surfaced eight findings; only A + D + G shipped. Five remain.

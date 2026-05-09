@@ -4,6 +4,19 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.16] — 2026-05-09 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening (v3.16.0)
+
+The integrations dashboard surfaced raw OAuth refresh tracebacks and a generic "Internal server error" for Notion Tasks, with no recovery path other than knowing to hit `/api/auth/google` manually. This pass turns each failure mode into either auto-recovery or a clear, actionable Reconnect link.
+
+- `src/lib/google.ts`, `src/lib/microsoft.ts`: refresh now parses the OAuth error body, detects `invalid_grant` (also `interaction_required` / `consent_required` / `login_required` for Microsoft), flips `needs_reauth=true` on the token row, and throws a typed `NEEDS_REAUTH:<provider>:<id>` sentinel instead of a leaky 400-with-body error.
+- `src/app/api/auth/google/callback/route.ts`, `src/app/api/auth/microsoft/callback/route.ts`: clear `needs_reauth=false` on successful re-auth.
+- `src/app/api/utilities/integrations/route.ts`: joins `google_tokens` / `microsoft_tokens` and surfaces `needs_reauth` + `reauth_url` per account.
+- `src/app/utilities/page.tsx`: replaces the raw error blob with a clickable "Reconnect" link when an account needs re-auth.
+- `src/lib/sync/notionTasks.ts`: dedupes by `notion_page_id`, switches the single batch upsert to chunked upserts (50 per chunk) with per-row retry on chunk failure. One bad row no longer kills the whole sync; the offending row + Postgres error code are logged for diagnosis.
+- `supabase/migration-028-token-needs-reauth.sql`: adds `needs_reauth boolean NOT NULL DEFAULT false` to `google_tokens` and `microsoft_tokens`. Applied to production.
+
+User actions still required for the original incident: re-auth Google for both accounts and Outlook (the existing refresh tokens are revoked and only consent can mint new ones); confirm cron-job.org has the `notion-context` schedule enabled.
+
 ## [3.15] — 2026-05-02 — Security pass: error leak fix, prompt sanitize, cookie centralize (v3.15.0)
 
 ### Contacts: editable cards + correct "In Notion" tab (v3.15.1)
