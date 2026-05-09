@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-09 — v3.17.0 — Cadence calculation fix (Garmin run-only avg)
+
+User flagged Saturday's reported cadence (157 spm) as implausibly low. Investigation found the local code was computing `steps / movingDuration`, which dilutes with walking segments. Garmin's own `averageRunningCadenceInStepsPerMinute` (run-only avg) for the same activity was 163. The weekly briefing then narrated "form breakdown to 157" off a calc artifact.
+
+**Well:**
+- The user's instinct was the signal; chasing it found a real, persistent bug that had been silently underreporting cadence on every long run that included a warm-up walk.
+- Built a tiny read-only inspection script (`scripts/inspect-activity.ts`) to decrypt and dump a single activity's raw_json. Surfaced the 163 vs 157 discrepancy in one run. Kept it for future debugging.
+- Backfill was free: existing `POST /api/running-analysis` with `force_resync:true` re-enriched this week's runs straight into Notion. No one-off script needed.
+
+**Wrong:**
+- The original code comment claimed "matches what the Garmin Connect app displays" — that was the opposite of true and probably gave reviewers false confidence at the time it shipped.
+- Per-lap cadence isn't fed to Claude in the weekly briefing prompt, only the activity-level average. The model still narrated within-run cadence trajectories ("dropped over the 55-minute Z2 portion") from a single number. That's a hallucination the prompt allowed; not addressed in this ship.
+
+**Next:**
+- Add per-lap cadence to the lap line in `analysis-engine.ts` so Claude has real within-run data to reason about, OR tighten the prompt to forbid trajectory claims when only the activity avg is present.
+- Audit other Garmin-derived metrics for similar "compute locally vs use Garmin's field" mismatches (stride length, GCT, vertical ratio).
+
+---
+
 ## 2026-05-09 — v3.16.0 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening
 
 The integrations dashboard had stockpiled five different failure modes (Google invalid_grant on two accounts, Outlook NO_TOKENS, Notion Tasks 500, notion-context 8d stale). Triaged into user-action vs code-fix and shipped the code-fix pass.
