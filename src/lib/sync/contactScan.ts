@@ -118,6 +118,47 @@ async function fetchNotionContactsMap(): Promise<Map<string, string>> {
   return emailMap;
 }
 
+/** Update editable fields (Name, Company, Phone) on an existing Notion contact page. */
+export async function updateNotionContactFields(
+  pageId: string,
+  fields: { name?: string | null; company?: string | null; phone?: string | null },
+): Promise<boolean> {
+  const notionApiKey = process.env.NOTION_API_KEY;
+  if (!notionApiKey) return false;
+
+  const properties: Record<string, unknown> = {};
+  if (fields.name !== undefined && fields.name !== null) {
+    properties['Name'] = { title: [{ text: { content: fields.name } }] };
+  }
+  if (fields.company !== undefined) {
+    properties['Company'] = fields.company
+      ? { rich_text: [{ text: { content: fields.company } }] }
+      : { rich_text: [] };
+  }
+  if (fields.phone !== undefined) {
+    properties['Phone Number'] = { phone_number: fields.phone || null };
+  }
+
+  if (Object.keys(properties).length === 0) return true;
+
+  const res = await fetch(`${NOTION_API_URL}/pages/${pageId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${notionApiKey}`,
+      'Content-Type': 'application/json',
+      'Notion-Version': '2022-06-28',
+    },
+    body: JSON.stringify({ properties }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`[contact-scan] Notion field update error: ${res.status} ${errBody}`);
+    return false;
+  }
+  return true;
+}
+
 /** Update Last contact date on an existing Notion contact page */
 async function updateNotionLastContact(pageId: string, date: string): Promise<void> {
   const notionApiKey = process.env.NOTION_API_KEY;

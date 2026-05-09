@@ -108,6 +108,8 @@ export default function ContactsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [ignoring, setIgnoring] = useState(false);
   const [filter, setFilter] = useState<Filter>('pending');
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchContacts = useCallback(async () => {
     try {
@@ -233,6 +235,35 @@ export default function ContactsPage() {
     }
   };
 
+  const handleSaveEdit = async (
+    email: string,
+    fields: { name: string; company: string; phone: string },
+  ) => {
+    setSavingEdit(true);
+    try {
+      const res = await fetch('/api/contacts/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          name: fields.name.trim() || null,
+          company: fields.company.trim() || null,
+          phone: fields.phone.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setEditingEmail(null);
+        await fetchContacts();
+        await fetchIgnored();
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const toggleSelect = (email: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -247,7 +278,7 @@ export default function ContactsPage() {
     filter === 'pending'
       ? all.filter((c) => c.status === 'new')
       : filter === 'existing'
-        ? all.filter((c) => c.status === 'existing')
+        ? all.filter((c) => c.status === 'existing' || c.status === 'synced')
         : filter === 'ignored'
           ? ignoredContacts
           : all;
@@ -319,7 +350,7 @@ export default function ContactsPage() {
               f === 'pending'
                 ? data?.summary.new_count ?? 0
                 : f === 'existing'
-                  ? data?.summary.existing_count ?? 0
+                  ? (data?.summary.existing_count ?? 0) + (data?.summary.synced_count ?? 0)
                   : f === 'ignored'
                     ? ignoredContacts.length
                     : data?.summary.total ?? 0;
@@ -390,6 +421,11 @@ export default function ContactsPage() {
                 selected={selected.has(c.email)}
                 onToggle={filter === 'pending' ? () => toggleSelect(c.email) : undefined}
                 onRestore={filter === 'ignored' ? () => handleRestore(c.email) : undefined}
+                editing={editingEmail === c.email}
+                onEdit={() => setEditingEmail(c.email)}
+                onCancelEdit={() => setEditingEmail(null)}
+                onSaveEdit={(fields) => handleSaveEdit(c.email, fields)}
+                saving={savingEdit}
               />
             ))}
           </div>
@@ -422,14 +458,36 @@ function ContactCard({
   selected,
   onToggle,
   onRestore,
+  editing,
+  onEdit,
+  onCancelEdit,
+  onSaveEdit,
+  saving,
 }: {
   contact: ScannedContact;
   selected: boolean;
   onToggle?: () => void;
   onRestore?: () => void;
+  editing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (fields: { name: string; company: string; phone: string }) => void;
+  saving: boolean;
 }) {
   const bars = touchBars(contact);
   const sug = suggestion(contact);
+  const [draftName, setDraftName] = useState(contact.name || '');
+  const [draftCompany, setDraftCompany] = useState(contact.company || '');
+  const [draftPhone, setDraftPhone] = useState(contact.phone || '');
+
+  useEffect(() => {
+    if (editing) {
+      setDraftName(contact.name || '');
+      setDraftCompany(contact.company || '');
+      setDraftPhone(contact.phone || '');
+    }
+  }, [editing, contact.name, contact.company, contact.phone]);
+
   return (
     <div
       className="rounded-[14px] border bg-jarvis-bg-card p-5 flex gap-4 items-start transition-colors"
@@ -450,10 +508,20 @@ function ContactCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-[15px] font-medium text-jarvis-text-primary truncate">
-            {contact.name || contact.email.split('@')[0]}
-          </p>
-          {onToggle && (
+          {editing ? (
+            <input
+              type="text"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="Name"
+              className="flex-1 min-w-0 text-[15px] font-medium text-jarvis-text-primary bg-transparent border-b border-jarvis-border focus:outline-none focus:border-jarvis-ambient px-0.5"
+            />
+          ) : (
+            <p className="text-[15px] font-medium text-jarvis-text-primary truncate">
+              {contact.name || contact.email.split('@')[0]}
+            </p>
+          )}
+          {!editing && onToggle && (
             <input
               type="checkbox"
               checked={selected}
@@ -462,7 +530,7 @@ function ContactCard({
               className="shrink-0 accent-jarvis-ambient"
             />
           )}
-          {onRestore && (
+          {!editing && onRestore && (
             <button
               onClick={onRestore}
               className="text-[11px]"
@@ -471,10 +539,39 @@ function ContactCard({
               Restore
             </button>
           )}
+          {!editing && (
+            <button
+              onClick={onEdit}
+              className="text-[11px] text-jarvis-text-dim hover:text-jarvis-text-primary shrink-0"
+              aria-label="Edit"
+            >
+              Edit
+            </button>
+          )}
         </div>
-        <p className="text-[12px] text-jarvis-text-faint truncate mt-0.5">
-          {contact.company || 'Unknown company'} · {contact.email}
-        </p>
+        {editing ? (
+          <div className="mt-2 space-y-1.5">
+            <input
+              type="text"
+              value={draftCompany}
+              onChange={(e) => setDraftCompany(e.target.value)}
+              placeholder="Company"
+              className="w-full text-[12px] text-jarvis-text-primary bg-transparent border border-jarvis-border rounded-[6px] px-2 py-1 focus:outline-none focus:border-jarvis-ambient"
+            />
+            <input
+              type="text"
+              value={draftPhone}
+              onChange={(e) => setDraftPhone(e.target.value)}
+              placeholder="Phone"
+              className="w-full text-[12px] text-jarvis-text-primary bg-transparent border border-jarvis-border rounded-[6px] px-2 py-1 focus:outline-none focus:border-jarvis-ambient"
+            />
+            <p className="text-[11px] text-jarvis-text-faint">{contact.email}</p>
+          </div>
+        ) : (
+          <p className="text-[12px] text-jarvis-text-faint truncate mt-0.5">
+            {contact.company || 'Unknown company'} · {contact.email}
+          </p>
+        )}
 
         {/* Touch history */}
         <div className="flex gap-[3px] items-end mt-3 h-6">
@@ -502,13 +599,35 @@ function ContactCard({
           <span>last {contact.last_seen_date}</span>
         </div>
 
-        {sug && (
+        {sug && !editing && (
           <p
             className="mt-2 text-[12px] italic"
             style={{ color: 'var(--color-jarvis-ambient)' }}
           >
             {sug}
           </p>
+        )}
+
+        {editing && (
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() =>
+                onSaveEdit({ name: draftName, company: draftCompany, phone: draftPhone })
+              }
+              disabled={saving}
+              className="px-3 py-1 text-[12px] rounded-[8px] text-white transition-colors disabled:opacity-50"
+              style={{ background: 'var(--color-jarvis-cta)' }}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={onCancelEdit}
+              disabled={saving}
+              className="px-3 py-1 text-[12px] rounded-[8px] border border-jarvis-border text-jarvis-text-dim hover:bg-jarvis-bg-deep transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         )}
       </div>
     </div>
