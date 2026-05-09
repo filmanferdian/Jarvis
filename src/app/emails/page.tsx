@@ -451,7 +451,7 @@ export default function EmailTriagePage() {
             )}
             {tab === 'needs' && selectedThread ? (
               <EmailThread thread={selectedThread} />
-            ) : tab === 'other' && selected && data ? (
+            ) : tab === 'other' && selected && data && rows.find((r) => r.key === selected) ? (
               <OtherEmailDetail row={rows.find((r) => r.key === selected)!} />
             ) : (
               <div className="flex-1 flex items-center justify-center">
