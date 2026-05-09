@@ -224,7 +224,7 @@ export async function generateWeeklyAnalysis(
       r.perfCondition != null ? `  Perf condition: ${r.perfCondition > 0 ? '+' : ''}${r.perfCondition}` : null,
       r.decouplingPct != null ? `  Decoupling: ${r.decouplingPct}%` : null,
       r.vo2Max != null ? `  VO2 Max: ${r.vo2Max}` : null,
-      r.cadenceSpm != null ? `  Cadence: ${r.cadenceSpm} spm (activity-level avg, may be diluted by warm-up/rest)` : null,
+      r.cadenceSpm != null ? `  Cadence: ${r.cadenceSpm} spm (Garmin run-only avg, excludes walking/rest; per-lap cadence in the lap table below)` : null,
       r.avgPowerW != null ? `  Power: ${r.avgPowerW}W` : null,
       r.weather ? `  Weather: ${r.weather}, ${r.tempC}°C, ${r.humidityPct}% humidity` : null,
     ].filter(Boolean);
@@ -238,7 +238,8 @@ export async function generateWeeklyAnalysis(
         const durSec = String(l.du % 60).padStart(2, '0');
         const paceStr = l.p != null ? `${Math.floor(l.p / 60)}:${String(l.p % 60).padStart(2, '0')}/km` : '—';
         const hrStr = l.hr != null ? `HR ${l.hr}` : 'HR —';
-        lines.push(`    L${l.i} [${l.t}] ${distKm}km in ${durMin}:${durSec} @ ${paceStr}, ${hrStr}`);
+        const cadStr = l.c != null ? `, cad ${l.c} spm` : '';
+        lines.push(`    L${l.i} [${l.t}] ${distKm}km in ${durMin}:${durSec} @ ${paceStr}, ${hrStr}${cadStr}`);
       }
     }
 
