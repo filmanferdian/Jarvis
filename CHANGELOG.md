@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.17] — 2026-05-09 — Cadence calculation fix: prefer Garmin run-only average over diluted moving-time compute (v3.17.0)
+
+The activity-level cadence reported in weekly briefings was being computed as `steps / movingDuration`, which dilutes with any walking segments and underreports the true running cadence. On Saturday's long run, the local compute returned 157 spm while Garmin's own `averageRunningCadenceInStepsPerMinute` (averaged only over time spent actually running) was 163. The weekly briefing then narrated "form breakdown to 157 spm" from a number that was a calculation artifact, not real form drift.
+
+- `src/lib/running-analysis/index.ts`: cadence now prefers `raw.averageRunningCadenceInStepsPerMinute` (Garmin's run-only value, matches the Garmin Connect app), falling back to `steps / movingDuration` only when missing. Comment updated to explain the dilution problem.
+- `scripts/inspect-activity.ts`: one-shot read-only diagnostic that decrypts a `garmin_activities.raw_json` row and prints cadence-related fields. Used to surface the 157 vs 163 discrepancy. Kept for future debugging.
+- Backfill: re-ran `POST /api/running-analysis` with `force_resync: true` after deploy to overwrite stored cadence values in the Notion Runs DB so the cardio-analysis page and weekly insights reflect the corrected number.
+- No schema, cron, or migration changes.
+
 ## [3.16] — 2026-05-09 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening (v3.16.0)
 
 ### Email triage Other-tab crash fix (v3.16.2)
