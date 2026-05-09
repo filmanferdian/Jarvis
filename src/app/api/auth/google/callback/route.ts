@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
       refresh_token: encrypt(tokens.refresh_token || ''),
       expires_at: expiresAt,
       scope: tokens.scope,
+      needs_reauth: false,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
 

@@ -11,6 +11,8 @@ interface AccountHealth {
   last_error: string | null;
   elapsed_minutes: number;
   status: 'ok' | 'warning' | 'error';
+  needs_reauth?: boolean;
+  reauth_url?: string;
 }
 
 interface Integration {
@@ -182,10 +184,21 @@ function ConnectorCard({ int }: { int: Integration }) {
                 <p className="text-[10.5px] text-jarvis-text-faint" style={{ fontFamily: 'var(--font-mono)' }}>
                   {a.last_synced_at ? formatElapsed(a.elapsed_minutes) : 'Never synced'}
                 </p>
-                {a.last_error && a.status !== 'ok' && (
-                  <p className="text-[10.5px] text-jarvis-danger truncate" title={a.last_error}>
-                    {a.last_error.slice(0, 120)}
-                  </p>
+                {a.needs_reauth && a.reauth_url ? (
+                  <a
+                    href={a.reauth_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block mt-1 text-[10.5px] text-jarvis-danger underline hover:no-underline"
+                  >
+                    Reconnect — refresh token expired or revoked
+                  </a>
+                ) : (
+                  a.last_error && a.status !== 'ok' && (
+                    <p className="text-[10.5px] text-jarvis-danger truncate" title={a.last_error}>
+                      {a.last_error.slice(0, 120)}
+                    </p>
+                  )
                 )}
               </div>
             </div>
