@@ -12,6 +12,18 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-09 — Per-lap cadence + audit Garmin-derived metrics
+
+**Context:** v3.17.0 fixed activity-level cadence (use Garmin's run-only average instead of locally diluted compute). Two follow-ups surfaced during the fix.
+
+**Scope:**
+- Add `cadence` to the per-lap line in `src/lib/running-analysis/analysis-engine.ts` (line ~241). Today the lap line is `dist/dur/pace/HR` only, so when Claude narrates "cadence dropped over the run" it is hallucinating a trajectory from a single average. With per-lap cadence, the model can either cite real lap drift or correctly say there is none.
+- Audit other Garmin-derived metrics in `src/lib/running-analysis/index.ts` for the same "compute locally vs use Garmin's field" mismatch. Suspects: stride length, ground contact time, vertical ratio. Compare against what Garmin Connect app surfaces for the same activity.
+
+**Trigger:** Next time we touch the running-analysis pipeline, or sooner if the briefing keeps producing dubious within-run dynamics claims.
+
+---
+
 ### 2026-05-09 — Integrations: "Run now" button + targeted Notion Tasks fix
 
 **Context:** v3.16.0 added Reconnect CTAs and chunked Notion Tasks upserts, but two follow-ups remain.
