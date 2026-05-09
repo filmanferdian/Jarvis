@@ -403,7 +403,9 @@ export function summarizeSegments(splits: SplitData[]): string {
 }
 
 /** Compact JSON serialization of laps for storage in a Notion rich_text property.
- *  Shape per lap: {i, t, d, du, hr, p}. Codes for `t`: w|m|t|iw|ir|c. */
+ *  Shape per lap: {i, t, d, du, hr, p, c}. Codes for `t`: w|m|t|iw|ir|c.
+ *  `c` is per-lap cadence (steps per minute, both legs). Older rows without `c`
+ *  parse cleanly with cadence=null. */
 export function serializeLapsForProperty(splits: SplitData[]): string {
   if (splits.length === 0) return '';
   const compact = splits.map((s) => ({
@@ -413,6 +415,7 @@ export function serializeLapsForProperty(splits: SplitData[]): string {
     du: Math.round(s.durationSeconds),
     hr: s.avgHr ?? null,
     p: paceStringToSec(s.pacePerKm) === Infinity ? null : Math.round(paceStringToSec(s.pacePerKm)),
+    c: s.cadence ?? null,
   }));
   return JSON.stringify(compact);
 }
@@ -424,13 +427,14 @@ export interface LapData {
   du: number;
   hr: number | null;
   p: number | null;
+  c: number | null;
 }
 
 /** Parse the compact JSON back into typed laps. Returns [] on any error. */
 export function parseLapsFromProperty(json: string | null | undefined): LapData[] {
   if (!json) return [];
   try {
-    const arr = JSON.parse(json) as Array<{ i: number; t: string; d: number; du: number; hr: number | null; p: number | null }>;
+    const arr = JSON.parse(json) as Array<{ i: number; t: string; d: number; du: number; hr: number | null; p: number | null; c?: number | null }>;
     if (!Array.isArray(arr)) return [];
     return arr
       .map((x) => ({
@@ -440,6 +444,7 @@ export function parseLapsFromProperty(json: string | null | undefined): LapData[
         du: x.du,
         hr: x.hr,
         p: x.p,
+        c: x.c ?? null,
       }))
       .filter((x): x is LapData => Number.isFinite(x.i) && Number.isFinite(x.d) && Number.isFinite(x.du));
   } catch {

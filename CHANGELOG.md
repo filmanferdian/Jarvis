@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+### Per-lap cadence in weekly briefing prompt (v3.17.1)
+
+After v3.17.0 fixed the activity-level cadence number, Claude still only saw a single cadence value per run, so it could (and did) hallucinate within-run trajectories like "cadence dropped over the 55-minute Z2 portion." `SplitData.cadence` was already populated from `lap.averageRunCadence` during enrichment but was being stripped by the Lap Profile serializer, so it never made it to Notion or to the briefing prompt.
+
+- `src/lib/running-analysis/garmin-enrich.ts`: `serializeLapsForProperty` and `LapData` now carry a `c` field (steps per minute, both legs). `parseLapsFromProperty` reads `c` with a null fallback so older Lap Profile rows (without `c`) still parse cleanly.
+- `src/lib/running-analysis/analysis-engine.ts`: the per-lap line in the weekly briefing prompt now appends `cad N spm` when present. Also updated the activity-level cadence label so Claude knows the value is now Garmin's run-only average (not the v3.17.0-removed dilution) and points to the per-lap table for within-run drift.
+- Backfill: re-ran `POST /api/running-analysis` with `force_resync: true` after deploy so existing Lap Profile rows in Notion are rewritten with the new `c` field.
+
 ## [3.17] — 2026-05-09 — Cadence calculation fix: prefer Garmin run-only average over diluted moving-time compute (v3.17.0)
 
 The activity-level cadence reported in weekly briefings was being computed as `steps / movingDuration`, which dilutes with any walking segments and underreports the true running cadence. On Saturday's long run, the local compute returned 157 spm while Garmin's own `averageRunningCadenceInStepsPerMinute` (averaged only over time spent actually running) was 163. The weekly briefing then narrated "form breakdown to 157 spm" from a number that was a calculation artifact, not real form drift.
