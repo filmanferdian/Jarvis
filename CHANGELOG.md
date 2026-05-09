@@ -6,6 +6,12 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.16] — 2026-05-09 — Integration self-healing: invalid_grant detection, Reconnect CTA, Notion Tasks hardening (v3.16.0)
 
+### Email triage Other-tab crash fix (v3.16.2)
+
+Clicking the *Other* tab after selecting an email under *Needs response* threw `Cannot read properties of undefined (reading 'from_name')`. The selected key from the previous tab no longer matched any row, but the detail pane was rendering `OtherEmailDetail` with a `rows.find(...)!` non-null assertion before the clearing effect ran.
+
+- `src/app/emails/page.tsx`: guard the *Other* detail render on `rows.find(...)` actually returning a row, falling back to the empty-state placeholder during the brief tab-switch race.
+
 ### Email triage list dedup (v3.16.1)
 
 The `/emails` page was rendering duplicate rows for the same physical email when it surfaced under multiple `(message_id, source)` tuples (forwarded copy, sync re-import). Tab counts also drifted from the visible list.
