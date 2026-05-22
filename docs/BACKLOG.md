@@ -12,6 +12,18 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-22 — Morning-freshness for Garmin data + raw_json realign
+
+**Context:** v3.17.2 fixed the date off-by-one so the 07:00-WIB sync now captures last night's sleep correctly, and the 07:30 briefing reads it. Two follow-ups surfaced.
+
+**Scope:**
+- Morning freshness: Garmin keeps refining the sleep score for ~1-2h after wake, so the 07:00 capture can be slightly preliminary (the 13:00 sync finalises it). If the user wants the latest possible number at review time, add a refresh-if-stale on dashboard load (trigger a single `syncGarmin` when `garmin_daily` for today is older than N minutes), respecting the 50/day budget and circuit breaker. Alternative: a manual "refresh" button on the Fitness card.
+- `raw_json` realign: the in-place column shift corrected the derived columns but left historical `raw_json.sleep` / `raw_json.heartRate` sub-objects one day shifted. Only surfaces via the latest-day sleep qualifier in `health-fitness/route.ts` (self-heals daily) and debug reads. A bounded re-fetch could realign history if it ever matters.
+
+**Trigger:** If morning review consistently shows a preliminary score, or before any feature that reads historical `raw_json` sleep internals.
+
+---
+
 ### 2026-05-09 — Per-lap cadence + audit Garmin-derived metrics
 
 **Context:** v3.17.0 fixed activity-level cadence (use Garmin's run-only average instead of locally diluted compute). Two follow-ups surfaced during the fix.

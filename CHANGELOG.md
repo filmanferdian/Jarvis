@@ -4,6 +4,16 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+### Garmin sleep/HR/steps off-by-one date fix (v3.17.2)
+
+Daily Garmin metrics were stored one day ahead of the night they actually measured. `syncGarmin` built the date object as midnight WIB (17:00 UTC the prior day). The `garmin-connect` library's `toDateString` formats with the server timezone (UTC on Railway), so the request silently rolled back a day: requesting `today` returned the night with Garmin `calendarDate = today - 1`. The row labelled `2026-05-22` actually held the night that ended on May 21. Last night's real sleep score (45) never landed; the dashboard showed the prior night (65).
+
+- `src/lib/sync/garmin.ts`: new `garminDateObj(dateStr)` helper anchors the library date at noon UTC so the resolved calendar date equals the intended WIB date for any realistic server timezone. Used in `syncGarmin`, the incremental backfill, and `backfillDateRange`, which were the three sites feeding `getSleepData` / `getSteps` / `getHeartRate`.
+- Affected columns (all date-shifted by one): `sleep_score`, `sleep_duration_seconds`, `resting_hr`, `steps`, `body_battery_charged`. Endpoints that embed the date string directly in the URL (stress, hrv, training readiness/status, body battery, fitness age) were already correct.
+- `backfillDateRange` was also writing `raw_json` unencrypted (plain insert, no `wrapJsonb`); now wrapped to match the other write paths.
+- Backfill: corrected existing rows via an in-place column shift in Supabase (each row's five shifted columns belong to the previous date; zero Garmin API calls, avoids the daily-budget circuit breaker) plus a one-off re-sync of the current day after deploy. Pre-shift snapshot kept in `garmin_daily_dateshift_bak_20260522`.
+- No schema, cron, or migration changes.
+
 ### Per-lap cadence in weekly briefing prompt (v3.17.1)
 
 After v3.17.0 fixed the activity-level cadence number, Claude still only saw a single cadence value per run, so it could (and did) hallucinate within-run trajectories like "cadence dropped over the 55-minute Z2 portion." `SplitData.cadence` was already populated from `lap.averageRunCadence` during enrichment but was being stripped by the Lap Profile serializer, so it never made it to Notion or to the briefing prompt.

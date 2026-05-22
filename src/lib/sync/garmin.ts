@@ -24,6 +24,15 @@ function formatDate(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
+// Build the Date passed to garmin-connect's date-based calls (getSleepData/getSteps/
+// getHeartRate). The library formats it with the SERVER's timezone (UTC on Railway),
+// so a WIB-midnight Date (17:00 UTC the prior day) silently resolves to the previous
+// calendar date and pulls the wrong night. Anchoring at noon UTC keeps the resolved
+// date equal to `dateStr` for any realistic server timezone.
+function garminDateObj(dateStr: string): Date {
+  return new Date(`${dateStr}T12:00:00Z`);
+}
+
 function getWibToday(): string {
   const now = new Date();
   const wibOffset = 7 * 60 * 60 * 1000;
@@ -433,7 +442,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
   }
 
   const client = await createGarminClient();
-  const dateObj = new Date(`${today}T00:00:00+07:00`);
+  const dateObj = garminDateObj(today);
 
   // Fetch all 10 endpoints sequentially with 1s delay between each call
   // This avoids burst requests that trigger Cloudflare rate limiting
@@ -593,7 +602,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
         }
 
         try {
-          const histDateObj = new Date(`${dateStr}T00:00:00+07:00`);
+          const histDateObj = garminDateObj(dateStr);
 
           if (existingRaw) {
             const rawData: RawData = {
@@ -920,12 +929,13 @@ export async function backfillDateRange(startDate: string, endDate: string, comp
     if (midLoopBlock.blocked) break;
 
     try {
-      const dateObj = new Date(dateStr + 'T00:00:00Z');
+      const dateObj = garminDateObj(dateStr);
       const rawData = await fetchAllEndpoints(client, dateStr, dateObj);
       const record = buildDailyRecord(dateStr, rawData);
+      const recordForInsert = { ...record, raw_json: wrapJsonb(record.raw_json) };
 
       await supabase.from('garmin_daily').delete().eq('date', dateStr);
-      const { error } = await supabase.from('garmin_daily').insert(record);
+      const { error } = await supabase.from('garmin_daily').insert(recordForInsert);
       if (!error) result.days_synced++;
       consecutiveFailures = 0;
       await adaptiveDelay(GARMIN_BACKFILL_DELAY_MS, 0);

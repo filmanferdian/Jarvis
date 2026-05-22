@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-22 — v3.17.2 — Garmin sleep/HR/steps off-by-one date fix
+
+User reported last night's sleep score showed 45 in Garmin but 65 in Supabase. Investigation traced it to date construction: `syncGarmin` passed a midnight-WIB `Date` to `garmin-connect`, whose `toDateString` formats with the server timezone (UTC), rolling the request back a day. Every row was labelled one day ahead of the night it measured. The same `Date` fed steps and resting HR, so those were shifted too; `body_battery_charged` was cross-contaminated from the shifted sleep payload.
+
+**Well:**
+- Confirmed root cause empirically (decrypted `raw_json`, compared embedded `calendarDate` per metric) rather than guessing. The 19:00-WIB sync still pulling the prior night ruled out an upload-lag explanation.
+- Backfill avoided Garmin entirely: realised each row's five shifted columns are exactly the next day's values, so a single in-place SQL column shift corrected all 57 rows with zero API calls. Re-fetching would have blown the 50/day budget and tripped the circuit breaker, blocking the night's syncs.
+- Took a pre-shift snapshot table before mutating prod, and dry-ran the shift (checked date continuity: 0 gaps) before applying.
+
+**Wrong:**
+- The codebase already had the correct pattern (`backfillDateRange` used `T00:00:00Z`) right next to the buggy one (`T00:00:00+07:00`). The inconsistency sat unnoticed; a shared helper would have prevented divergence from the start.
+- `backfillDateRange` was silently writing `raw_json` unencrypted — a latent security gap found only because the backfill path was being relied on. Caught and fixed in the same ship.
+
+**Next:**
+- Historical `raw_json` internals (sleep/heartRate sub-objects) remain one day shifted; only the derived columns were corrected. Low impact (display reads columns), but a future re-fetch could fully realign if needed.
+- Decide on morning-freshness improvement (on-demand refresh-if-stale on dashboard load) — see backlog.
+
+---
+
 ## 2026-05-09 — v3.17.0 — Cadence calculation fix (Garmin run-only avg)
 
 User flagged Saturday's reported cadence (157 spm) as implausibly low. Investigation found the local code was computing `steps / movingDuration`, which dilutes with walking segments. Garmin's own `averageRunningCadenceInStepsPerMinute` (run-only avg) for the same activity was 163. The weekly briefing then narrated "form breakdown to 157" off a calc artifact.
