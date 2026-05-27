@@ -15,110 +15,164 @@ interface HRDefaults {
   maxHrSource: 'measured' | 'formula';
 }
 
+type Category = 'formula' | 'lthr' | 'expert';
+
 interface ZoneMethod {
   name: string;
   short: string;
   low: number;
   high: number;
   expert: string;
+  rationale: string;
+  category: Category;
   color: string;
 }
 
 type ZoneMode = 'z2' | 'z5';
+type ConsensusRule = 'median' | 'strict';
+
+const CATEGORY_LABEL: Record<Category, string> = {
+  formula: 'Formulas',
+  lthr: 'LTHR-based',
+  expert: 'Experts',
+};
+
+const CATEGORY_ORDER: Category[] = ['formula', 'lthr', 'expert'];
+
+function clampHigh(value: number, max: number): number {
+  return Math.min(value, max);
+}
 
 function computeZones(age: number, rhr: number, lthr: number, maxHR: number, mode: ZoneMode): ZoneMethod[] {
+  const hrr = maxHR - rhr;
+
   if (mode === 'z5') {
-    return [
+    const rows: ZoneMethod[] = [
       {
         name: 'Age-based',
         short: 'Age',
         low: Math.round(maxHR * 0.90),
-        high: Math.round(maxHR * 1.00),
+        high: maxHR,
         expert: 'Traditional (90-100% maxHR)',
+        rationale: 'Standard 90-100% of max HR. Easy to compute but ignores individual physiology.',
+        category: 'formula',
         color: '#6b7280',
       },
       {
         name: 'Karvonen',
         short: 'Karvonen',
-        low: Math.round((maxHR - rhr) * 0.90 + rhr),
-        high: Math.round((maxHR - rhr) * 1.00 + rhr),
+        low: Math.round(hrr * 0.90 + rhr),
+        high: Math.round(hrr * 1.00 + rhr),
         expert: 'HRR method (90-100%)',
+        rationale: 'Heart Rate Reserve accounts for resting HR variation between individuals.',
+        category: 'formula',
         color: '#3b82f6',
       },
       {
-        name: 'LTHR-based',
-        short: 'LTHR',
-        low: Math.round(lthr * 1.06),
-        high: Math.round(lthr * 1.10),
+        name: 'LTHR-Friel',
+        short: 'Friel',
+        low: clampHigh(Math.round(lthr * 1.06), maxHR),
+        high: clampHigh(Math.round(lthr * 1.10), maxHR),
         expert: 'Friel Z5 (≥106% LTHR)',
+        rationale: 'Joe Friel anchors Z5 above lactate threshold HR. Sensitive to LTHR accuracy.',
+        category: 'lthr',
         color: '#8b5cf6',
+      },
+      {
+        name: 'Coggan',
+        short: 'Coggan',
+        low: clampHigh(Math.round(lthr * 1.10), maxHR),
+        high: maxHR,
+        expert: 'Coggan VO2 (110%+ LTHR)',
+        rationale: 'Andy Coggan VO2 zone: above 110% LTHR up to max. Hidden when LTHR is too high.',
+        category: 'lthr',
+        color: '#ec4899',
       },
       {
         name: 'Attia',
         short: 'Attia',
         low: Math.round(maxHR * 0.90),
-        high: Math.round(maxHR * 1.00),
-        expert: 'Peter Attia (90-100% actual max)',
-        color: '#ef4444',
-      },
-      {
-        name: 'Coggan Z5',
-        short: 'Coggan',
-        low: Math.round(lthr * 1.10),
         high: maxHR,
-        expert: 'Coggan VO2 (110%+ LTHR)',
-        color: '#ec4899',
+        expert: 'Peter Attia (90-100% max)',
+        rationale: 'VO2 max for longevity; cites San Millán methodology.',
+        category: 'expert',
+        color: '#ef4444',
       },
       {
         name: 'Galpin Red',
         short: 'Galpin',
         low: Math.round(maxHR * 0.90),
-        high: Math.round(maxHR * 1.00),
-        expert: 'Andy Galpin (90-100% peak)',
+        high: maxHR,
+        expert: 'Galpin Red (90-100% peak)',
+        rationale: "Galpin's color framework: Red = maximal effort, 90-100% peak HR.",
+        category: 'expert',
         color: '#10b981',
       },
+      {
+        name: 'San Millán',
+        short: 'San Millán',
+        low: Math.round(maxHR * 0.95),
+        high: maxHR,
+        expert: 'San Millán 4×4 (~95% max)',
+        rationale: '4-minute intervals at highest sustained intensity; HR drifts to ~95% by interval 2-4.',
+        category: 'expert',
+        color: '#f97316',
+      },
+      {
+        name: 'Lyon',
+        short: 'Lyon',
+        low: Math.round(maxHR * 0.85),
+        high: Math.round(maxHR * 0.95),
+        expert: 'Lyon VO2 max (85-95% max)',
+        rationale: 'VO2 max band for "raise the ceiling" work; RPE 10. Lower floor than other experts.',
+        category: 'expert',
+        color: '#14b8a6',
+      },
+      {
+        name: 'Patrick',
+        short: 'Patrick',
+        low: Math.round(maxHR * 0.95),
+        high: maxHR,
+        expert: 'Patrick (≥95% max)',
+        rationale: 'Near-maximal Z5 per her co-authored guide; ≥1 HIIT/week.',
+        category: 'expert',
+        color: '#d946ef',
+      },
+      {
+        name: 'Huberman',
+        short: 'Huberman',
+        low: Math.round(maxHR * 0.80),
+        high: maxHR,
+        expert: 'Huberman (80-100% max)',
+        rationale: 'Foundational Fitness Protocol: 30+ min/week in top 10% of HR.',
+        category: 'expert',
+        color: '#06b6d4',
+      },
     ];
+    return rows.filter(r => r.low < r.high);
   }
-  return [
+
+  // Z2 mode
+  const rows: ZoneMethod[] = [
     {
       name: 'Age-based',
       short: 'Age',
       low: Math.round(maxHR * 0.60),
       high: Math.round(maxHR * 0.70),
-      expert: 'Traditional (220-age)',
+      expert: 'Traditional (60-70% maxHR)',
+      rationale: '220-age max with 60-70% band. Simple but ignores individual physiology.',
+      category: 'formula',
       color: '#6b7280',
     },
     {
       name: 'Karvonen',
       short: 'Karvonen',
-      low: Math.round((maxHR - rhr) * 0.60 + rhr),
-      high: Math.round((maxHR - rhr) * 0.70 + rhr),
-      expert: 'Heart Rate Reserve method',
+      low: Math.round(hrr * 0.60 + rhr),
+      high: Math.round(hrr * 0.70 + rhr),
+      expert: 'HRR method (60-70%)',
+      rationale: 'Heart Rate Reserve accounts for resting HR variation between individuals.',
+      category: 'formula',
       color: '#3b82f6',
-    },
-    {
-      name: 'LTHR-based',
-      short: 'LTHR',
-      low: Math.round(lthr * 0.85),
-      high: Math.round(lthr * 0.89),
-      expert: 'Joe Friel (85-89% LTHR)',
-      color: '#8b5cf6',
-    },
-    {
-      name: 'Attia',
-      short: 'Attia',
-      low: Math.round(maxHR * 0.70),
-      high: Math.round(maxHR * 0.80),
-      expert: 'Peter Attia (70-80% actual max)',
-      color: '#ef4444',
-    },
-    {
-      name: 'Galpin Blue',
-      short: 'Galpin',
-      low: Math.round(maxHR * 0.60),
-      high: Math.round(maxHR * 0.80),
-      expert: 'Andy Galpin (60-80% HR peak)',
-      color: '#10b981',
     },
     {
       name: 'MAF',
@@ -126,9 +180,110 @@ function computeZones(age: number, rhr: number, lthr: number, maxHR: number, mod
       low: 180 - age - 10,
       high: 180 - age,
       expert: 'Maffetone (180-age)',
+      rationale: 'Conservative aerobic ceiling; popular in endurance world (Nick Bare uses this).',
+      category: 'formula',
       color: '#f59e0b',
     },
+    {
+      name: 'LTHR-Friel',
+      short: 'Friel',
+      low: clampHigh(Math.round(lthr * 0.85), maxHR),
+      high: clampHigh(Math.round(lthr * 0.89), maxHR),
+      expert: 'Friel Z2 (85-89% LTHR)',
+      rationale: 'LTHR-anchored Z2; closer to true LT1 for experienced athletes.',
+      category: 'lthr',
+      color: '#8b5cf6',
+    },
+    {
+      name: 'Attia',
+      short: 'Attia',
+      low: Math.round(maxHR * 0.70),
+      high: Math.round(maxHR * 0.80),
+      expert: 'Peter Attia (70-80% max)',
+      rationale: 'Cites San Millán methodology; "costly conversation" RPE.',
+      category: 'expert',
+      color: '#ef4444',
+    },
+    {
+      name: 'Galpin Blue',
+      short: 'Galpin',
+      low: Math.round(maxHR * 0.60),
+      high: Math.round(maxHR * 0.80),
+      expert: 'Galpin Blue (60-80% peak)',
+      rationale: "Galpin's color framework: Blue = easy aerobic, broad 60-80% band.",
+      category: 'expert',
+      color: '#10b981',
+    },
+    {
+      name: 'San Millán',
+      short: 'San Millán',
+      low: Math.round(maxHR * 0.70),
+      high: Math.round(maxHR * 0.80),
+      expert: 'San Millán (70-80% max)',
+      rationale: 'Lactate 1.7-1.9 mmol/L; "costly conversation" talk test. Original Z2 source.',
+      category: 'expert',
+      color: '#f97316',
+    },
+    {
+      name: 'Lyon',
+      short: 'Lyon',
+      low: Math.round(maxHR * 0.60),
+      high: Math.round(maxHR * 0.65),
+      expert: 'Lyon (60-65% max)',
+      rationale: 'Conversational pace; muscle-first framing with cardio layered on.',
+      category: 'expert',
+      color: '#14b8a6',
+    },
+    {
+      name: 'Patrick',
+      short: 'Patrick',
+      low: Math.round(maxHR * 0.70),
+      high: Math.round(maxHR * 0.80),
+      expert: 'Patrick (70-80% max)',
+      rationale: '80/20 split with HIIT; cites Levine/Gibala. Talk test for confirmation.',
+      category: 'expert',
+      color: '#d946ef',
+    },
+    {
+      name: 'Huberman',
+      short: 'Huberman',
+      low: Math.round(maxHR * 0.55),
+      high: Math.round(maxHR * 0.70),
+      expert: 'Huberman (55-70% max)',
+      rationale: 'Foundational Fitness Protocol; "just barely have a conversation."',
+      category: 'expert',
+      color: '#06b6d4',
+    },
   ];
+  return rows.filter(r => r.low < r.high);
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+    : sorted[mid];
+}
+
+function computeConsensus(zones: ZoneMethod[], rule: ConsensusRule, mode: ZoneMode): { min: number; max: number } {
+  if (rule === 'median') {
+    return {
+      min: median(zones.map(z => z.low)),
+      max: median(zones.map(z => z.high)),
+    };
+  }
+  if (mode === 'z5') {
+    return {
+      min: Math.min(...zones.map(z => z.low)),
+      max: Math.max(...zones.map(z => z.low)),
+    };
+  }
+  return {
+    min: Math.max(...zones.map(z => z.low)),
+    max: Math.max(...zones.map(z => z.high)),
+  };
 }
 
 function InputField({ label, value, onChange, onCommit, suffix, badge }: {
@@ -174,15 +329,21 @@ function InputField({ label, value, onChange, onCommit, suffix, badge }: {
   );
 }
 
-// Custom tooltip for the chart
-function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; low: number; high: number; expert: string } }> }) {
+function ChartTooltip({ active, payload }: {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; low: number; high: number; expert: string; rationale: string; category: Category } }>;
+}) {
   if (!active || !payload?.[0]) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-lg border border-jarvis-border bg-jarvis-bg-card px-3 py-2 shadow-lg">
-      <p className="text-[12px] font-medium text-jarvis-text-primary">{d.name}</p>
+    <div className="rounded-lg border border-jarvis-border bg-jarvis-bg-card px-3 py-2 shadow-lg max-w-xs">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <p className="text-[12px] font-medium text-jarvis-text-primary">{d.name}</p>
+        <span className="text-[9px] uppercase tracking-wider text-jarvis-text-dim">{CATEGORY_LABEL[d.category]}</span>
+      </div>
       <p className="text-[12px] text-jarvis-text-muted font-mono">{d.low} – {d.high} bpm</p>
       <p className="text-[11px] text-jarvis-text-dim mt-0.5">{d.expert}</p>
+      <p className="text-[11px] text-jarvis-text-faint mt-1 leading-snug">{d.rationale}</p>
     </div>
   );
 }
@@ -196,6 +357,7 @@ export default function HRZoneCalculator() {
   const [savingMaxHr, setSavingMaxHr] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<ZoneMode>('z2');
+  const [rule, setRule] = useState<ConsensusRule>('median');
 
   useEffect(() => {
     fetchAuth<HRDefaults>('/api/cardio/hr-zones')
@@ -236,9 +398,11 @@ export default function HRZoneCalculator() {
     }
   }
 
-  const zones = useMemo(() => computeZones(age, rhr, lthr, maxHR, mode), [age, rhr, lthr, maxHR, mode]);
+  const zones = useMemo(() => {
+    const all = computeZones(age, rhr, lthr, maxHR, mode);
+    return all.sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
+  }, [age, rhr, lthr, maxHR, mode]);
 
-  // Chart data: each bar shows the range from low to high
   const chartData = useMemo(() =>
     zones.map((z) => ({
       name: z.short,
@@ -247,21 +411,32 @@ export default function HRZoneCalculator() {
       high: z.high,
       range: z.high - z.low,
       expert: z.expert,
+      rationale: z.rationale,
+      category: z.category,
       color: z.color,
     })),
     [zones],
   );
 
-  // Consensus band:
-  //  Z2 — min = highest lower bound, max = highest upper bound (keeps you from drifting too low)
-  //  Z5 — min = lowest floor, max = highest floor across methods (target is the *entry* to Z5,
-  //       ceilings are too close to max HR to be meaningful)
-  const consensusMin = mode === 'z5'
-    ? Math.min(...zones.map((z) => z.low))
-    : Math.max(...zones.map((z) => z.low));
-  const consensusMax = mode === 'z5'
-    ? Math.max(...zones.map((z) => z.low))
-    : Math.max(...zones.map((z) => z.high));
+  const medianConsensus = useMemo(() => computeConsensus(zones, 'median', mode), [zones, mode]);
+  const strictConsensus = useMemo(() => computeConsensus(zones, 'strict', mode), [zones, mode]);
+  const activeConsensus = rule === 'median' ? medianConsensus : strictConsensus;
+  const inactiveConsensus = rule === 'median' ? strictConsensus : medianConsensus;
+
+  const yDomain = useMemo<[number, number]>(() => {
+    if (zones.length === 0) return mode === 'z5' ? [150, 200] : [90, 170];
+    const lows = zones.map(z => z.low);
+    const highs = zones.map(z => z.high);
+    const dataMin = Math.min(...lows);
+    const dataMax = Math.max(...highs);
+    return [Math.max(0, dataMin - 5), dataMax + 5];
+  }, [zones, mode]);
+
+  const zonesByCategory = useMemo(() => {
+    const grouped: Record<Category, ZoneMethod[]> = { formula: [], lthr: [], expert: [] };
+    for (const z of zones) grouped[z.category].push(z);
+    return grouped;
+  }, [zones]);
 
   if (!loaded) {
     return (
@@ -270,6 +445,12 @@ export default function HRZoneCalculator() {
       </div>
     );
   }
+
+  const ruleHint = rule === 'median'
+    ? `Median of ${zones.length} methods (robust to outliers).`
+    : mode === 'z5'
+      ? 'Spread of Z5 entry floors across methods.'
+      : 'Highest floor and highest ceiling across methods (strictest read).';
 
   return (
     <div className="rounded-xl border border-jarvis-border bg-jarvis-bg-card p-5 space-y-4">
@@ -280,8 +461,9 @@ export default function HRZoneCalculator() {
           </h2>
           <p className="text-[12px] text-jarvis-text-dim mt-1">
             {mode === 'z5'
-              ? 'Zone 5 (VO2 max) ranges across expert methods. Target band = spread of Z5 floors.'
-              : 'Zone 2 ranges across expert methods. Min = highest lower bound, Max = highest upper bound.'}
+              ? 'Zone 5 (VO2 max) ranges across formulas + experts.'
+              : 'Zone 2 ranges across formulas + experts.'}{' '}
+            <span className="text-jarvis-text-faint">Hover a bar for the source rationale.</span>
           </p>
         </div>
         <div className="flex items-center rounded-md border border-jarvis-border bg-jarvis-bg-main p-0.5 flex-shrink-0">
@@ -328,12 +510,12 @@ export default function HRZoneCalculator() {
       </div>
       {maxHrSource === 'formula' && (
         <p className="text-[11px] text-jarvis-text-faint -mt-2">
-          Max HR is using the age-based 220 − age estimate. Enter a tested max from a race or Garmin lab test to tighten the Z5 consensus band.
+          Max HR is using the age-based 220 − age estimate. Enter a tested max from a race or Garmin lab test to tighten every method.
         </p>
       )}
 
       {/* Chart */}
-      <div className="w-full" style={{ height: 280 }}>
+      <div className="w-full" style={{ height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
@@ -342,12 +524,13 @@ export default function HRZoneCalculator() {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
             <XAxis
               dataKey="name"
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
+              tick={{ fill: '#9ca3af', fontSize: 10 }}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
               tickLine={false}
+              interval={0}
             />
             <YAxis
-              domain={mode === 'z5' ? [150, 200] : [90, 170]}
+              domain={yDomain}
               tick={{ fill: '#9ca3af', fontSize: 11 }}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
               tickLine={false}
@@ -355,38 +538,52 @@ export default function HRZoneCalculator() {
             />
             <Tooltip content={<ChartTooltip />} />
 
-            {/* Consensus band (shaded area between min and max) */}
+            {/* Active (selected rule) consensus band — filled */}
             <ReferenceArea
-              y1={consensusMin}
-              y2={consensusMax}
-              fill="#3b82f6"
-              fillOpacity={0.08}
+              y1={activeConsensus.min}
+              y2={activeConsensus.max}
+              fill={rule === 'median' ? '#3b82f6' : '#f59e0b'}
+              fillOpacity={0.1}
               strokeOpacity={0}
             />
 
-            {/* Min floor reference line */}
+            {/* Inactive rule — dashed outline only */}
             <ReferenceLine
-              y={consensusMin}
+              y={inactiveConsensus.min}
+              stroke={rule === 'median' ? '#f59e0b' : '#3b82f6'}
+              strokeDasharray="2 4"
+              strokeOpacity={0.5}
+              strokeWidth={1}
+            />
+            <ReferenceLine
+              y={inactiveConsensus.max}
+              stroke={rule === 'median' ? '#f59e0b' : '#3b82f6'}
+              strokeDasharray="2 4"
+              strokeOpacity={0.5}
+              strokeWidth={1}
+            />
+
+            {/* Active min/max */}
+            <ReferenceLine
+              y={activeConsensus.min}
               stroke="#22c55e"
               strokeDasharray="8 4"
               strokeWidth={2}
               label={{
-                value: `${consensusMin} bpm`,
+                value: `${activeConsensus.min}`,
                 position: 'right',
                 fill: '#22c55e',
                 fontSize: 12,
                 fontWeight: 600,
               }}
             />
-
-            {/* Max ceiling reference line */}
             <ReferenceLine
-              y={consensusMax}
+              y={activeConsensus.max}
               stroke="#ef4444"
               strokeDasharray="8 4"
               strokeWidth={2}
               label={{
-                value: `${consensusMax} bpm`,
+                value: `${activeConsensus.max}`,
                 position: 'right',
                 fill: '#ef4444',
                 fontSize: 12,
@@ -405,31 +602,55 @@ export default function HRZoneCalculator() {
         </ResponsiveContainer>
       </div>
 
-      {/* Legend / Expert attribution */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        {zones.map((z) => (
-          <div key={z.name} className="flex items-start gap-2">
-            <div className="w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0" style={{ backgroundColor: z.color }} />
-            <div>
-              <p className="text-[12px] text-jarvis-text-secondary font-medium">
-                {z.name}: <span className="font-mono">{z.low}–{z.high}</span>
-              </p>
-              <p className="text-[11px] text-jarvis-text-dim">{z.expert}</p>
+      {/* Legend grouped by category */}
+      <div className="space-y-2">
+        {CATEGORY_ORDER.filter(cat => zonesByCategory[cat].length > 0).map(cat => (
+          <div key={cat}>
+            <p className="text-[10px] uppercase tracking-wider text-jarvis-text-dim mb-1.5">
+              {CATEGORY_LABEL[cat]}
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {zonesByCategory[cat].map((z) => (
+                <div key={z.name} className="flex items-start gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0" style={{ backgroundColor: z.color }} />
+                  <div>
+                    <p className="text-[12px] text-jarvis-text-secondary font-medium">
+                      {z.name}: <span className="font-mono">{z.low}–{z.high}</span>
+                    </p>
+                    <p className="text-[11px] text-jarvis-text-dim">{z.expert}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Consensus summary */}
-      <div className="rounded-lg bg-jarvis-bg-main border border-jarvis-border px-4 py-3">
-        <p className="text-[12px] text-jarvis-text-secondary">
-          <span className="font-medium text-jarvis-text-primary">Target Zone {mode === 'z5' ? '5' : '2'}:</span>{' '}
-          <span className="font-mono">{consensusMin}–{consensusMax} bpm</span>{' '}
-          <span className="text-jarvis-text-dim">
-            {mode === 'z5'
-              ? '(min = lowest Z5 floor, max = highest Z5 floor across methods)'
-              : '(min = highest floor across all methods, max = highest ceiling)'}
-          </span>
+      {/* Consensus block with rule toggle */}
+      <div className="rounded-lg bg-jarvis-bg-main border border-jarvis-border px-4 py-3 space-y-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[12px] text-jarvis-text-secondary">
+            <span className="font-medium text-jarvis-text-primary">Target Zone {mode === 'z5' ? '5' : '2'}:</span>{' '}
+            <span className="font-mono text-jarvis-text-primary">{activeConsensus.min}–{activeConsensus.max} bpm</span>
+          </p>
+          <div className="flex items-center rounded-md border border-jarvis-border bg-jarvis-bg-card p-0.5">
+            {(['median', 'strict'] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRule(r)}
+                className={`px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider rounded transition-colors ${
+                  rule === r
+                    ? 'bg-jarvis-accent text-white'
+                    : 'text-jarvis-text-dim hover:text-jarvis-text-primary'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[11px] text-jarvis-text-faint">
+          {ruleHint} Dashed faint lines show the {rule === 'median' ? 'strict' : 'median'} band for reference.
         </p>
       </div>
     </div>

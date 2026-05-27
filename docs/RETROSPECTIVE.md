@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-27 — v3.18.0 — HR Zone Calculator: 4 new experts, median consensus, category grouping
+
+Cardio page HR Zone Calculator gained four named expert rows (San Millán, Lyon, Patrick, Huberman), switched its default consensus rule from "strict floor / highest ceiling" to median across all methods, and grouped bars by category (Formulas / LTHR-based / Experts) with a per-method rationale exposed in the chart tooltip. Coggan Z5 and Friel Z2/Z5 now clamp at maxHR instead of producing inverted ranges when LTHR is high.
+
+**Well:**
+- Pulled expert HR ranges from each NotebookLM notebook before touching code; built the 11-method median table and validated against the user's actual numbers (RHR=49, LTHR=169, maxHR=185) before committing. Caught Bare's redundancy with MAF early and dropped him rather than double-counting Maffetone.
+- Computed both consensus rules in the component and surfaced them in the same chart so the user can compare without leaving the page. The dashed-line overlay for the inactive rule is low-key enough not to clutter the active band.
+- Found and fixed a latent Coggan bug in the same ship: with LTHR=169 / maxHR=185, the Z5 floor was rendering above maxHR (an inverted range). The clamping and degenerate-row filter handle this without special-casing.
+
+**Wrong:**
+- Submitted three NotebookLM queries in a single batch but used `find` to locate submit buttons by ref — those refs were stale by the time the click landed, so the questions sat in the input boxes for a beat before I noticed and clicked the visible blue arrows manually. Faster path would have been to find the submit button immediately after each `form_input` and click in the same batch.
+- Did not get past the dev-server auth screen, so the UI change is type-checked (`npm run build` clean) but not eyeball-verified pre-merge. Acceptable given the change is component-internal with no API surface, but flagging for future ships that touch authenticated dashboard views.
+
+**Next:**
+- Consider adding a "category strip" annotation above the X axis so the Formula / LTHR / Expert groupings are visible without scanning the legend.
+- If LTHR/maxHR diverge often (LTHR is ≥91% of max in the current state), consider auto-flagging when the inputs are likely stale and prompting a real max test.
+
+---
+
 ## 2026-05-22 — v3.17.2 — Garmin sleep/HR/steps off-by-one date fix
 
 User reported last night's sleep score showed 45 in Garmin but 65 in Supabase. Investigation traced it to date construction: `syncGarmin` passed a midnight-WIB `Date` to `garmin-connect`, whose `toDateString` formats with the server timezone (UTC), rolling the request back a day. Every row was labelled one day ahead of the night it measured. The same `Date` fed steps and resting HR, so those were shifted too; `body_battery_charged` was cross-contaminated from the shifted sleep payload.
