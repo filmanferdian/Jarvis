@@ -4,6 +4,21 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.18] — 2026-05-27 — HR Zone Calculator: 4 new experts, median consensus, category grouping (v3.18.0)
+
+Cardio page HR Zone Calculator extended from 6 to 10 methods per mode, with the consensus rule switched from a strict floor/ceiling to median across all methods. Adds 4 named experts (San Millán, Lyon, Patrick, Huberman), groups bars by category (Formulas / LTHR-based / Experts), and surfaces a per-method rationale in the chart tooltip.
+
+- `src/components/HRZoneCalculator.tsx`:
+  - Added San Millán (70-80% max for Z2, ~95% max floor for Z5 from 4×4 protocol), Lyon (60-65% Z2, 85-95% Z5 VO2 max band), Patrick (70-80% Z2, ≥95% Z5), Huberman (55-70% Z2, 80-100% Z5). Bare omitted since his Z2 maps to the existing MAF row (180-age).
+  - `ZoneMethod` now carries `category` (formula / lthr / expert) and `rationale` (one-sentence source paraphrase) fields.
+  - Bars sort by category left-to-right and legend renders with category headers.
+  - Tooltip shows method name, category badge, bpm range, expert attribution, and rationale.
+  - Consensus computed two ways: **median** (default) across all methods, **strict** (highest floor / highest ceiling for Z2; floor spread for Z5) as a toggle. Active band is shaded; inactive rule's min/max appear as faint dashed reference lines.
+  - Y-axis domain is now data-driven (`min - 5` to `max + 5`) instead of hard-coded, so Huberman's lower Z2 floor and Lyon's lower Z2 ceiling fit cleanly.
+  - Coggan Z5 and Friel Z2/Z5 ceilings clamped at `maxHR`; rows where `low >= high` after clamping are filtered out (previously Coggan rendered an inverted range when LTHR > 91% of maxHR).
+- Expert HR ranges are sourced from each expert's NotebookLM notebook in the personal library. Bare's view was queried but folded into MAF rather than added as a redundant row.
+- No API or schema changes. `/api/cardio/hr-zones` continues to return `{age, restingHR, lthr, maxHR, maxHrSource}` unchanged.
+
 ### Garmin sleep/HR/steps off-by-one date fix (v3.17.2)
 
 Daily Garmin metrics were stored one day ahead of the night they actually measured. `syncGarmin` built the date object as midnight WIB (17:00 UTC the prior day). The `garmin-connect` library's `toDateString` formats with the server timezone (UTC on Railway), so the request silently rolled back a day: requesting `today` returned the night with Garmin `calendarDate = today - 1`. The row labelled `2026-05-22` actually held the night that ended on May 21. Last night's real sleep score (45) never landed; the dashboard showed the prior night (65).
