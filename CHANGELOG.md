@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.19] — 2026-05-29 — Career job watch: twice-weekly role scan across Anthropic, Stripe, Revolut with LLM fit scoring (v3.19.0)
 
+### Career location filter tightened to Indonesia / Singapore / SEA / APAC + Revolut banner suppressed (v3.19.1)
+
+The location gate kept too much: it admitted ANZ, South Asia, and single-country East Asia roles (Sydney, Bengaluru, Tokyo, Seoul) that are not relevant. New bar: a role must plausibly include Indonesia, meaning Indonesia itself, Singapore (the regional hub), any SEA market, or a broad APAC / Asia-Pacific / remote-APAC label. ANZ, South Asia (India and neighbours), and single-country East Asia (Japan, Korea, China, Hong Kong, Taiwan) are now dropped before scoring. Compound locations still pass on any in-region hit, so "Singapore; Tokyo" stays while "Tokyo, Japan" alone drops.
+
+- `src/lib/sources/careers/filter.ts`: `APAC_PATTERNS` reduced to Singapore, APAC / Asia-Pacific, SEA / Southeast Asia, Indonesia, Malaysia, Thailand, Philippines, Vietnam, and Cambodia. Removed the Japan, ANZ, Korea, Hong Kong, India, and Taiwan patterns. Verified against 24 location cases.
+- One-time cleanup of the production table: 30 of 32 stored rows were out-of-region (ANZ, Japan, Korea, India) and were deleted; the 2 in-region Singapore rows (both not a fit) remain. The default fit-plus-partial view is empty until a relevant in-region role opens, which is the stricter filter behaving as intended.
+- `src/app/career/page.tsx`: Revolut (and any future best-effort source with no reliable automated path) no longer surfaces as a standing failure banner. The source stays wired so it auto-resumes if a path opens; genuine failures from Anthropic or Stripe still show a banner. Probed Greenhouse, Lever, Ashby, SmartRecruiters, and Revolut's own endpoints: no clean public jobs API exists and every Revolut route returns a Cloudflare 403.
+
 New Career page (`/career`) that checks open roles at Anthropic, Stripe, and Revolut twice a week (Tue/Thu, 07:00 WIB), filters to in-region (Singapore / APAC / APAC-remote) leadership-track roles, and scores each against Filman's profile with the Anthropic API. Each role gets a fit verdict (fit / partial / not_fit), a 0-100 score, a plain-language summary, and a fit rationale that explains level mismatches explicitly.
 
 - `supabase/migration-029-career-job-watch.sql`: new `career_job_watch` table (`unique (company, external_id)`), RLS enabled with no permissive policy (service-role key bypasses RLS, matching migration-027 posture). Indexes on `company` and `status`. Applied to production.
