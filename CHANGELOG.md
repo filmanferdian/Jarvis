@@ -6,6 +6,14 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.19] — 2026-05-29 — Career job watch: twice-weekly role scan across Anthropic, Stripe, Revolut with LLM fit scoring (v3.19.0)
 
+### OpenAI added as a fourth career source via Ashby (v3.19.2)
+
+Broadened the watch to OpenAI. OpenAI publishes its board through Ashby's clean public posting API, so it slots in next to the Anthropic Greenhouse source with no scraping. First scan: 708 roles fetched, 21 kept after the in-region location and category gate, 4 scored partial, 17 not a fit. The 4 partials are all Singapore GTM/deployment leadership roles (Lead AI Deployment Manager, Technical Deployment Lead, APAC Sales Development Leader, VC Partnerships Lead APAC); the Global Affairs strategy roles scored not a fit.
+
+- `src/lib/sources/careers/openai.ts`: new `openaiSource` reading `api.ashbyhq.com/posting-api/job-board/openai`. Maps Ashby fields (id, title, department/team, descriptionPlain) and folds primary plus secondary locations into one string, so an in-region secondary location still passes the gate. Skips unlisted roles; throws on zero listed jobs so an API shape change surfaces as a source failure instead of a silent empty result.
+- `src/lib/sources/careers/index.ts`: `openaiSource` appended to `CAREER_SOURCES` (now Anthropic, OpenAI, Stripe, Revolut).
+- `src/app/career/page.tsx`: page subtitle now names OpenAI.
+
 ### Career location filter tightened to Indonesia / Singapore / SEA / APAC + Revolut banner suppressed (v3.19.1)
 
 The location gate kept too much: it admitted ANZ, South Asia, and single-country East Asia roles (Sydney, Bengaluru, Tokyo, Seoul) that are not relevant. New bar: a role must plausibly include Indonesia, meaning Indonesia itself, Singapore (the regional hub), any SEA market, or a broad APAC / Asia-Pacific / remote-APAC label. ANZ, South Asia (India and neighbours), and single-country East Asia (Japan, Korea, China, Hong Kong, Taiwan) are now dropped before scoring. Compound locations still pass on any in-region hit, so "Singapore; Tokyo" stays while "Tokyo, Japan" alone drops.

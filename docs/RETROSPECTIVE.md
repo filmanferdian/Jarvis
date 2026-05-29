@@ -4,6 +4,20 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-29 — v3.19.2 — OpenAI added as a fourth career source
+
+Broadened the watch to OpenAI. It runs on Ashby's public posting API, so it dropped in next to the Anthropic Greenhouse source with no scraping.
+
+**Well:**
+- Probed the four common ATS APIs first and found OpenAI on Ashby (708 roles), so no scraping was needed. Validated the source plus the in-region gate offline (21 kept of 708) before spending any paid scoring.
+- Folded secondary locations into the location string, so a role offered in both Sydney and Singapore still passes the gate on Singapore. The first scan produced 4 in-region partials, a real improvement over the empty post-cleanup state.
+
+**Wrong:**
+- The dev server dropped twice mid-session, so the first scan attempt failed on a connection refusal. Added a readiness wait-loop before re-running, which is what I should have done up front.
+
+**Next:**
+- The 4 OpenAI partials are GTM/deployment leadership; the Global Affairs strategy roles (Head of APAC Growth Markets, APAC Strategic Initiatives Lead) scored not a fit, which is the opposite of what I expected. Worth checking whether the profile block or scoring rubric is under-crediting policy/strategy titles relative to GTM ones.
+
 ## 2026-05-29 — v3.19.1 — Career location filter tightened + Revolut banner suppressed
 
 Follow-up to v3.19.0 the same day. The first run made it obvious the location gate was too loose (ANZ, Japan, Korea, India roles dominated), so the gate was narrowed to roles that plausibly include Indonesia: Indonesia, Singapore, SEA, and broad APAC / remote-APAC. Revolut, which has no reachable jobs source, stopped showing a standing failure banner.
