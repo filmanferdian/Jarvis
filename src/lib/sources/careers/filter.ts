@@ -2,8 +2,15 @@
 // The keep-set is intentionally loose: anything not hard-excluded that clears
 // the location gate goes to the LLM, which makes the final fit/level call.
 
-// APAC / in-region signals. Locations are free-text and often compound
-// (e.g. "London, UK; Singapore"); a single APAC hit keeps the role.
+// In-region signals. The bar is: a role must plausibly include Indonesia.
+// That means Indonesia itself, Singapore (the regional hub Filman targets),
+// any SEA market, or a broad APAC / Asia-Pacific / remote-APAC label.
+// Deliberately excluded because they do NOT include Indonesia: ANZ
+// (Australia/New Zealand), South Asia (India and neighbours), and
+// single-country East Asia (Japan, Korea, China, Hong Kong, Taiwan).
+// Locations are free-text and often compound (e.g. "London, UK; Singapore");
+// a single in-region hit keeps the role, so "Singapore; Tokyo" still passes
+// on Singapore while "Tokyo, Japan" alone does not.
 const APAC_PATTERNS = [
   /singapore/i,
   /\bapac\b/i,
@@ -11,16 +18,11 @@ const APAC_PATTERNS = [
   /\bsea\b/i,
   /southeast asia/i,
   /jakarta|indonesia/i,
-  /tokyo|japan/i,
-  /sydney|melbourne|australia|\banz\b/i,
-  /seoul|korea/i,
-  /hong kong/i,
-  /bangalore|bengaluru|mumbai|india/i,
   /kuala lumpur|malaysia/i,
   /bangkok|thailand/i,
   /manila|philippines/i,
-  /hanoi|vietnam/i,
-  /taipei|taiwan/i,
+  /ho chi minh|saigon|hanoi|vietnam/i,
+  /phnom penh|cambodia/i,
 ];
 
 // "Remote-Friendly, United States" and bare US/EU remote must NOT count as

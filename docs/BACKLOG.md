@@ -17,7 +17,7 @@ _Empty — all items shipped._
 **Context:** v3.19.0 shipped the `/career` page and the Tue/Thu scan across Anthropic, Stripe, and Revolut. Three follow-ups surfaced.
 
 **Scope:**
-- Revolut source is wired but blocked by Cloudflare (HTTP 403), so it returns nothing and the page shows a standing failure banner. Either find a JSON/XHR jobs endpoint, route the fetch through something that survives the bot check, or drop the source and remove the banner. Stripe is a server-rendered HTML scrape and is similarly fragile; it throws on zero rows so a markup change shows up as a source failure rather than a silent empty list.
+- Revolut source is wired but blocked by Cloudflare (HTTP 403), so it returns nothing. As of v3.19.1 its failure banner is suppressed (treated as a best-effort source, stays wired so it auto-resumes if a path opens), but it still yields zero roles. Probed Greenhouse, Lever, Ashby, SmartRecruiters, and Revolut's own endpoints in v3.19.1: no clean public jobs API exists and every Revolut route returns a Cloudflare 403. To get Revolut data, find a working JSON/XHR endpoint or route the fetch through something that survives the bot check. Stripe is a server-rendered HTML scrape and is similarly fragile; it throws on zero rows so a markup change shows up as a source failure rather than a silent empty list.
 - Scheduling is currently manual: a cron-job.org Tue/Thu job at `0 0 * * 2,4` UTC must be pointed at the deployed `/api/cron/career-jobs` with the `x-cron-secret` header. Until that exists the pipeline only runs from the "Check now" button.
 - New-role notification: the twice-weekly scan only helps if the user opens the page. Consider a light alert (briefing line, push, or email) when a new fit or partial role appears.
 

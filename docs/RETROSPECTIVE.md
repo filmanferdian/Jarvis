@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-29 — v3.19.1 — Career location filter tightened + Revolut banner suppressed
+
+Follow-up to v3.19.0 the same day. The first run made it obvious the location gate was too loose (ANZ, Japan, Korea, India roles dominated), so the gate was narrowed to roles that plausibly include Indonesia: Indonesia, Singapore, SEA, and broad APAC / remote-APAC. Revolut, which has no reachable jobs source, stopped showing a standing failure banner.
+
+**Well:**
+- Validated the new gate against 24 explicit location cases (kept Singapore / Jakarta / KL / Bangkok / "Singapore; Tokyo" / APAC; dropped Sydney / Tokyo / Seoul / Bengaluru / "South Asia" / US) before touching the database, so the cleanup was a known quantity.
+- Confirmed there is no clean Revolut path by probing the four common ATS APIs (Greenhouse, Lever, Ashby, SmartRecruiters) plus Revolut's own endpoints; all either 404 or return a Cloudflare 403. Chose to suppress the banner and keep the source wired rather than rip it out, so it auto-resumes if a path ever opens.
+- Cleaned the table deterministically by deleting only the eight out-of-region location strings present, preserving the two in-region Singapore rows, and verified the row count dropped 32 to 2.
+
+**Wrong:**
+- The original v3.19.0 gate was looser than the user actually wanted, which only surfaced once real data landed. A short clarifying question on region scope before the first build would have saved the re-run and the cleanup.
+- The clarifying question UI returned no recorded selection, so I proceeded on the recommended defaults (exclude East Asia, suppress Revolut banner). They matched the user's stated rule, but worth confirming rather than assuming when the picker comes back empty.
+
+**Next:**
+- The default view is now empty until a genuinely senior in-region role opens. A new-fit notification (already on the backlog) would make the twice-weekly scan useful without the user opening an empty page.
+
 ## 2026-05-29 — v3.19.0 — Career job watch: twice-weekly role scan with LLM fit scoring
 
 New `/career` page plus a Tue/Thu pipeline that scans Anthropic, Stripe, and Revolut for in-region leadership roles, filters by location and category, and scores survivors against Filman's profile with Sonnet (fit / partial / not_fit + score + summary + rationale).

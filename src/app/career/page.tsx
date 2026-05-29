@@ -40,6 +40,11 @@ const STATUS_OPTIONS: JobStatus[] = ['new', 'reviewing', 'applied', 'passed'];
 
 const VERDICT_ORDER: Record<string, number> = { fit: 0, partial: 1, not_fit: 2 };
 
+// Sources with no reliable automated path (e.g. Revolut, behind Cloudflare).
+// They stay wired so they auto-resume if a path opens, but their failures are
+// expected and should not surface as a standing failure banner.
+const BEST_EFFORT_SOURCES = ['Revolut'];
+
 function verdictStyle(v: Verdict | null): { bg: string; color: string; label: string } {
   switch (v) {
     case 'fit':
@@ -135,7 +140,9 @@ export default function CareerPage() {
     return [...byCompany.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [data, showAll, showClosed]);
 
-  const failedSources = (data?.sources || []).filter((s) => !s.ok);
+  const failedSources = (data?.sources || []).filter(
+    (s) => !s.ok && !BEST_EFFORT_SOURCES.includes(s.company),
+  );
   const totalShown = grouped.reduce((n, [, list]) => n + list.length, 0);
 
   return (
