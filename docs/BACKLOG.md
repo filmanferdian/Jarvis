@@ -12,6 +12,19 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-29 — Career job watch follow-ups: Revolut source, scheduling, new-role notification
+
+**Context:** v3.19.0 shipped the `/career` page and the Tue/Thu scan across Anthropic, Stripe, and Revolut. Three follow-ups surfaced.
+
+**Scope:**
+- Revolut source is wired but blocked by Cloudflare (HTTP 403), so it returns nothing and the page shows a standing failure banner. Either find a JSON/XHR jobs endpoint, route the fetch through something that survives the bot check, or drop the source and remove the banner. Stripe is a server-rendered HTML scrape and is similarly fragile; it throws on zero rows so a markup change shows up as a source failure rather than a silent empty list.
+- Scheduling is currently manual: a cron-job.org Tue/Thu job at `0 0 * * 2,4` UTC must be pointed at the deployed `/api/cron/career-jobs` with the `x-cron-secret` header. Until that exists the pipeline only runs from the "Check now" button.
+- New-role notification: the twice-weekly scan only helps if the user opens the page. Consider a light alert (briefing line, push, or email) when a new fit or partial role appears.
+
+**Trigger:** Revolut/Stripe when a scan silently drops a source or the banner becomes noise; scheduling immediately (one-time setup); notification if the page is not being checked regularly.
+
+---
+
 ### 2026-05-22 — Morning-freshness for Garmin data + raw_json realign
 
 **Context:** v3.17.2 fixed the date off-by-one so the 07:00-WIB sync now captures last night's sleep correctly, and the 07:30 briefing reads it. Two follow-ups surfaced.

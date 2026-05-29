@@ -4,6 +4,22 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.19] — 2026-05-29 — Career job watch: twice-weekly role scan across Anthropic, Stripe, Revolut with LLM fit scoring (v3.19.0)
+
+New Career page (`/career`) that checks open roles at Anthropic, Stripe, and Revolut twice a week (Tue/Thu, 07:00 WIB), filters to in-region (Singapore / APAC / APAC-remote) leadership-track roles, and scores each against Filman's profile with the Anthropic API. Each role gets a fit verdict (fit / partial / not_fit), a 0-100 score, a plain-language summary, and a fit rationale that explains level mismatches explicitly.
+
+- `supabase/migration-029-career-job-watch.sql`: new `career_job_watch` table (`unique (company, external_id)`), RLS enabled with no permissive policy (service-role key bypasses RLS, matching migration-027 posture). Indexes on `company` and `status`. Applied to production.
+- `src/lib/sources/careers/`: pluggable source layer with per-source isolation.
+  - `anthropic.ts`: clean Greenhouse board API (`boards-api.greenhouse.io`), ~388 roles. Proven first to validate the pipeline.
+  - `stripe.ts`: server-rendered HTML scrape of the jobs search page, ~62 roles. Throws on zero rows so a markup change surfaces as a source failure rather than a silent empty result.
+  - `revolut.ts`: best-effort fetch; detects Cloudflare bot protection and returns a clean failure (currently blocked, HTTP 403).
+  - `filter.ts`: location gate (keep SG/APAC/APAC-remote, drop US/EU-only) plus hard-exclude of engineering, design, support, AML, and early-career roles before any LLM call. `html.ts`: entity-decode + tag-strip for Greenhouse job descriptions. `profile.ts`: the verbatim profile block. `types.ts`: `RawJob` / `JobSource` contracts.
+- `src/lib/sync/careerJobWatch.ts`: core `syncCareerJobs()`. Fetches all sources in parallel with try/catch isolation, records per-source health in `sync_account_status`, applies the location/category filter, diffs against the table by `(company, external_id)`, inserts new rows (status `new`), preserves user status on updates, reopens previously-closed roles, and sets `closed_at` for roles that vanished. Only new or changed rows are scored, capped at 40 LLM calls per run, guarded by the usage rate-limit check. Scoring uses Sonnet with prompt caching on the instructions + profile block; all job text is sanitized and `wrapUntrusted`-wrapped before reaching the prompt.
+- `src/app/api/career/route.ts` (GET, cookie auth): roles grouped for the page plus per-source health and last-refreshed timestamp. `src/app/api/career/refresh/route.ts` (POST): browser-triggered on-demand scan, same pipeline as the cron. `src/app/api/career/status/route.ts` (PATCH): write back status (new / reviewing / applied / passed), validated by `CareerStatusSchema`. `src/app/api/cron/career-jobs/route.ts` (GET, cron auth): the scheduled entry point wrapped in `runCronJob`.
+- `src/app/career/page.tsx`: groups roles by company, sorts fit before partial before not_fit (then score desc), shows verdict badge (green / amber / grey), score, summary, rationale, first-seen date, Apply link, and a status dropdown with optimistic write-back. Defaults to fit + partial only with a "show all" toggle, plus a "hide closed" toggle and a source-failure banner. `src/components/Sidebar.tsx`: new Career nav item.
+- `src/lib/validation.ts`: `CareerStatusSchema` (UUID id + status enum).
+- Scheduling is a manual cron-job.org step (no workflow file is checked in): a Tue/Thu job at `0 0 * * 2,4` UTC hitting the deployed `/api/cron/career-jobs` with the `x-cron-secret` header.
+
 ## [3.18] — 2026-05-27 — HR Zone Calculator: 4 new experts, median consensus, category grouping (v3.18.0)
 
 Cardio page HR Zone Calculator extended from 6 to 10 methods per mode, with the consensus rule switched from a strict floor/ceiling to median across all methods. Adds 4 named experts (San Millán, Lyon, Patrick, Huberman), groups bars by category (Formulas / LTHR-based / Experts), and surfaces a per-method rationale in the chart tooltip.
