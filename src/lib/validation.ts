@@ -50,3 +50,8 @@ export const ContactUpsertSchema = z.object({
 export const ContactIgnoreSchema = z.object({
   email: z.string().email().max(320),
 });
+
+export const CareerStatusSchema = z.object({
+  id: z.string().uuid('Invalid job id'),
+  status: z.enum(['new', 'reviewing', 'applied', 'passed']),
+});

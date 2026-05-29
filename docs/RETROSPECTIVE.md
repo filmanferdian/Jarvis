@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-29 — v3.19.0 — Career job watch: twice-weekly role scan with LLM fit scoring
+
+New `/career` page plus a Tue/Thu pipeline that scans Anthropic, Stripe, and Revolut for in-region leadership roles, filters by location and category, and scores survivors against Filman's profile with Sonnet (fit / partial / not_fit + score + summary + rationale).
+
+**Well:**
+- Built the source layer behind a small `JobSource` contract with per-source try/catch isolation, so one site failing never blanks the others. Validated this empirically on the first real run: Anthropic (388) and Stripe (62) both succeeded while Revolut failed cleanly on Cloudflare, and the page surfaced the Revolut failure in a banner instead of silently showing fewer roles.
+- Proved the cheapest source first. Anthropic's clean Greenhouse API validated the normalize → filter → diff → score → store pipeline before spending effort on the fragile Stripe scrape and the likely-blocked Revolut fetch.
+- Filtered hard before the LLM. Location gate plus category hard-excludes cut ~388 Anthropic roles to ~21 candidates, so the expensive scoring only ran on plausible matches, capped at 40 calls per run and guarded by the usage rate-limit check.
+- Kept the prompt-injection posture: every job field is sanitized and wrapped with `wrapUntrusted` before reaching the model, since job descriptions are externally-sourced text.
+
+**Wrong:**
+- Could not get authenticated browser data onto the page without putting the auth token into the browser context, so I verified the rendered cards by mocking the API response in the page (real-shaped data) and verified the live data separately via a server-side bearer-auth call. The shell and the data are both confirmed, but not in a single authenticated browser view.
+- Revolut is wired but currently returns nothing (Cloudflare 403). It ships as a known-failing best-effort source rather than being dropped, which means the page shows a persistent Revolut failure banner until that source is either solved or removed.
+- The first end-to-end run scored 32 roles and only 1 came back partial (0 fit), so the default fit + partial view is sparse. That is the filter working as designed (most kept roles are sales-IC that the model correctly rates not_fit), but it means the page looks thin until a genuinely senior in-region role opens.
+
+**Next:**
+- Solve or retire Revolut: either find a JSON/XHR endpoint, route through a fetch that survives Cloudflare, or drop the source and remove the standing failure banner.
+- The cron-job.org Tue/Thu schedule is a manual UI step the user still needs to add (no workflow file is checked in). Until then the pipeline only runs via the "Check now" button.
+- Consider a light notification when a new fit/partial role appears, so the twice-weekly scan does not depend on the user opening the page.
+
 ## 2026-05-27 — v3.18.0 — HR Zone Calculator: 4 new experts, median consensus, category grouping
 
 Cardio page HR Zone Calculator gained four named expert rows (San Millán, Lyon, Patrick, Huberman), switched its default consensus rule from "strict floor / highest ceiling" to median across all methods, and grouped bars by category (Formulas / LTHR-based / Experts) with a per-method rationale exposed in the chart tooltip. Coggan Z5 and Friel Z2/Z5 now clamp at maxHR instead of producing inverted ranges when LTHR is high.
