@@ -6,6 +6,16 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.19] — 2026-05-29 — Career job watch: twice-weekly role scan across Anthropic, Stripe, Revolut with LLM fit scoring (v3.19.0)
 
+### Grab and GoTo added as sources, plus a below-bar title pre-filter (v3.19.3)
+
+Broadened the watch to Grab and GoTo (now six sources), and added a seniority pre-filter so high-volume employers do not flood scoring with sub-Director roles.
+
+- `src/lib/sources/careers/grab.ts`: Grab via SmartRecruiters' public posting API (paginated, ~348 roles). The list endpoint carries no job description, so `description_raw` is null (same as Stripe) and scoring falls back to title and department. Fails closed on any page error, so partial data never mis-triggers closures.
+- `src/lib/sources/careers/goto.ts`: GoTo Group via the gotocompany.com careers JSON API (`content.goinfra.co.id/ent-hris/career`). Exposes the HoldCo group-corporate roles only (~12, with full JD); Gojek, GoPay, and Tokopedia run on separate sites. Surfaces only published and publicly-listed roles.
+- `src/lib/sources/careers/filter.ts`: new below-bar title filter drops Associate, Assistant, Officer, Coordinator, Analyst, Specialist, Representative, Administrator, and Clerk before scoring, unless the title carries a senior marker (Head, Director, Chief, VP, President, Partner, Principal, Managing Director, General Manager). Cuts Grab's in-region set from ~189 to ~116 and removes obvious not-a-fit noise across all sources. Verified against 16 title cases.
+- `src/lib/sources/careers/index.ts`: `grabSource` and `gotoSource` appended (now Anthropic, OpenAI, Grab, GoTo, Stripe, Revolut). `src/app/career/page.tsx`: subtitle names all six.
+- First scan: 145 kept across all sources, 40 scored this run (the per-run cap), 105 queued for later runs. New in-region results include an OpenAI "Head of APAC Growth Markets" (fit, 85) plus three Grab strategy partials in Malaysia, Thailand, and the Philippines.
+
 ### OpenAI added as a fourth career source via Ashby (v3.19.2)
 
 Broadened the watch to OpenAI. OpenAI publishes its board through Ashby's clean public posting API, so it slots in next to the Anthropic Greenhouse source with no scraping. First scan: 708 roles fetched, 21 kept after the in-region location and category gate, 4 scored partial, 17 not a fit. The 4 partials are all Singapore GTM/deployment leadership roles (Lead AI Deployment Manager, Technical Deployment Lead, APAC Sales Development Leader, VC Partnerships Lead APAC); the Global Affairs strategy roles scored not a fit.

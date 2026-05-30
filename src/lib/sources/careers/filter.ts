@@ -52,7 +52,23 @@ export function isHardExcluded(title: string, department: string | null | undefi
   return HARD_EXCLUDE.some((re) => re.test(haystack));
 }
 
+// Below-bar titles: clearly junior or IC-level roles that sit under Filman's
+// Director / Head / regional-lead bar, so the LLM would always score them not a
+// fit. Dropping them before scoring cuts cost and noise (matters most for
+// traditional-title employers like Grab and GoTo where these dominate volume).
+const BELOW_BAR =
+  /\b(associate|assistant|officer|coordinator|analyst|specialist|representative|administrator|clerk|executive assistant)\b/i;
+// Senior markers that override a below-bar word (e.g. "Associate Director",
+// "Chief Risk Officer" must NOT be dropped on "associate" / "officer").
+const SENIOR_OVERRIDE =
+  /\b(head|director|chief|vice president|vp|president|partner|principal|managing director|general manager|country manager|gm)\b/i;
+
+export function isBelowBar(title: string): boolean {
+  if (SENIOR_OVERRIDE.test(title)) return false;
+  return BELOW_BAR.test(title);
+}
+
 // True if a role should be kept for LLM scoring.
 export function shouldScore(title: string, department: string | null, location: string | null): boolean {
-  return passesLocationGate(location) && !isHardExcluded(title, department);
+  return passesLocationGate(location) && !isHardExcluded(title, department) && !isBelowBar(title);
 }
