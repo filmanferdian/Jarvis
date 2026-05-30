@@ -12,6 +12,16 @@ _Empty — all items shipped._
 
 ## Medium priority
 
+### 2026-05-30 – Investments price source: cron schedule + Yahoo fallback
+
+**Context:** v3.21.0 shipped the `/investments` page. Prices come from the `investment_quotes` table, refreshed by `/api/cron/investment-quotes`. Two setup/contingency items remain.
+
+**Scope:**
+- Cron schedule (setup): add the cron-job.org job hitting the deployed `/api/cron/investment-quotes` with the `x-cron-secret` header. Target a few WIB runs covering each exchange's mid-day and close (IDX and SGX cluster early; US is later in WIB). The price column shows placeholders until the first successful run populates the table.
+- Yahoo fallback: prices use Yahoo's public chart endpoint with no API key. It is rate-limited (429) from the dev IP; the production IP is likely fine, but unverified. If Railway is also blocked, add a keyed provider (Twelve Data covers IDX, SGX, and US on a free tier) behind an env var, falling back to Yahoo. Built only if needed.
+
+**Trigger:** schedule immediately (one-time setup); fallback only if production prices stay blank after the first cron run.
+
 ### 2026-05-29 — Career job watch follow-ups: Revolut source, scheduling, new-role notification
 
 **Context:** v3.19.0 shipped the `/career` page and the Tue/Thu scan across Anthropic, Stripe, and Revolut. Three follow-ups surfaced.
