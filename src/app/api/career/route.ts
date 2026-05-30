@@ -16,15 +16,16 @@ export const GET = withAuth(async (_req: NextRequest) => {
     return NextResponse.json({ error: 'Failed to load career jobs' }, { status: 500 });
   }
 
-  // Per-source health for the failure banner.
+  // Per-source data-pull health (drives the source-health strip + failure banner).
   const { data: statusRows } = await supabase
     .from('sync_account_status')
-    .select('account_key, last_result, last_error, last_synced_at')
+    .select('account_key, last_result, last_error, last_synced_at, events_synced')
     .eq('sync_type', 'career-jobs');
 
   const sources = (statusRows || []).map((s) => ({
     company: s.account_key.replace(/^source:/, ''),
     ok: s.last_result === 'success',
+    count: s.events_synced ?? 0,
     error: s.last_error,
     lastSyncedAt: s.last_synced_at,
   }));
