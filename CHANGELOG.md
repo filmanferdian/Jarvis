@@ -4,6 +4,18 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.20] — 2026-05-30 — Career page filters + Singapore/Jakarta base restriction (v3.20.0)
+
+The career watch is now restricted to roles based in Singapore or Jakarta (Filman's only acceptable bases), and the page gains four client-side filter facets.
+
+- `src/lib/sources/careers/filter.ts`: the location gate now keeps a role only if its base location names Singapore or Indonesia/Jakarta. Dropped the rest of SEA (KL, Bangkok, Manila, HCMC), broad APAC/remote, and everything else. One-time production cleanup deleted 70 out-of-base rows; 75 Singapore/Jakarta rows remain.
+- `src/app/career/page.tsx`: four multi-select filter facets, all derived client-side from the fields the API already returns (no schema change):
+  - **Company** — Anthropic, OpenAI, Grab, GoTo, Stripe, Revolut.
+  - **Base** — Singapore or Jakarta, from the location string (a compound location can match both).
+  - **Scope** — the role's mandate breadth (Global / APAC / SEA / Country) inferred from the title.
+  - **Type of work** — a normalized cross-company function taxonomy (Strategy, GTM & Sales, Finance, Product, Operations, Marketing, Policy & Public Affairs, People, Risk & Audit, Data, Other) derived from department + title.
+  Each facet is a dropdown of checkboxes with live counts. Selections combine AND across facets, OR within a facet; a "Clear filters" control resets them. The existing fit+partial and hide-closed toggles are unchanged. Subtitle now reads "Singapore and Jakarta roles…".
+
 ## [3.19] — 2026-05-29 — Career job watch: twice-weekly role scan across Anthropic, Stripe, Revolut with LLM fit scoring (v3.19.0)
 
 ### Grab and GoTo added as sources, plus a below-bar title pre-filter (v3.19.3)

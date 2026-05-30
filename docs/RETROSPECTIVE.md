@@ -4,6 +4,24 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-30 — v3.20.0 — Career filters + Singapore/Jakarta base restriction
+
+Restricted the watch to Singapore/Jakarta-based roles only (Filman confirmed those are his only acceptable bases, Jakarta preferred) and added four client-side filter facets to the page: Company, Base, Scope (mandate breadth), and Type of work (normalized function taxonomy).
+
+**Well:**
+- The base restriction and the budget fix turned out to be the same lever. Tightening the gate from SEA+APAC to Singapore/Jakarta cut the watch from 145 to 75 kept, which both matches Filman's actual relocation constraints and keeps the per-run scoring well under the daily Claude budget.
+- Built all four facets client-side over the fields the API already returns, so no migration, no sync change, no backfill. Derivations (base, mandate scope, normalized work type) are pure functions, easy to test and adjust.
+- Verified each facet in the browser with realistic mock data before shipping: Base=Jakarta correctly dropped the Singapore roles, and the work-type taxonomy bucketed the four sample roles into Policy, GTM, Risk & Audit, and Strategy as intended.
+
+**Wrong:**
+- Asked the user for the geo-scope and work-type definitions, and the answer also redefined the gate ("only Jakarta or Singapore"), which contradicted the earlier "SEA is relevant" call. Re-reading both, the requirement genuinely shifted as Filman thought it through; a single up-front "where would you actually relocate" question at the very start would have avoided the SEA detour and the two rounds of row deletion.
+- Facet counts are computed over the closed-filtered set only, not cross-filtered by the other active facets, so a count can read higher than what a combined selection actually shows. Acceptable for now, but slightly misleading.
+
+**Next:**
+- Optionally prioritize Jakarta-based roles above Singapore within each company group, since Jakarta is the preferred base.
+- Cross-filter facet counts so they reflect the other active selections.
+- The work-type taxonomy is a hand-maintained keyword map; revisit if a new source brings titles it classifies as Other too often.
+
 ## 2026-05-30 — v3.19.3 — Grab and GoTo sources + below-bar title pre-filter
 
 Added Grab (SmartRecruiters) and GoTo (gotocompany.com JSON API) as the fifth and sixth sources, and introduced a seniority pre-filter to stop high-volume employers from flooding the scorer.

@@ -2,35 +2,21 @@
 // The keep-set is intentionally loose: anything not hard-excluded that clears
 // the location gate goes to the LLM, which makes the final fit/level call.
 
-// In-region signals. The bar is: a role must plausibly include Indonesia.
-// That means Indonesia itself, Singapore (the regional hub Filman targets),
-// any SEA market, or a broad APAC / Asia-Pacific / remote-APAC label.
-// Deliberately excluded because they do NOT include Indonesia: ANZ
-// (Australia/New Zealand), South Asia (India and neighbours), and
-// single-country East Asia (Japan, Korea, China, Hong Kong, Taiwan).
-// Locations are free-text and often compound (e.g. "London, UK; Singapore");
-// a single in-region hit keeps the role, so "Singapore; Tokyo" still passes
-// on Singapore while "Tokyo, Japan" alone does not.
-const APAC_PATTERNS = [
-  /singapore/i,
-  /\bapac\b/i,
-  /asia[\s-]?pacific/i,
-  /\bsea\b/i,
-  /southeast asia/i,
-  /jakarta|indonesia/i,
-  /kuala lumpur|malaysia/i,
-  /bangkok|thailand/i,
-  /manila|philippines/i,
-  /ho chi minh|saigon|hanoi|vietnam/i,
-  /phnom penh|cambodia/i,
-];
+// In-region signals. The bar is now narrow: a role must be BASED in Singapore
+// or in Indonesia (Jakarta is the hub). Everything else is dropped before
+// scoring, including the rest of SEA (KL, Bangkok, Manila, HCMC), broad
+// APAC/remote labels, ANZ, South Asia, and East Asia. Locations are free-text
+// and often compound (e.g. "Seoul; Singapore"); a single in-region hit keeps
+// the role, so a role offered in both Singapore and Tokyo still passes on
+// Singapore while a Tokyo-only role does not.
+const IN_REGION_PATTERNS = [/singapore/i, /jakarta|indonesia/i];
 
-// "Remote-Friendly, United States" and bare US/EU remote must NOT count as
-// APAC-relevant. A remote role only passes if it also names an APAC region.
+// A role passes only if its (possibly compound) base location names Singapore
+// or Indonesia/Jakarta. Bare "Remote" or "APAC" with no SG/Jakarta base fails.
 export function passesLocationGate(location: string | null | undefined): boolean {
   const loc = (location || '').trim();
   if (!loc) return false;
-  return APAC_PATTERNS.some((re) => re.test(loc));
+  return IN_REGION_PATTERNS.some((re) => re.test(loc));
 }
 
 // Drop-before-LLM categories, matched against title + department. Keeps noise
