@@ -16,6 +16,7 @@ const EXPECTED_INTERVALS: Record<string, { label: string; description: string; i
   'contact-scan':     { label: 'Contact Scanner',   description: 'Discovers and enriches professional contacts from emails',               interval_ms: 7 * 24 * 60 * 60 * 1000 },
   'news-synthesis':   { label: 'News Synthesis',    description: 'Curates personalized news digest from RSS and web sources',              interval_ms: 6 * 60 * 60 * 1000 },
   'running-analysis': { label: 'Running Analysis',  description: 'Analyzes weekly outdoor runs with pace, form, and progress insights',    interval_ms: 7 * 24 * 60 * 60 * 1000 },
+  'career-jobs':      { label: 'Career Job Watch',  description: 'Pulls senior Singapore/Jakarta roles from Anthropic, OpenAI, Grab, GoTo, Stripe, Revolut', interval_ms: 4 * 24 * 60 * 60 * 1000 },
 };
 
 interface AccountHealth {

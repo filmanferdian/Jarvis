@@ -26,6 +26,7 @@ interface CareerJob {
 interface SourceHealth {
   company: string;
   ok: boolean;
+  count?: number;
   error: string | null;
   lastSyncedAt: string | null;
 }
@@ -271,6 +272,9 @@ export default function CareerPage() {
           </button>
         </div>
 
+        {/* Source data-pull health */}
+        {!loading && <SourceHealthStrip sources={data?.sources || []} />}
+
         {/* Source-failure banner */}
         {failedSources.length > 0 && (
           <div
@@ -407,6 +411,45 @@ export default function CareerPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+// At-a-glance data-pull health for each source. Green = fetched OK (with the
+// raw count pulled), amber = best-effort source that is expected to fail
+// (Revolut, Cloudflare-blocked), red = a genuine failure that needs attention.
+function SourceHealthStrip({ sources }: { sources: SourceHealth[] }) {
+  if (!sources.length) return null;
+  const ordered = [...sources].sort((a, b) => a.company.localeCompare(b.company));
+  return (
+    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+      <span
+        className="text-[10px] uppercase text-jarvis-text-faint"
+        style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}
+      >
+        Sources
+      </span>
+      {ordered.map((s) => {
+        const bestEffort = BEST_EFFORT_SOURCES.includes(s.company);
+        const color = s.ok
+          ? 'var(--color-jarvis-success)'
+          : bestEffort
+            ? 'var(--color-jarvis-warn)'
+            : 'var(--color-jarvis-danger)';
+        const detail = s.ok ? `${s.count ?? 0}` : bestEffort ? 'blocked' : 'failed';
+        const title = s.error
+          ? s.error
+          : s.lastSyncedAt
+            ? `pulled ${s.count ?? 0} · last checked ${formatWibDate(s.lastSyncedAt)} WIB`
+            : '';
+        return (
+          <span key={s.company} className="inline-flex items-center gap-1.5 text-[12px]" title={title}>
+            <span className="inline-block w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} />
+            <span className="text-jarvis-text-secondary">{s.company}</span>
+            <span className="font-mono text-[11px] text-jarvis-text-faint">{detail}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 

@@ -97,6 +97,7 @@ const CONNECTOR_ICON: Record<string, string> = {
   'contact-scan': 'CS',
   'running-analysis': 'RA',
   'morning-briefing': 'MB',
+  'career-jobs': 'CJ',
 };
 
 function formatElapsed(minutes: number): string {
@@ -180,7 +181,7 @@ function ConnectorCard({ int }: { int: Integration }) {
                 style={{ background: statusLightColor(a.status) }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-[11.5px] text-jarvis-text-dim truncate">{a.account_key}</p>
+                <p className="text-[11.5px] text-jarvis-text-dim truncate">{a.account_key.replace(/^source:/, '')}</p>
                 <p className="text-[10.5px] text-jarvis-text-faint" style={{ fontFamily: 'var(--font-mono)' }}>
                   {a.last_synced_at ? formatElapsed(a.elapsed_minutes) : 'Never synced'}
                 </p>

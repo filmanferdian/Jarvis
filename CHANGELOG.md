@@ -6,6 +6,16 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.20] — 2026-05-30 — Career page filters + Singapore/Jakarta base restriction (v3.20.0)
 
+### Career data-pull health check on the page and in Utilities (v3.20.2)
+
+Surfaced per-source data-pull health so a broken source is obvious at a glance, using the per-source status the sync already records in `sync_account_status`.
+
+- `src/app/api/career/route.ts`: the `sources` payload now includes each source's `count` (the raw rows fetched, from `events_synced`).
+- `src/app/career/page.tsx`: a "Sources" health strip under the header shows every source with a status dot and its fetched count — green for a healthy pull, amber "blocked" for a best-effort source that is expected to fail (Revolut), red "failed" for a genuine failure. This makes the working-vs-broken split visible (e.g. Anthropic 377, OpenAI 716, Grab 348, GoTo 12, Stripe 62 green; Revolut amber). The strip shows the raw pull count, so a source that fetched fine but has no senior matches (GoTo, Stripe) still reads as healthy.
+- `src/app/api/utilities/integrations/route.ts`: added `career-jobs` to the expected-interval map (label "Career Job Watch", twice-weekly cadence) so it appears as a proper connector card instead of a raw `career-jobs` row with a mis-flagged interval.
+- `src/app/utilities/page.tsx`: career sources show under the Career Job Watch connector with the `source:` prefix stripped (Anthropic, OpenAI, …), and a `CJ` icon. Revolut surfaces as the unhealthy account with its Cloudflare error.
+- No schema change; both surfaces read existing `sync_account_status` / `sync_status` data.
+
 ### Stricter seniority filter, legal/audit/accounting excluded, facet z-index fix (v3.20.1)
 
 Tightened the watch to genuine senior leadership and fixed a filter-dropdown layering bug.

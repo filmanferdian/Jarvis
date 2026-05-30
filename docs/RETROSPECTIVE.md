@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-30 — v3.20.2 — Career data-pull health check (page + Utilities)
+
+Surfaced per-source data-pull health on the Career page (a "Sources" strip with status dots and fetched counts) and under Utilities (a Career Job Watch connector card with the six sources).
+
+**Well:**
+- Almost no new plumbing: the sync already wrote per-source result/error/count to sync_account_status under sync_type career-jobs, and sync_status already had the career-jobs row. So this was mostly surfacing existing data — one field added to the career API, a strip component, one expected-interval entry, and a label prettify.
+- The strip shows the raw fetched count, which cleanly separates "source is broken" from "source works but has no senior matches." GoTo (12) and Stripe (62) read as healthy green even though they currently contribute zero roles after the seniority filter, which is exactly the right signal.
+- Reused the existing ConnectorCard for Utilities, so the career card looks identical to every other integration with zero new UI risk.
+
+**Wrong:**
+- Verified the Utilities card via the API plus the known-good ConnectorCard rather than a live browser render, because that page only fetches on mount and needs real auth, which makes a preview-mode mock fiddly. Low risk here, but it is the second time this session that the auth-gated, mount-only pages have been awkward to eyeball.
+- The Career Job Watch connector now sits at a permanent "warning" because Revolut (best-effort) always errors. Correct as a raw health view, but Utilities does not know Revolut is intentionally best-effort, so the amber is slightly louder than it needs to be.
+
+**Next:**
+- If the permanent Revolut amber on Utilities becomes noise, teach the integrations API about best-effort accounts so an expected failure reads as informational rather than a warning.
+- A small preview-mode auth shim (NEXT_PUBLIC_DEV_AUTO_LOGIN, already on the backlog) would make these mount-only authed pages verifiable in the browser.
+
 ## 2026-05-30 — v3.20.1 — Stricter seniority filter + facet z-index fix
 
 Follow-up to v3.20.0 from a mobile screenshot. Replaced the below-bar exclude with a positive seniority gate (keep only Head/VP/GM/Director/Lead-level), added legal/audit/accounting/tax to the hard-excludes, un-excluded architecture, and fixed the facet dropdown rendering behind the wrapped-row buttons.
