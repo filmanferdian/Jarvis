@@ -75,6 +75,16 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: '/investments',
+    label: 'Investments',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19V5M4 19h16" />
+        <path d="M7 15l4-4 3 3 5-6" />
+      </svg>
+    ),
+  },
+  {
     href: '/utilities',
     label: 'Utilities',
     icon: (
