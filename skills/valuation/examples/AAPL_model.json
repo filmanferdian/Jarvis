@@ -1,0 +1,41 @@
+{
+  "company": "Apple Inc.",
+  "ticker": "AAPL",
+  "currency": "USD",
+  "units": "billions",
+  "valuation_date": "2026-05-29",
+  "forecast": [
+    {"year": 2026, "fcf": 105},
+    {"year": 2027, "fcf": 111},
+    {"year": 2028, "fcf": 117},
+    {"year": 2029, "fcf": 123},
+    {"year": 2030, "fcf": 129},
+    {"year": 2031, "fcf": 135},
+    {"year": 2032, "fcf": 141},
+    {"year": 2033, "fcf": 146},
+    {"year": 2034, "fcf": 151},
+    {"year": 2035, "fcf": 156}
+  ],
+  "wacc": {
+    "risk_free": 0.04,
+    "erp": 0.045,
+    "beta": 1.06,
+    "pretax_cost_of_debt": 0.045,
+    "tax_rate": 0.16,
+    "equity_weight": 0.979,
+    "debt_weight": 0.021,
+    "midyear": true
+  },
+  "continuing_value": {
+    "method": "key_value_driver",
+    "growth": 0.025,
+    "ronic": 0.18,
+    "noplat_next": 185
+  },
+  "bridge": {
+    "nonoperating_assets": 124,
+    "debt_and_equivalents": 98.66,
+    "other_claims": 0,
+    "shares_outstanding": 14.69
+  }
+}
