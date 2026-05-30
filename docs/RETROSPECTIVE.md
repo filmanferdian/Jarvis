@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-30 — v3.19.3 — Grab and GoTo sources + below-bar title pre-filter
+
+Added Grab (SmartRecruiters) and GoTo (gotocompany.com JSON API) as the fifth and sixth sources, and introduced a seniority pre-filter to stop high-volume employers from flooding the scorer.
+
+**Well:**
+- Probed the four ATS APIs first: Grab is on SmartRecruiters, and GoTo's client-rendered SPA turned out to be backed by a clean public JSON endpoint found by reading its careers bundle. No scraping needed for either.
+- Caught the volume problem before shipping rather than after: Grab alone passed 189 in-region roles, which would have dominated the shared 40-per-run Claude budget on Tue/Thu scan days, right before the briefing. Added a below-bar title filter aligned with Filman's Director/Head bar, with a senior-override so "Associate Director" and "Chief Risk Officer" survive. Verified against 16 cases before scanning.
+- The first scan produced a genuine fit (OpenAI Head of APAC Growth Markets, 85) plus Grab strategy partials, so the default view is now populated.
+
+**Wrong:**
+- A high-volume source plus the 40-per-run cap plus the 50-per-day shared Claude budget is an awkward combination: 145 kept means scoring takes roughly four scan-days to catch up, and each catch-up run eats most of the day's budget right before the morning brief. The pre-filter helps but the structural tension remains.
+- Grab's list endpoint has no job description, so those roles score on title alone, which is weaker. The three Grab partials are plausible but lower-confidence than the JD-backed OpenAI ones.
+
+**Next:**
+- Decouple career scoring from the shared daily Claude budget, or schedule the career cron well clear of the 07:30 briefing window, so a big catch-up run cannot starve the morning brief.
+- Optionally enrich Grab roles with the SmartRecruiters detail endpoint (JD) for kept roles only, to lift scoring confidence without fetching all 348 descriptions.
+
 ## 2026-05-29 — v3.19.2 — OpenAI added as a fourth career source
 
 Broadened the watch to OpenAI. It runs on Ashby's public posting API, so it dropped in next to the Anthropic Greenhouse source with no scraping.

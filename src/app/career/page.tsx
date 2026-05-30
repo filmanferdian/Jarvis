@@ -158,7 +158,7 @@ export default function CareerPage() {
               Career
             </h1>
             <p className="text-[12px] text-jarvis-text-dim mt-0.5">
-              In-region roles at Anthropic, OpenAI, Stripe, and Revolut, scored against your profile
+              In-region roles at Anthropic, OpenAI, Grab, GoTo, Stripe, and Revolut, scored against your profile
             </p>
             {data?.lastRefreshedAt && (
               <p className="text-[11px] font-mono text-jarvis-text-faint mt-0.5">
