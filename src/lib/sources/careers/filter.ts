@@ -20,17 +20,21 @@ export function passesLocationGate(location: string | null | undefined): boolean
 }
 
 // Drop-before-LLM categories, matched against title + department. Keeps noise
-// out: engineering/ML/research, design/UX, support specialists, financial-crime
-// analyst/ops, internships and early-career.
+// out: engineering/ML/research, design/UX, support specialists, financial-crime,
+// internships, plus the support/control functions Filman explicitly ruled out
+// (legal, audit, accounting/tax). Architecture is NOT excluded — Filman counts
+// it as relevant — so senior architecture roles are allowed through.
 const HARD_EXCLUDE = [
   /\bengineer(ing)?\b/i,
   /\bdeveloper\b/i,
-  /\barchitect\b/i,
   /machine learning|\bml\b|research scientist|research engineer/i,
   /\bdesign(er)?\b|\bux\b|\bui\b/i,
   /product support|support specialist|customer support|technical support/i,
   /\baml\b|anti-money|financial crime|fraud analyst|compliance analyst/i,
   /\bintern(ship)?\b|new grad|early career|graduate program|apprentice/i,
+  /\blegal\b|\bcounsel\b|paralegal/i,
+  /\baudit(or|ing)?\b/i,
+  /\baccount(ing|ant)\b|\btax\b/i,
 ];
 
 export function isHardExcluded(title: string, department: string | null | undefined): boolean {
@@ -38,23 +42,19 @@ export function isHardExcluded(title: string, department: string | null | undefi
   return HARD_EXCLUDE.some((re) => re.test(haystack));
 }
 
-// Below-bar titles: clearly junior or IC-level roles that sit under Filman's
-// Director / Head / regional-lead bar, so the LLM would always score them not a
-// fit. Dropping them before scoring cuts cost and noise (matters most for
-// traditional-title employers like Grab and GoTo where these dominate volume).
-const BELOW_BAR =
-  /\b(associate|assistant|officer|coordinator|analyst|specialist|representative|administrator|clerk|executive assistant)\b/i;
-// Senior markers that override a below-bar word (e.g. "Associate Director",
-// "Chief Risk Officer" must NOT be dropped on "associate" / "officer").
-const SENIOR_OVERRIDE =
-  /\b(head|director|chief|vice president|vp|president|partner|principal|managing director|general manager|country manager|gm)\b/i;
+// Seniority gate: Filman wants leadership only — Head, VP, GM, Director, or Lead
+// level (10+ years). Plain "Manager" / "Senior Manager" and anything more junior
+// are dropped. Higher titles (Chief, President, Principal, Managing Director)
+// also qualify. "General/Country Manager" count (GM-level) even though they
+// contain "Manager"; a bare "Manager" does not.
+const SENIOR_TITLE =
+  /\b(head|chief|president|vice president|vp|director|principal|managing director|general manager|country manager|gm|lead(?:er)?)\b/i;
 
-export function isBelowBar(title: string): boolean {
-  if (SENIOR_OVERRIDE.test(title)) return false;
-  return BELOW_BAR.test(title);
+export function hasSeniorTitle(title: string): boolean {
+  return SENIOR_TITLE.test(title);
 }
 
 // True if a role should be kept for LLM scoring.
 export function shouldScore(title: string, department: string | null, location: string | null): boolean {
-  return passesLocationGate(location) && !isHardExcluded(title, department) && !isBelowBar(title);
+  return passesLocationGate(location) && hasSeniorTitle(title) && !isHardExcluded(title, department);
 }

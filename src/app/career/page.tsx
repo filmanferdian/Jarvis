@@ -85,16 +85,20 @@ function coverageScope(title: string): Scope {
 }
 
 // Normalized function category from department + title (cross-company taxonomy).
-// Ordered most-specific first; first match wins.
+// Ordered most-specific first; first match wins. Tuned to Filman's relevant
+// areas: strategy, GTM, product, architecture, general management / P&L.
 function workType(department: string | null, title: string): string {
   const h = `${title} ${department || ''}`.toLowerCase();
-  if (/\baudit|enterprise risk|\brisk\b|compliance|controls\b/.test(h)) return 'Risk & Audit';
   if (/policy|public affairs|government|regulat|global affairs/.test(h)) return 'Policy & Public Affairs';
+  if (/general manager|country manager|managing director|business unit|\bp&l\b|chief executive|chief operating/.test(h))
+    return 'General Management';
   if (/strateg|corp(orate)? dev|chief of staff|business operations|biz ?ops|\bplanning\b/.test(h)) return 'Strategy';
-  if (/financ|treasury|\btax\b|accounting|controller|fp&a/.test(h)) return 'Finance';
+  if (/architect/.test(h)) return 'Architecture';
+  if (/product manager|product lead|\bproduct\b/.test(h)) return 'Product';
   if (/sales|account (executive|director|manager)|business development|\bbd\b|go.?to.?market|\bgtm\b|revenue|partnership|client partner|commercial|deployment/.test(h))
     return 'GTM & Sales';
-  if (/product manager|product lead|\bproduct\b/.test(h)) return 'Product';
+  if (/financ|treasury|controller|fp&a/.test(h)) return 'Finance';
+  if (/enterprise risk|\brisk\b|compliance|controls\b/.test(h)) return 'Risk';
   if (/marketing|\bbrand\b|growth|demand gen|\bevents\b/.test(h)) return 'Marketing';
   if (/operations|\bops\b|supply chain|program manager|\bpmo\b|delivery|logistics/.test(h)) return 'Operations';
   if (/people|talent|recruit|human resources|\bhr\b|culture|employee/.test(h)) return 'People';
@@ -442,7 +446,7 @@ function FacetMenu({
         </svg>
       </button>
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 min-w-[210px] max-h-[320px] overflow-auto rounded-[10px] border border-jarvis-border bg-jarvis-bg-card p-1.5 shadow-lg">
+        <div className="absolute left-0 top-full mt-1 z-50 min-w-[210px] max-h-[320px] overflow-auto rounded-[10px] border border-jarvis-border bg-jarvis-bg-card p-1.5 shadow-lg">
           {options.length === 0 && (
             <div className="px-2 py-1.5 text-[12px] text-jarvis-text-faint">No options</div>
           )}
