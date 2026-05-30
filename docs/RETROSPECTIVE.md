@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-30 — v3.20.1 — Stricter seniority filter + facet z-index fix
+
+Follow-up to v3.20.0 from a mobile screenshot. Replaced the below-bar exclude with a positive seniority gate (keep only Head/VP/GM/Director/Lead-level), added legal/audit/accounting/tax to the hard-excludes, un-excluded architecture, and fixed the facet dropdown rendering behind the wrapped-row buttons.
+
+**Well:**
+- Switched from "exclude the junior words" to "require a senior word," which is both simpler and exactly what Filman asked for (no Manager). Verified 19 title cases including the tricky ones (General Manager kept, Senior Manager dropped, Director Accounts Receivable kept while Senior Accounting Manager dropped, architecture kept while engineering still excluded).
+- The re-scan did the cleanup for free: the new filter closed the 46 now-disqualified rows via the existing close-detection, then a single delete swept them. The watch self-corrected to 30 fully-scored senior roles with no hand-curation.
+- Caught that the result is genuinely better, not just smaller: the OpenAI fit held, and Grab surfaced real Jakarta strategy/product roles (Head, Jabo Mobility Strategy; Lead Product Manager) that the looser filter had buried under sub-Director noise.
+
+**Wrong:**
+- The z-index bug shipped in v3.20.0 because I only verified the facets on desktop, where all four sit on one row and the dropdown never overlaps a sibling button. On mobile the bar wraps and the dropdown rendered behind the second-row button. Should have checked the wrapped mobile layout before shipping a new dropdown component.
+- GoTo and Stripe both dropped to zero under the seniority bar. Correct for now (their current SG/Jakarta openings are all Manager/specialist/audit level), but a source showing zero is worth a glance to confirm it is the filter, not a fetch regression.
+
+**Next:**
+- If GoTo/Stripe stay at zero for several scans, consider surfacing a small "0 senior roles right now" note per source so an empty company reads as intentional rather than broken.
+- The work-type taxonomy keeps growing by hand (now 13 categories); fine, but it is the kind of map that drifts, so revisit when adding the next source.
+
 ## 2026-05-30 — v3.20.0 — Career filters + Singapore/Jakarta base restriction
 
 Restricted the watch to Singapore/Jakarta-based roles only (Filman confirmed those are his only acceptable bases, Jakarta preferred) and added four client-side filter facets to the page: Company, Base, Scope (mandate breadth), and Type of work (normalized function taxonomy).

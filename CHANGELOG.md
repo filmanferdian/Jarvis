@@ -6,6 +6,15 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.20] — 2026-05-30 — Career page filters + Singapore/Jakarta base restriction (v3.20.0)
 
+### Stricter seniority filter, legal/audit/accounting excluded, facet z-index fix (v3.20.1)
+
+Tightened the watch to genuine senior leadership and fixed a filter-dropdown layering bug.
+
+- `src/lib/sources/careers/filter.ts`: replaced the below-bar exclude with a positive seniority gate. A role is kept only if its title carries a senior marker (Head, Chief, President, VP, Director, Principal, Managing Director, General/Country Manager, or Lead/Leader). Plain Manager and Senior Manager are now dropped. Added legal, counsel, audit, accounting, and tax to the hard-excludes (Filman ruled those functions out). Removed the architect exclude, since architecture is relevant. Verified against 19 title cases.
+- `src/app/career/page.tsx`: the facet dropdown panel now has `z-50` so it layers above the other facet buttons (it was rendering behind "Type of work" on the wrapped mobile layout). The work-type taxonomy gained General Management (GM / P&L / business-unit) and Architecture categories, renamed Risk & Audit to Risk (audit is now excluded), and dropped tax/accounting from Finance.
+- Re-scan + cleanup: the new filter closed 46 disqualified roles (Manager-level, audit, etc.), which were then deleted, and scored the remaining qualifying roles. The watch now holds 30 fully-scored Singapore/Jakarta senior roles (Grab 17, OpenAI 13); GoTo and Stripe dropped to zero as none of their current open roles cleared the seniority bar. Default view shows 1 fit plus 12 partial.
+
+
 The career watch is now restricted to roles based in Singapore or Jakarta (Filman's only acceptable bases), and the page gains four client-side filter facets.
 
 - `src/lib/sources/careers/filter.ts`: the location gate now keeps a role only if its base location names Singapore or Indonesia/Jakarta. Dropped the rest of SEA (KL, Bangkok, Manila, HCMC), broad APAC/remote, and everything else. One-time production cleanup deleted 70 out-of-base rows; 75 Singapore/Jakarta rows remain.
