@@ -4,6 +4,20 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.21] – 2026-05-30 – Investments watchlist: last price vs valuation fair-value range, drill-in memos (v3.21.0)
+
+New Investments page (`/investments`): a watchlist grouped by exchange then industry, each row showing the last price against the valuation fair-value range and a verdict pill with upside, plus a "Details" link that drills into the full exec-summary memo. Valuations and memos are read live from the Notion "Valuation models (DCF)" database (joined by ticker); the watchlist universe lives in code. Prices are refreshed by a cron job a few times a day (around each exchange's mid-day and close) and stored, rather than pulled live on every page load. This suits a fundamental-investor cadence and avoids hammering the upstream.
+
+- `supabase/migration-030-investment-quotes.sql`: new `investment_quotes` table (one row per ticker: price, currency, change_pct, fetched_at). RLS enabled with no permissive policy (service-role key only, matching migration-027). Applied to production.
+- `src/data/watchlist.ts`: the watchlist universe (exchange, industry, company) plus helpers (`flatCompanies`, `yahooSymbol`). The US "AI infrastructure & platforms" group is split into Semiconductors (NVDA, AVGO, TSM), Platforms & big tech (MSFT, GOOGL, META, AMZN, AAPL), and Software & dev infra (NET, DDOG, GTLB). SGX banks carry explicit Yahoo codes (D05.SI, O39.SI, U11.SI).
+- `src/lib/investments/valuation.ts`: live reader for the Notion DCF database. `listValuations()` returns structured props for every memo (now including fair-value low/high); `getMemoForTicker()` returns the full markdown plus props. Day-keyed in-memory cache so navigation does not re-hit Notion. Added `Fair value low` and `Fair value high` number columns to the Notion database and backfilled BBCA from its sensitivity run.
+- `src/lib/investments/quotes.ts`: per-symbol fetch from Yahoo's public chart endpoint with a browser User-Agent, a per-request timeout, and a short cache. Never throws; returns a null price on any failure.
+- `src/lib/sync/investmentQuotes.ts`: `syncInvestmentQuotes()` pulls every watchlist symbol and upserts only the priced rows, so a transient upstream failure never blanks the last good value. `getStoredQuotes()` reads the last stored quote per ticker plus the most recent refresh time.
+- `src/app/api/investments/route.ts` (GET, cookie auth): three modes (valuations list, stored quotes, single-ticker memo), all routed through `safeError`.
+- `src/app/api/cron/investment-quotes/route.ts` (GET, cron auth): the scheduled refresh entry point wrapped in `runCronJob`.
+- `src/app/investments/page.tsx`: the master-detail UI, with XSS-safe memo rendering via `src/lib/investments/renderMemo.ts`. `src/components/Sidebar.tsx`: new Investments nav item.
+- Scheduling is a manual cron-job.org step (no workflow file is checked in): runs covering each exchange's mid-day and close in WIB. Prices populate on the first successful run.
+
 ## [3.20] — 2026-05-30 — Career page filters + Singapore/Jakarta base restriction (v3.20.0)
 
 ### Career data-pull health check on the page and in Utilities (v3.20.2)

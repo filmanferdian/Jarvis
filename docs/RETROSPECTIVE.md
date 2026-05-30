@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-30 – v3.21.0 – Investments watchlist (last price vs fair-value range, drill-in memos)
+
+New /investments page: a watchlist grouped by exchange and industry, each row showing the last price against the valuation fair-value range with a verdict and a drill-in to the full memo. Valuations and memos read live from Notion; prices are refreshed by a cron a few times a day and stored, not pulled live.
+
+**Well:**
+- Reused existing patterns end to end: the Notion REST reader mirrors the other Notion syncs, the cron route uses the same withCronAuth plus runCronJob wrapper as every other job, and the page leans on AppShell and existing card styling. Little new plumbing.
+- Switching prices from live-on-load to a stored cron refresh hit two goals at once: it matches the fundamental-investor cadence the user asked for, and it sidesteps the Yahoo rate-limiting that blocks the dev IP, since pulls become infrequent and run from Railway.
+- Upserting only priced rows means a transient upstream failure leaves the last good price in place instead of blanking the column.
+
+**Wrong:**
+- Could not exercise the populated price path locally: Yahoo rate-limits this dev IP and the quotes table is empty until the first production cron run, so the price column shows placeholders until then. Verified structure, fair-value range, verdict, and the drill-in memo, but not live prices end to end.
+- The watchlist universe lives in code while valuations live in Notion, joined by ticker. Fine for one user, but a ticker typo on either side silently shows "No analysis" with no warning.
+
+**Next:**
+- After the first cron run, confirm prices populate for all three exchanges (IDX, SGX, US). If Railway's IP is also rate-limited by Yahoo, add a keyed provider (Twelve Data covers IDX, SGX, US on a free tier) as a fallback.
+- Set up the cron-job.org schedule (WIB runs covering each exchange's mid-day and close).
+
 ## 2026-05-30 — v3.20.2 — Career data-pull health check (page + Utilities)
 
 Surfaced per-source data-pull health on the Career page (a "Sources" strip with status dots and fetched counts) and under Utilities (a Career Job Watch connector card with the six sources).
