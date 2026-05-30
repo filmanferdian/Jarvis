@@ -63,12 +63,57 @@ function formatWibDate(iso: string): string {
   return `${wib.getUTCFullYear()}-${String(wib.getUTCMonth() + 1).padStart(2, '0')}-${String(wib.getUTCDate()).padStart(2, '0')}`;
 }
 
+// Base city/country where the role sits (gate guarantees Singapore or Jakarta).
+// A compound location can match both.
+function baseRegions(location: string | null): string[] {
+  const l = (location || '').toLowerCase();
+  const out: string[] = [];
+  if (l.includes('singapore')) out.push('Singapore');
+  if (l.includes('jakarta') || l.includes('indonesia')) out.push('Jakarta');
+  return out;
+}
+
+// Breadth of the role's mandate, inferred from the title.
+type Scope = 'Global' | 'APAC' | 'SEA' | 'Country';
+const SCOPE_ORDER: Scope[] = ['Global', 'APAC', 'SEA', 'Country'];
+function coverageScope(title: string): Scope {
+  const t = title.toLowerCase();
+  if (/\bglobal\b|worldwide/.test(t)) return 'Global';
+  if (/\bapac\b|asia[\s-]?pacific|\basia\b/.test(t)) return 'APAC';
+  if (/\bsea\b|south[\s-]?east asia/.test(t)) return 'SEA';
+  return 'Country';
+}
+
+// Normalized function category from department + title (cross-company taxonomy).
+// Ordered most-specific first; first match wins.
+function workType(department: string | null, title: string): string {
+  const h = `${title} ${department || ''}`.toLowerCase();
+  if (/\baudit|enterprise risk|\brisk\b|compliance|controls\b/.test(h)) return 'Risk & Audit';
+  if (/policy|public affairs|government|regulat|global affairs/.test(h)) return 'Policy & Public Affairs';
+  if (/strateg|corp(orate)? dev|chief of staff|business operations|biz ?ops|\bplanning\b/.test(h)) return 'Strategy';
+  if (/financ|treasury|\btax\b|accounting|controller|fp&a/.test(h)) return 'Finance';
+  if (/sales|account (executive|director|manager)|business development|\bbd\b|go.?to.?market|\bgtm\b|revenue|partnership|client partner|commercial|deployment/.test(h))
+    return 'GTM & Sales';
+  if (/product manager|product lead|\bproduct\b/.test(h)) return 'Product';
+  if (/marketing|\bbrand\b|growth|demand gen|\bevents\b/.test(h)) return 'Marketing';
+  if (/operations|\bops\b|supply chain|program manager|\bpmo\b|delivery|logistics/.test(h)) return 'Operations';
+  if (/people|talent|recruit|human resources|\bhr\b|culture|employee/.test(h)) return 'People';
+  if (/data scien|analytics|economist/.test(h)) return 'Data';
+  return 'Other';
+}
+
 export default function CareerPage() {
   const [data, setData] = useState<CareerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAll, setShowAll] = useState(false); // false => fit + partial only
   const [showClosed, setShowClosed] = useState(false);
+  // Facet filters (empty set => no constraint).
+  const [fCompany, setFCompany] = useState<Set<string>>(new Set());
+  const [fBase, setFBase] = useState<Set<string>>(new Set());
+  const [fScope, setFScope] = useState<Set<string>>(new Set());
+  const [fWork, setFWork] = useState<Set<string>>(new Set());
+  const [openFacet, setOpenFacet] = useState<string | null>(null);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -118,10 +163,34 @@ export default function CareerPage() {
     }
   };
 
+  // Facet options + counts, computed over the closed-filtered set.
+  const facets = useMemo(() => {
+    const open = (data?.jobs || []).filter((j) => showClosed || !j.closed_at);
+    const tally = (pick: (j: CareerJob) => string[]) => {
+      const m = new Map<string, number>();
+      for (const j of open) for (const v of pick(j)) m.set(v, (m.get(v) || 0) + 1);
+      return m;
+    };
+    const sortAlpha = (m: Map<string, number>) =>
+      [...m.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => a.value.localeCompare(b.value));
+    const company = sortAlpha(tally((j) => [j.company]));
+    const base = sortAlpha(tally((j) => baseRegions(j.location)));
+    const scopeMap = tally((j) => [coverageScope(j.title)]);
+    const scope = SCOPE_ORDER.filter((s) => scopeMap.has(s)).map((s) => ({ value: s, count: scopeMap.get(s)! }));
+    const work = [...tally((j) => [workType(j.department, j.title)]).entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+    return { company, base, scope, work };
+  }, [data, showClosed]);
+
   const grouped = useMemo(() => {
     const jobs = (data?.jobs || []).filter((j) => {
       if (!showClosed && j.closed_at) return false;
       if (!showAll && (j.fit_verdict === 'not_fit' || j.fit_verdict === null)) return false;
+      if (fCompany.size && !fCompany.has(j.company)) return false;
+      if (fBase.size && !baseRegions(j.location).some((b) => fBase.has(b))) return false;
+      if (fScope.size && !fScope.has(coverageScope(j.title))) return false;
+      if (fWork.size && !fWork.has(workType(j.department, j.title))) return false;
       return true;
     });
     const byCompany = new Map<string, CareerJob[]>();
@@ -138,15 +207,37 @@ export default function CareerPage() {
       });
     }
     return [...byCompany.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [data, showAll, showClosed]);
+  }, [data, showAll, showClosed, fCompany, fBase, fScope, fWork]);
 
   const failedSources = (data?.sources || []).filter(
     (s) => !s.ok && !BEST_EFFORT_SOURCES.includes(s.company),
   );
   const totalShown = grouped.reduce((n, [, list]) => n + list.length, 0);
+  const anyFilter = fCompany.size + fBase.size + fScope.size + fWork.size > 0;
+  const clearAllFilters = () => {
+    setFCompany(new Set());
+    setFBase(new Set());
+    setFScope(new Set());
+    setFWork(new Set());
+    setOpenFacet(null);
+  };
+  const toggleIn = (
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+    value: string,
+  ) =>
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
 
   return (
     <AppShell>
+      {/* Backdrop to close any open facet menu on outside click. */}
+      {openFacet && (
+        <div className="fixed inset-0 z-30" onClick={() => setOpenFacet(null)} aria-hidden="true" />
+      )}
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-baseline justify-between gap-4 flex-wrap">
@@ -158,7 +249,7 @@ export default function CareerPage() {
               Career
             </h1>
             <p className="text-[12px] text-jarvis-text-dim mt-0.5">
-              In-region roles at Anthropic, OpenAI, Grab, GoTo, Stripe, and Revolut, scored against your profile
+              Singapore and Jakarta roles at Anthropic, OpenAI, Grab, GoTo, Stripe, and Revolut, scored against your profile
             </p>
             {data?.lastRefreshedAt && (
               <p className="text-[11px] font-mono text-jarvis-text-faint mt-0.5">
@@ -194,6 +285,54 @@ export default function CareerPage() {
             ))}
           </div>
         )}
+
+        {/* Facet filters */}
+        <div className="relative z-40 flex gap-2 flex-wrap items-center">
+          <FacetMenu
+            label="Company"
+            options={facets.company}
+            selected={fCompany}
+            onToggle={(v) => toggleIn(setFCompany, v)}
+            onClear={() => setFCompany(new Set())}
+            isOpen={openFacet === 'company'}
+            onOpen={() => setOpenFacet(openFacet === 'company' ? null : 'company')}
+          />
+          <FacetMenu
+            label="Base"
+            options={facets.base}
+            selected={fBase}
+            onToggle={(v) => toggleIn(setFBase, v)}
+            onClear={() => setFBase(new Set())}
+            isOpen={openFacet === 'base'}
+            onOpen={() => setOpenFacet(openFacet === 'base' ? null : 'base')}
+          />
+          <FacetMenu
+            label="Scope"
+            options={facets.scope}
+            selected={fScope}
+            onToggle={(v) => toggleIn(setFScope, v)}
+            onClear={() => setFScope(new Set())}
+            isOpen={openFacet === 'scope'}
+            onOpen={() => setOpenFacet(openFacet === 'scope' ? null : 'scope')}
+          />
+          <FacetMenu
+            label="Type of work"
+            options={facets.work}
+            selected={fWork}
+            onToggle={(v) => toggleIn(setFWork, v)}
+            onClear={() => setFWork(new Set())}
+            isOpen={openFacet === 'work'}
+            onOpen={() => setOpenFacet(openFacet === 'work' ? null : 'work')}
+          />
+          {anyFilter && (
+            <button
+              onClick={clearAllFilters}
+              className="px-3 py-1.5 text-[12px] rounded-full text-jarvis-text-faint hover:text-jarvis-text-dim"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
 
         {/* Toggles */}
         <div className="flex gap-2 flex-wrap items-center">
@@ -264,6 +403,89 @@ export default function CareerPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function FacetMenu({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+  isOpen,
+  onOpen,
+}: {
+  label: string;
+  options: { value: string; count: number }[];
+  selected: Set<string>;
+  onToggle: (v: string) => void;
+  onClear: () => void;
+  isOpen: boolean;
+  onOpen: () => void;
+}) {
+  const active = selected.size > 0;
+  return (
+    <div className="relative">
+      <button
+        onClick={onOpen}
+        className="px-3 py-1.5 text-[12px] rounded-full border transition-colors flex items-center gap-1.5"
+        style={{
+          background: active ? 'var(--color-jarvis-cta-soft)' : 'transparent',
+          borderColor: active ? 'var(--color-jarvis-cta)' : 'var(--color-jarvis-border)',
+          color: active ? 'var(--color-jarvis-cta)' : 'var(--color-jarvis-text-dim)',
+        }}
+      >
+        {label}
+        {active ? ` · ${selected.size}` : ''}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 min-w-[210px] max-h-[320px] overflow-auto rounded-[10px] border border-jarvis-border bg-jarvis-bg-card p-1.5 shadow-lg">
+          {options.length === 0 && (
+            <div className="px-2 py-1.5 text-[12px] text-jarvis-text-faint">No options</div>
+          )}
+          {options.map((o) => {
+            const on = selected.has(o.value);
+            return (
+              <button
+                key={o.value}
+                onClick={() => onToggle(o.value)}
+                className="w-full flex items-center justify-between gap-3 px-2 py-1.5 rounded-md text-[12.5px] hover:bg-jarvis-bg-deep text-left"
+                style={{ color: on ? 'var(--color-jarvis-cta)' : 'var(--color-jarvis-text-dim)' }}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className="w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center flex-shrink-0"
+                    style={{
+                      borderColor: on ? 'var(--color-jarvis-cta)' : 'var(--color-jarvis-border)',
+                      background: on ? 'var(--color-jarvis-cta)' : 'transparent',
+                    }}
+                  >
+                    {on && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>
+                    )}
+                  </span>
+                  {o.value}
+                </span>
+                <span className="text-[11px] text-jarvis-text-faint">{o.count}</span>
+              </button>
+            );
+          })}
+          {active && (
+            <button
+              onClick={onClear}
+              className="w-full mt-1 px-2 py-1.5 text-[11px] text-jarvis-text-faint hover:text-jarvis-text-dim text-left border-t border-jarvis-border"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
