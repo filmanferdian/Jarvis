@@ -6,7 +6,28 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
-_Empty — all items shipped._
+### 2026-05-31 — Security hardening wave: OAuth, Garmin secrets, dependencies
+
+**Context:** Security review on 2026-05-31 covered auth, OAuth, secrets, Supabase/RLS, prompt-injection surfaces, input validation, storage/media URLs, dependency audit, n8n workflow artifacts, and the existing backlog. The app already has several strong defenses: timing-safe auth comparisons, signed OAuth state cookies, server-only service-role Supabase access, tightened RLS policies, centralized session cookie attributes, and escaped markdown rendering before `dangerouslySetInnerHTML`.
+
+**Status (2026-05-31):** First P0 batch shipped in v3.22.0 (commit `6dbecb78a6eb129721135d17ae5035104b883822`): OAuth start routes are auth-gated, Garmin local scripts now require service-role encrypted writes, and dependency audit findings are patched. Remaining from this newly identified high-priority set: prompt-injection defense standardization.
+
+**Highest-priority batch:**
+- **DONE in v3.22.0 — Protect OAuth connect start routes:** wrap `/api/auth/google` and `/api/auth/microsoft` in browser auth, or bind OAuth state to an existing Jarvis session. Today the callback is state-protected, but the connect flow itself can be initiated by anyone.
+- **DONE in v3.22.0 — Clean up Garmin secret handling in local scripts:** update `scripts/seed-garmin-tokens.mjs` and `scripts/backfill-recent.mjs` so they require `SUPABASE_SERVICE_ROLE_KEY`, write encrypted tokens to `garmin_tokens`, never fall back to the publishable/anon key, and encrypt Garmin `raw_json` with `wrapJsonb` when writing daily rows.
+- **DONE in v3.22.0 — Patch dependency vulnerabilities:** `npm audit --audit-level=high` currently reports 7 vulnerabilities: high severity in `next`, `axios`, and `lodash`; moderate in `follow-redirects`, `postcss`, `qs`, and `ws`. `next` is pinned to `16.1.6`; `garmin-connect` brings several vulnerable transitives. Upgrade or override, then rerun audit + build.
+- **Standardize prompt-injection defenses:** apply `sanitizeInline` / `sanitizeMultiline` + `wrapUntrusted` to remaining Claude prompts that embed email/calendar/task data directly: `/api/emails/synthesize`, `/api/emails/style-analysis`, and `/api/briefing/delta`.
+
+**Second batch / fold-ins from existing backlog:**
+- Roll in the 2026-05-02 security leftovers: rate limits for `/api/sync/emails`, `/api/briefing/*`, `/api/contacts/scan`, and `/api/cron/*`; zod schemas + body-size caps for remaining POST handlers; session hardening; Origin/Referer checks; login backoff.
+- Replace the browser session cookie value with a signed session token instead of storing the root `JARVIS_AUTH_TOKEN`; reduce TTL or add revocation if a session table is introduced.
+- Move state-changing browser GET routes like `/api/sync/garmin/run` and `/api/running-analysis/run` to POST.
+- Tighten authenticated/private audio caching, store Supabase Storage object paths instead of persisted signed URLs for delta audio, and mint signed URLs on read.
+- Remove embedded Supabase keys from `n8n-workflows/*.json`; keep keys in n8n credentials or route workflows through Jarvis cron endpoints with scoped cron auth. Also reconcile the README, which still mentions service-role setup, with the current RLS-no-policy posture.
+
+**Existing backlog security opportunities checked:** the 2026-05-02 security item remains the main prior security backlog entry; attachment-aware email triage also requires a separate security review before implementation because it would introduce attachment parsing and phishing/malware exposure.
+
+**Trigger:** First P0 batch is shipped. Next security ship should start with prompt hardening, then pick up the older B/C findings and the remaining second-batch items.
 
 ---
 
@@ -80,6 +101,8 @@ _Empty — all items shipped._
 ### 2026-05-02 — Security: remaining findings from v3.15.0 scan
 
 **Context:** Full security scan in v3.15.0 surfaced eight findings; only A + D + G shipped. Five remain.
+
+**Status (2026-05-31):** Still valid. Fold these into the 2026-05-31 high-priority security hardening wave above so the next security ship can cover old and new findings together.
 
 **Scope:**
 - **B (rate limits):** add limiter coverage to `/api/sync/emails`, `/api/briefing/*`, `/api/contacts/scan`, `/api/cron/*`. The cron endpoints are constant-time-secret-checked but allow unlimited guesses.

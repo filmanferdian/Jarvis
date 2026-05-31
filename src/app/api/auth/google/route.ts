@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { buildAuthUrl } from '@/lib/google';
 import { createState, setStateCookie } from '@/lib/oauthState';
+import { withAuth } from '@/lib/auth';
 
 // GET: Redirect user to Google login for Gmail access.
 // Generates a signed OAuth state, sets it in a cookie, and forwards the state to Google
 // so the callback can verify it (H1 — CSRF / code-injection protection).
-export async function GET() {
+export const GET = withAuth(async (_req: NextRequest) => {
   try {
     const { value: state, cookieValue } = createState();
     const authUrl = buildAuthUrl(state);
@@ -19,4 +20,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});

@@ -1,6 +1,6 @@
 {
   "name": "jarvis",
-  "version": "3.21.0",
+  "version": "3.22.0",
   "private": true,
   "engines": {
     "node": ">=20.9.0"
@@ -14,7 +14,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
     "garmin-connect": "^1.6.2",
-    "next": "16.1.6",
+    "next": "16.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.8.1",
@@ -26,10 +26,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "garmin-connect": "^1.6.2",
-    "next": "16.1.6",
+    "next": "16.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "axios": "1.16.1",
+    "follow-redirects": "1.16.0",
+    "lodash": "4.18.1",
+    "postcss": "8.5.15",
+    "qs": "6.15.2",
+    "ws": "8.21.0"
   }
 }
