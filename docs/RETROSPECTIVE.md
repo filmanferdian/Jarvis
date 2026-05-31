@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-31 — v3.22.0 — Security hardening: OAuth starts, Garmin scripts, dependency audit
+
+Implementation commit: `6dbecb78a6eb129721135d17ae5035104b883822`.
+
+Shipped the first high-priority security batch: OAuth start routes now require Jarvis auth, Garmin local scripts use service-role-only encrypted storage, daily backfills encrypt raw Garmin payloads, and the dependency audit is clean after Next/transitive updates.
+
+**Well:**
+- The OAuth change stayed narrow: only the connect start routes moved behind `withAuth`, while callbacks remain public and protected by the existing signed state cookie flow.
+- The Garmin script cleanup now matches app storage: one script-side crypto helper uses the same `enc:v1` AES-GCM envelope, tokens land only in `garmin_tokens.tokens_encrypted`, and missing service-role credentials fail before any Garmin call.
+- Dependency remediation is explicit and inspectable: Next is on 16.2.6 and the vulnerable transitive packages resolve to patched override versions. Audit now reports zero vulnerabilities.
+
+**Wrong:**
+- `garmin-connect` is CommonJS in these scripts, so the cleanup also needed an import-shape fix while touching the files. Low risk, but it was adjacent rather than part of the original security scope.
+- The build still prints Next's middleware-to-proxy deprecation warning. It does not block the ship, but it is a future framework-maintenance chore.
+
+**Next:**
+- Pick up the remaining high-priority security item: standardize prompt-injection defenses in email synthesis, email style analysis, and briefing delta prompts.
+- Then roll through the older backlog security leftovers: rate limits, zod/body caps, session hardening, Origin/Referer checks, and login backoff.
+
 ## 2026-05-30 – v3.21.0 – Investments watchlist (last price vs fair-value range, drill-in memos)
 
 New /investments page: a watchlist grouped by exchange and industry, each row showing the last price against the valuation fair-value range with a verdict and a drill-in to the full memo. Valuations and memos read live from Notion; prices are refreshed by a cron a few times a day and stored, not pulled live.

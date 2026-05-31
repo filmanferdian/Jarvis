@@ -4,6 +4,19 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
+
+Implementation commit: `6dbecb78a6eb129721135d17ae5035104b883822`.
+
+First high-priority security batch shipped. OAuth connect initiation now requires an authenticated Jarvis browser session, legacy Garmin local scripts no longer write plaintext tokens or raw payloads, and the dependency audit is clean at high severity and overall.
+
+- `src/app/api/auth/google/route.ts` and `src/app/api/auth/microsoft/route.ts`: OAuth start routes now use `withAuth`; unauthenticated direct hits return 401, while authenticated reconnect flows still redirect to Google/Microsoft and set the signed `jarvis_oauth_state` cookie. Callback routes remain public and state-protected.
+- `scripts/crypto-helper.mjs`: new script-side AES-256-GCM helper that matches the app ciphertext envelope (`enc:v1:<iv>:<tag>:<ciphertext>`).
+- `scripts/seed-garmin-tokens.mjs`: requires `SUPABASE_SERVICE_ROLE_KEY` and `CRYPTO_KEY`, removes anon/publishable fallback, writes only `garmin_tokens.tokens_encrypted` for `id = 'default'`, and clears the legacy `sync_status.last_error` for `garmin-tokens`.
+- `scripts/backfill-recent.mjs`: requires service-role Supabase access and crypto configuration, stores Garmin daily `raw_json` as encrypted JSONB (`{ enc: ... }`), and persists refreshed Garmin tokens only through the encrypted token table.
+- `package.json` / `package-lock.json`: bumped Jarvis to v3.22.0, Next to 16.2.6 in dependencies and devDependencies, and pinned patched vulnerable transitives with overrides: axios 1.16.1, follow-redirects 1.16.0, lodash 4.18.1, postcss 8.5.15, qs 6.15.2, ws 8.21.0.
+- Verification: `npm audit --audit-level=high` reports 0 vulnerabilities, `npm ls next axios follow-redirects lodash postcss qs ws` resolves to the patched versions, `npm run build` passes, direct unauthenticated OAuth start requests return 401, authenticated start requests redirect with state cookies, and both Garmin scripts fail fast when `SUPABASE_SERVICE_ROLE_KEY` is missing.
+
 ## [3.21] – 2026-05-30 – Investments watchlist: last price vs valuation fair-value range, drill-in memos (v3.21.0)
 
 New Investments page (`/investments`): a watchlist grouped by exchange then industry, each row showing the last price against the valuation fair-value range and a verdict pill with upside, plus a "Details" link that drills into the full exec-summary memo. Valuations and memos are read live from the Notion "Valuation models (DCF)" database (joined by ticker); the watchlist universe lives in code. Prices are refreshed by a cron job a few times a day (around each exchange's mid-day and close) and stored, rather than pulled live on every page load. This suits a fundamental-investor cadence and avoids hammering the upstream.
