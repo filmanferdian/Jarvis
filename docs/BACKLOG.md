@@ -12,15 +12,17 @@ _Empty — all items shipped._
 
 ## Medium priority
 
-### 2026-05-30 – Investments price source: cron schedule + Yahoo fallback
+### 2026-05-30 – Investments price source: Yahoo blocked, needs keyed provider
 
-**Context:** v3.21.0 shipped the `/investments` page. Prices come from the `investment_quotes` table, refreshed by `/api/cron/investment-quotes`. Two setup/contingency items remain.
+**Context:** v3.21.0 shipped the `/investments` page. Prices come from the `investment_quotes` table, refreshed by `/api/cron/investment-quotes`. The cron job is now set up; the data source is not working.
 
-**Scope:**
-- Cron schedule (setup): add the cron-job.org job hitting the deployed `/api/cron/investment-quotes` with the `x-cron-secret` header. Target a few WIB runs covering each exchange's mid-day and close (IDX and SGX cluster early; US is later in WIB). The price column shows placeholders until the first successful run populates the table.
-- Yahoo fallback: prices use Yahoo's public chart endpoint with no API key. It is rate-limited (429) from the dev IP; the production IP is likely fine, but unverified. If Railway is also blocked, add a keyed provider (Twelve Data covers IDX, SGX, and US on a free tier) behind an env var, falling back to Yahoo. Built only if needed.
+**Status (2026-05-31):**
+- Cron schedule: DONE. cron-job.org job "Investment Quotes Refresh" (id 7705843), Asia/Jakarta, fires daily at 12:30, 16:30, 04:30 WIB (IDX/SGX mid-day, IDX/SGX close, US close). Sends `x-cron-secret` (reuses the existing jobs' secret). Enabled, `saveResponses` on.
+- Yahoo confirmed BLOCKED: HTTP 429 from both the dev IP and the Railway production IP. A manual seed run returned `{fetched:47, priced:0}`. This is IP-based rate-limiting, so the cron stores zero prices on every run. The page degrades gracefully (no price/verdict shown, never crashes).
+- Stooq (keyless) tested as an alternative: covers US only (AAPL.US returns data); IDX (BBCA.JK) and SGX (D05.SI) return no data. Not viable as sole source.
+- Decision (2026-05-31): leave as-is for now. Page shows valuation ranges only, prices blank, until a working source is wired.
 
-**Trigger:** schedule immediately (one-time setup); fallback only if production prices stay blank after the first cron run.
+**Next when revisited:** wire Twelve Data as the primary quote source (free tier 800 req/day covers IDX/SGX/US; our load is ~141/day). Needs a free account + API key behind an env var, plus a symbol-format mapping (Yahoo `BBCA.JK`/`D05.SI`/`AAPL` to Twelve Data symbol + exchange). Verify with a manual cron trigger after wiring.
 
 ### 2026-05-29 — Career job watch follow-ups: Revolut source, scheduling, new-role notification
 
