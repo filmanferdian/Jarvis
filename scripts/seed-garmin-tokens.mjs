@@ -6,19 +6,23 @@
  * to login to Garmin, extract OAuth tokens, and push them to Supabase.
  *
  * Usage:
- *   GARMIN_EMAIL=xxx GARMIN_PASSWORD=xxx SUPABASE_URL=xxx SUPABASE_KEY=xxx node scripts/seed-garmin-tokens.mjs
+ *   GARMIN_EMAIL=xxx GARMIN_PASSWORD=xxx NEXT_PUBLIC_SUPABASE_URL=xxx SUPABASE_SERVICE_ROLE_KEY=xxx CRYPTO_KEY=xxx node scripts/seed-garmin-tokens.mjs
  *
  * Or with .env.local:
  *   node --env-file=.env.local scripts/seed-garmin-tokens.mjs
  */
 
-import { GarminConnect } from 'garmin-connect';
+import garminConnectPkg from 'garmin-connect';
 import { createClient } from '@supabase/supabase-js';
+import { encryptJson } from './crypto-helper.mjs';
+
+const { GarminConnect } = garminConnectPkg;
 
 const email = process.env.GARMIN_EMAIL;
 const password = process.env.GARMIN_PASSWORD;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const cryptoKey = process.env.CRYPTO_KEY;
 
 if (!email || !password) {
   console.error('Missing GARMIN_EMAIL or GARMIN_PASSWORD');
@@ -26,6 +30,10 @@ if (!email || !password) {
 }
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+if (!cryptoKey) {
+  console.error('Missing CRYPTO_KEY');
   process.exit(1);
 }
 
@@ -47,21 +55,25 @@ async function main() {
   const profile = await client.getUserProfile();
   console.log(`Verified: logged in as ${profile.displayName || profile.userName || 'unknown'}`);
 
-  // Push tokens to Supabase
-  const { error } = await supabase.from('sync_status').upsert(
+  // Push encrypted tokens to Supabase
+  const { error } = await supabase.from('garmin_tokens').upsert(
     {
-      sync_type: 'garmin-tokens',
-      last_synced_at: new Date().toISOString(),
-      last_result: 'success',
-      last_error: JSON.stringify(tokens),
+      id: 'default',
+      tokens_encrypted: encryptJson(tokens),
+      updated_at: new Date().toISOString(),
     },
-    { onConflict: 'sync_type' },
+    { onConflict: 'id' },
   );
 
   if (error) {
     console.error('Failed to save tokens to Supabase:', error);
     process.exit(1);
   }
+
+  await supabase
+    .from('sync_status')
+    .update({ last_error: null })
+    .eq('sync_type', 'garmin-tokens');
 
   // Also clear the circuit breaker so the next cron run tries immediately
   await supabase.from('sync_status').upsert(

@@ -8,17 +8,25 @@
  *   node --env-file=.env.local scripts/backfill-recent.mjs 7    # last 7 days
  */
 
-import { GarminConnect } from 'garmin-connect';
+import garminConnectPkg from 'garmin-connect';
 import { createClient } from '@supabase/supabase-js';
+import { encryptJson, wrapJsonb } from './crypto-helper.mjs';
+
+const { GarminConnect } = garminConnectPkg;
 
 const email = process.env.GARMIN_EMAIL;
 const password = process.env.GARMIN_PASSWORD;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const cryptoKey = process.env.CRYPTO_KEY;
 const DAYS = parseInt(process.argv[2] || '3', 10);
 
 if (!email || !password || !supabaseUrl || !supabaseKey) {
   console.error('Missing env vars: GARMIN_EMAIL, GARMIN_PASSWORD, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+if (!cryptoKey) {
+  console.error('Missing env var: CRYPTO_KEY');
   process.exit(1);
 }
 
@@ -95,7 +103,7 @@ function buildRecord(dateStr, raw) {
     endurance_score: null,
     training_load_acute: acuteDTO.dailyTrainingLoadAcute ?? null,
     training_load_chronic: acuteDTO.dailyTrainingLoadChronic ?? null,
-    raw_json: raw,
+    raw_json: wrapJsonb(raw),
     last_synced: new Date().toISOString(),
   };
 }
@@ -128,12 +136,21 @@ async function main() {
 
   // Save tokens for Railway
   const tokens = client.exportToken();
-  await supabase.from('sync_status').upsert({
-    sync_type: 'garmin-tokens',
-    last_synced_at: new Date().toISOString(),
-    last_result: 'success',
-    last_error: JSON.stringify(tokens),
-  }, { onConflict: 'sync_type' });
+  const { error: tokenError } = await supabase.from('garmin_tokens').upsert({
+    id: 'default',
+    tokens_encrypted: encryptJson(tokens),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'id' });
+
+  if (tokenError) {
+    console.error('Failed to save encrypted tokens:', tokenError.message);
+    process.exit(1);
+  }
+
+  await supabase
+    .from('sync_status')
+    .update({ last_error: null })
+    .eq('sync_type', 'garmin-tokens');
 
   console.log('\nDone! Tokens refreshed in Supabase.');
 }
