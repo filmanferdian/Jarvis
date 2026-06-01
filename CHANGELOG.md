@@ -6,6 +6,15 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Investments quotes: replace blocked Yahoo with a Google Sheet (US+IDX) and the SGX API (v3.22.2)
+
+The investments price pull works again. Yahoo's quote endpoint returns HTTP 429 from datacenter IPs (both dev and Railway), so the few-times-a-day refresh was storing zero prices. Replaced Yahoo with two reachable, key-free sources.
+
+- `src/lib/investments/sheetQuotes.ts`: reads US and IDX quotes from a published-to-web Google Sheet of GOOGLEFINANCE formulas in one CSV fetch. The sheet does the per-symbol fan-out; the app parses ticker, price, and changePct (stored as a fraction). The CSV URL defaults in code (public, non-secret) and is overridable via `INVESTMENTS_SHEET_CSV_URL`.
+- `src/lib/investments/sgxQuotes.ts`: reads the three SGX banks (DBS, OCBC, UOB) from SGX's own public delayed-price JSON feed, because Singapore Exchange revoked GOOGLEFINANCE access and Yahoo is blocked. One request returns the whole board; we pick the counter codes we track.
+- `src/lib/sync/investmentQuotes.ts`: now merges the sheet (US + IDX) and the SGX feed, derives currency by exchange (IDR/SGD/USD), and keeps the upsert-only-priced guard so a transient outage never blanks stored values. The Yahoo fetcher (`quotes.ts`) is no longer used.
+- Verification: build passes; the published CSV returns all 44 US+IDX rows priced; the SGX feed returns the three banks' last prices.
+
 ### Prompt-injection hardening for email and delta prompts (v3.22.1)
 
 Closed the remaining high-priority prompt-injection item from the 2026-05-31 security review. The remaining Claude prompt surfaces that embed email/task/calendar-derived data now sanitize fields, wrap external text in explicit untrusted-data delimiters, and include the shared untrusted-content preamble.

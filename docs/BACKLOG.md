@@ -33,9 +33,11 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
-### 2026-05-30 – Investments price source: Yahoo blocked, needs keyed provider
+### 2026-05-30 – Investments price source: Yahoo blocked (RESOLVED 2026-05-31, v3.22.2)
 
-**Context:** v3.21.0 shipped the `/investments` page. Prices come from the `investment_quotes` table, refreshed by `/api/cron/investment-quotes`. The cron job is now set up; the data source is not working.
+**Resolution (2026-05-31, v3.22.2):** replaced Yahoo with two key-free sources. US + IDX now come from a published-to-web Google Sheet of GOOGLEFINANCE formulas (one CSV fetch, parsed in `sheetQuotes.ts`); the three SGX banks come from SGX's own public delayed-price JSON feed (`sgxQuotes.ts`). Twelve Data was dropped: its free tier is US-only and IDX/SGX need the $229/mo Pro plan. Cron job 7705843 unchanged. Verified: published CSV returns all 44 US+IDX rows priced; SGX feed returns DBS/OCBC/UOB. Prod cron-trigger verification pending deploy.
+
+**Context (historical):** v3.21.0 shipped the `/investments` page. Prices come from the `investment_quotes` table, refreshed by `/api/cron/investment-quotes`. The cron job is now set up; the data source is not working.
 
 **Status (2026-05-31):**
 - Cron schedule: DONE. cron-job.org job "Investment Quotes Refresh" (id 7705843), Asia/Jakarta, fires daily at 12:30, 16:30, 04:30 WIB (IDX/SGX mid-day, IDX/SGX close, US close). Sends `x-cron-secret` (reuses the existing jobs' secret). Enabled, `saveResponses` on.

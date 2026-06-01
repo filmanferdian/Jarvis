@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-05-31 — v3.22.2 — Investments quotes: Google Sheet (US+IDX) + SGX API
+
+The Investments price pull was storing zero prices: Yahoo returns HTTP 429 from datacenter IPs. Replaced it with a published Google Sheet of GOOGLEFINANCE formulas for US + IDX and SGX's own public JSON feed for the three Singapore banks. Both are key-free and reachable server-side.
+
+**Well:**
+- Probed providers before committing: confirmed Yahoo blocked on both IPs, Twelve Data free is US-only (IDX/SGX gated to a $229/mo plan), GOOGLEFINANCE no longer covers SGX, then found SGX's own feed works server-side. The chosen design fell out of evidence, not assumption.
+- The sheet offloads per-symbol fan-out to Google, so the app makes one CSV fetch instead of 47 throttled calls; no rate-limit handling needed.
+- Upsert-only-priced guard and per-source graceful degradation mean a flaky source never blanks good data.
+
+**Wrong:**
+- Building the sheet via browser automation hit two avoidable detours: clipboard writes fail on a non-focused tab, and Google Sheets' Tab-to-next-cell anchor resets across automation batches, which scrambled columns the first time. Fixed by entering data in self-positioning per-batch runs.
+- Initially trusted the "Twelve Data free covers 50+ exchanges" headline; the free tier is effectively US-only. Verifying the actual symbols earlier would have saved a round.
+
+**Next:**
+- Verify the prod cron run populates `investment_quotes` (priced > 0) after deploy.
+- GOOGLEFINANCE is ~15-20 min delayed and unofficial; if it drifts, revisit a paid provider (EODHD ~EUR 20/mo) for reliability.
+
 ## 2026-06-01 — v3.22.1 — Prompt-injection hardening for email and delta prompts
 
 Closed the remaining high-priority prompt-injection item from the 2026-05-31 security review. The manual email synthesis, email style-analysis, and briefing delta prompts now sanitize external fields, wrap externally sourced content with `wrapUntrusted`, and include the shared untrusted-content preamble.
