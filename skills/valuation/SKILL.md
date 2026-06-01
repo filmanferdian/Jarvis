@@ -14,7 +14,7 @@ Value is created by investing capital at returns above the cost of capital. Only
 ## What a run produces (3 artifacts)
 
 1. **Excel model** — `scripts/build_model.py` writes an `.xlsx` with live formulas (analyst can edit assumptions and watch value recalc) plus a WACC×growth sensitivity grid.
-2. **Markdown summary** — a written valuation memo (thesis, key drivers, WACC, continuing-value reliance, bridge, sensitivity, risks).
+2. **Markdown summary** — a written valuation memo (thesis, key drivers, WACC, continuing-value reliance, bridge, sensitivity, a synthesis of the underlying assumptions, what it would take for the value to be higher, and risks).
 3. **Notion insights page** — one page per valuation in the running Notion library (see "Notion library" below).
 
 ## The 7-step workflow
@@ -31,6 +31,32 @@ Work the steps in order. Each has a reference doc with the pure 4th-edition meth
 | 5. Continuing value | `reference/05-continuing-value.md` | Key-value-driver CV with RONIC; choose g and RONIC defensibly. |
 | 6. Assemble | `reference/06-assemble.md` | PV of operations + nonoperating − debt − other claims = equity → per share. |
 | 7. Multiples cross-check | `reference/07-multiples.md` | EV/EBITA vs. peers; reconcile to the implied multiple. |
+
+## How to run: checkpoint-gated and sequential (default)
+
+Run every valuation as a guided, step-by-step exercise. Do NOT compute the whole model silently and hand back a finished number. Work the 7 steps in order and STOP at the end of each one as a checkpoint, so the user can reason each assumption and verify progress before you continue. This sequential, gated mode is the default. Only skip the gating if the user explicitly says something like "just run it" or "give me the number".
+
+At every checkpoint:
+1. Show the recast numbers or driver outputs for that step as tight tables, not prose dumps.
+2. Make the one to three value-driving judgment calls for that step explicit, each with your recommended default and the trade-off of every alternative.
+3. Put those judgment calls to the user as quick structured choices using the AskUserQuestion tool (2 to 4 options each, the recommended option first and labelled "(Recommended)"). Never silently pick an assumption that moves value.
+4. Wait for the answer, lock it, then move to the next step.
+
+Number the checkpoints for the user (for example "Checkpoint 3 of 7") and say where you are. Carry locked assumptions forward and do not re-litigate them. Keep each checkpoint short: the user should reason one layer at a time, not read an essay.
+
+Surface the decisions that actually move value at the checkpoint where they first bite. A good default map:
+
+| Checkpoint | Structured choices to put to the user |
+|---|---|
+| 0 to 1. Foundations and data | Base year and any normalization (one-off charges, accelerated depreciation); treatment of large minority interest (book vs fair value); emerging-market handling (country risk in WACC plus a downside and multiples, vs scenario cash flows); marginal tax rate. |
+| 1. Reorganize | Marginal tax rate to lock; how to read the capex-vs-depreciation signal (normalize capex up to depreciation, keep harvesting below it, or reinvest above it). |
+| 2. Analyze | Long-run steady-state revenue growth to converge to; where the NOPLAT margin settles (stabilize, erode, or recover). |
+| 3. Forecast | Explicit horizon (10 vs 15 years); pace of any capex normalization (immediate vs phased). |
+| 4. WACC | Country and equity risk premium level; beta source and level; risk-free normalization in distorted-rate environments. |
+| 5. Continuing value | RONIC in perpetuity (fade to WACC, a modest premium, or a durable moat); terminal growth g. |
+| 6 to 7. Assemble and cross-check | Which case is the headline number (for example fair-value vs book minority); whether to publish the memo and Notion page now. |
+
+If the user asks to go faster, you may batch the remaining low-controversy choices into one AskUserQuestion call, but still show the step's numbers before asking.
 
 **Special situations** (route to the matching doc and adapt): banks/insurers → `reference/special/banks.md` (equity DCF, discount at cost of equity); cyclicals → `reference/special/cyclicals.md` (normalize through the cycle); high-growth/startups → `reference/special/high-growth.md` (start from the future, work backward); emerging markets → `reference/special/emerging-markets.md`; conglomerates → `reference/special/sum-of-parts.md` (value each unit with its own WACC).
 
@@ -103,14 +129,18 @@ If `.venv` does not exist yet (first use on a machine), create it once:
 ## Writing the markdown summary
 
 Write a tight memo (not a data dump):
-- **Verdict** — value per share vs. current price; over/undervalued and by how much.
+- **Verdict** — value per share vs. current price; over/undervalued and by how much, with the fair-value range.
 - **Thesis** — the ROIC-vs-WACC story in 2–3 sentences.
 - **Key drivers** — the 2–3 assumptions the value hinges on (usually long-run margin, growth, WACC).
 - **WACC** — components and the number.
 - **Continuing value reliance** — % of operating value in the CV (from engine output `continuing_value.share_of_operations`); flag if >75%.
 - **Sensitivity** — the WACC×growth grid takeaway.
+- **Synthesis on the underlying assumptions** (REQUIRED). Pull together the handful of assumptions the whole value rests on (the ones the user locked at the checkpoints) and state plainly, for each, how the value moves if it is wrong. This is the heart of the memo: make the reader see which two or three beliefs they are really buying when they accept this number.
+- **What would it take for the value to be higher** (REQUIRED). Name the specific upside levers (higher long-run growth, margin recovery, lower WACC, RONIC persistence, sum-of-the-parts or asset unlocks, capex staying lean, balance-sheet optionality) and quantify roughly what each is worth (per share or in EV), so the gap to the market price is explained rather than asserted. Mirror it with a short downside path (what would make the value lower).
 - **Risks / what would change the call.**
 - **Sources & as-of dates**, and every estimated figure flagged.
+
+The synthesis and the "what would it take for the value to be higher" levers are not optional polish; they are the main output the user wants. Include both in the Notion page body as well.
 
 ## Notion library
 
@@ -126,7 +156,7 @@ Create one page per valuation with `notion-create-pages` using `parent: {"data_s
 - `Verdict` (Undervalued / Fairly valued / Overvalued), `Method` (Enterprise DCF / Equity DCF / Sum-of-parts / Multiples)
 - `CV share of value` (decimal from engine `continuing_value.share_of_operations`), `WACC` (decimal), `Valuation date` (ISO date)
 
-The **page body** is the markdown memo (verdict, thesis, drivers, WACC, CV reliance, sensitivity, risks, sources). Reference the Excel file by name/path — Notion holds the written insights, not the spreadsheet. **Keep Notion content free of code blocks, raw URLs, and SQL-like patterns (Cloudflare WAF).**
+The **page body** is the markdown memo (verdict, thesis, drivers, WACC, CV reliance, sensitivity, the synthesis on underlying assumptions, what would take the value higher, risks, sources). Reference the Excel file by name/path — Notion holds the written insights, not the spreadsheet. **Keep Notion content free of code blocks, raw URLs, and SQL-like patterns (Cloudflare WAF).**
 
 ## Quality checks before reporting (book pitfalls)
 
