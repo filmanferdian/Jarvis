@@ -6,6 +6,16 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Prompt-injection hardening for email and delta prompts (v3.22.1)
+
+Closed the remaining high-priority prompt-injection item from the 2026-05-31 security review. The remaining Claude prompt surfaces that embed email/task/calendar-derived data now sanitize fields, wrap external text in explicit untrusted-data delimiters, and include the shared untrusted-content preamble.
+
+- `src/app/api/emails/synthesize/route.ts`: added runtime request validation for the caller-provided email list (1-50 emails, bounded fields), sanitizes email metadata/snippets, wraps the email block with `wrapUntrusted('untrusted_emails', ...)`, includes `UNTRUSTED_PREAMBLE`, and routes errors through `safeError`.
+- `src/app/api/emails/style-analysis/route.ts`: sanitizes sent-email metadata/body text and wraps the examples with `wrapUntrusted('untrusted_sent_emails', ...)`, because sent email bodies can include quoted external replies.
+- `src/app/api/briefing/delta/route.ts`: sanitizes calendar titles, task titles/priorities, email subjects/senders/labels before composing change details, then wraps the change list with `wrapUntrusted('untrusted_changes', ...)` for the Claude delta prompt.
+- `src/lib/validation.ts`: added `EmailSynthesisSchema` to cap manual email synthesis input before prompt construction.
+- Verification: `npm run build` passes on Next 16.2.6. The build still emits the known middleware-to-proxy deprecation warning only.
+
 Implementation commit: `6dbecb78a6eb129721135d17ae5035104b883822`.
 
 First high-priority security batch shipped. OAuth connect initiation now requires an authenticated Jarvis browser session, legacy Garmin local scripts no longer write plaintext tokens or raw payloads, and the dependency audit is clean at high severity and overall.

@@ -12,6 +12,7 @@ import {
   getValidAccessToken as getGoogleToken,
   fetchSentEmailsWithBody as fetchGmailSent,
 } from '@/lib/google';
+import { sanitizeInline, sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 export const maxDuration = 120;
 
@@ -78,15 +79,18 @@ export const GET = withAuth(async (_req: NextRequest) => {
     // Sort by date descending
     allSent.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Format emails for Claude
+    // Format emails for Claude. Sent email bodies can include quoted external
+    // replies, so delimit them as untrusted source data.
     const emailList = allSent
       .map(
         (e, i) =>
-          `Email #${i + 1}\nTo: ${e.to}\nSubject: ${e.subject}\nDate: ${e.date}\n---\n${e.body}\n===`,
+          `Email #${i + 1}\nTo: ${sanitizeInline(e.to, 300)}\nSubject: ${sanitizeInline(e.subject, 500)}\nDate: ${sanitizeInline(e.date, 100)}\n---\n${sanitizeMultiline(e.body, 3000)}\n===`,
       )
       .join('\n\n');
 
     const prompt = `Analyze the following ${allSent.length} sent emails from Filman to distill his email communication style patterns.
+
+${UNTRUSTED_PREAMBLE}
 
 Focus on:
 
@@ -105,7 +109,7 @@ Return a structured style guide that could be used to ghostwrite emails in Filma
 
 --- SENT EMAILS (${allSent.length} total) ---
 
-${emailList}`;
+${wrapUntrusted('untrusted_sent_emails', emailList)}`;
 
     const anthropicKey = process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) throw new Error('JARVIS_ANTHROPIC_KEY not configured');
