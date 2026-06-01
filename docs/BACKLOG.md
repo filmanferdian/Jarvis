@@ -10,13 +10,13 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 **Context:** Security review on 2026-05-31 covered auth, OAuth, secrets, Supabase/RLS, prompt-injection surfaces, input validation, storage/media URLs, dependency audit, n8n workflow artifacts, and the existing backlog. The app already has several strong defenses: timing-safe auth comparisons, signed OAuth state cookies, server-only service-role Supabase access, tightened RLS policies, centralized session cookie attributes, and escaped markdown rendering before `dangerouslySetInnerHTML`.
 
-**Status (2026-05-31):** First P0 batch shipped in v3.22.0 (commit `6dbecb78a6eb129721135d17ae5035104b883822`): OAuth start routes are auth-gated, Garmin local scripts now require service-role encrypted writes, and dependency audit findings are patched. Remaining from this newly identified high-priority set: prompt-injection defense standardization.
+**Status (2026-06-01):** First P0 batch shipped in v3.22.0 (commit `6dbecb78a6eb129721135d17ae5035104b883822`): OAuth start routes are auth-gated, Garmin local scripts now require service-role encrypted writes, and dependency audit findings are patched. Prompt-injection defense standardization shipped in v3.22.1. Remaining security work now starts with the older B/C findings: rate limits plus request validation/body caps.
 
 **Highest-priority batch:**
 - **DONE in v3.22.0 — Protect OAuth connect start routes:** wrap `/api/auth/google` and `/api/auth/microsoft` in browser auth, or bind OAuth state to an existing Jarvis session. Today the callback is state-protected, but the connect flow itself can be initiated by anyone.
 - **DONE in v3.22.0 — Clean up Garmin secret handling in local scripts:** update `scripts/seed-garmin-tokens.mjs` and `scripts/backfill-recent.mjs` so they require `SUPABASE_SERVICE_ROLE_KEY`, write encrypted tokens to `garmin_tokens`, never fall back to the publishable/anon key, and encrypt Garmin `raw_json` with `wrapJsonb` when writing daily rows.
 - **DONE in v3.22.0 — Patch dependency vulnerabilities:** `npm audit --audit-level=high` currently reports 7 vulnerabilities: high severity in `next`, `axios`, and `lodash`; moderate in `follow-redirects`, `postcss`, `qs`, and `ws`. `next` is pinned to `16.1.6`; `garmin-connect` brings several vulnerable transitives. Upgrade or override, then rerun audit + build.
-- **Standardize prompt-injection defenses:** apply `sanitizeInline` / `sanitizeMultiline` + `wrapUntrusted` to remaining Claude prompts that embed email/calendar/task data directly: `/api/emails/synthesize`, `/api/emails/style-analysis`, and `/api/briefing/delta`.
+- **DONE in v3.22.1 — Standardize prompt-injection defenses:** apply `sanitizeInline` / `sanitizeMultiline` + `wrapUntrusted` to remaining Claude prompts that embed email/calendar/task data directly: `/api/emails/synthesize`, `/api/emails/style-analysis`, and `/api/briefing/delta`.
 
 **Second batch / fold-ins from existing backlog:**
 - Roll in the 2026-05-02 security leftovers: rate limits for `/api/sync/emails`, `/api/briefing/*`, `/api/contacts/scan`, and `/api/cron/*`; zod schemas + body-size caps for remaining POST handlers; session hardening; Origin/Referer checks; login backoff.
@@ -27,7 +27,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 **Existing backlog security opportunities checked:** the 2026-05-02 security item remains the main prior security backlog entry; attachment-aware email triage also requires a separate security review before implementation because it would introduce attachment parsing and phishing/malware exposure.
 
-**Trigger:** First P0 batch is shipped. Next security ship should start with prompt hardening, then pick up the older B/C findings and the remaining second-batch items.
+**Trigger:** OAuth/Garmin/dependency and prompt-hardening batches are shipped. Next security ship should pick up the older B/C findings and the remaining second-batch items.
 
 ---
 

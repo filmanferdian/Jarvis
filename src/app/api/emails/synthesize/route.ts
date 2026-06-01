@@ -3,6 +3,9 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { buildJarvisContext } from '@/lib/context';
+import { safeError } from '@/lib/errors';
+import { EmailSynthesisSchema } from '@/lib/validation';
+import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 // POST: Trigger email synthesis on-demand using Gmail MCP data
 // This endpoint accepts pre-fetched email data and generates a synthesis via Claude
@@ -18,20 +21,20 @@ export const POST = withAuth(async (req: NextRequest) => {
     }
 
     const body = await req.json();
-    const emails: { from: string; subject: string; snippet: string; date: string }[] = body.emails || [];
-
-    if (emails.length === 0) {
+    const parsed = EmailSynthesisSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'No emails provided' },
-        { status: 400 }
+        { error: 'Invalid input', issues: parsed.error.issues },
+        { status: 400 },
       );
     }
+    const { emails } = parsed.data;
 
-    // Build prompt
+    // Build prompt with untrusted email fields delimited from instructions.
     const emailList = emails
       .map(
         (e, i) =>
-          `${i + 1}. From: ${e.from}\n   Subject: ${e.subject}\n   Preview: ${e.snippet}`
+          `${i + 1}. From: ${sanitizeInline(e.from, 200)}\n   Subject: ${sanitizeInline(e.subject, 500)}\n   Date: ${sanitizeInline(e.date, 100)}\n   Preview: ${sanitizeInline(e.snippet, 1000)}`
       )
       .join('\n\n');
 
@@ -46,6 +49,8 @@ export const POST = withAuth(async (req: NextRequest) => {
     const ctx = await buildJarvisContext();
 
     const prompt = `${ctx.systemPrompt}
+
+${UNTRUSTED_PREAMBLE}
 
 Synthesize the following emails received recently for ${today}.
 
@@ -69,7 +74,7 @@ STRICT FORMATTING RULES — violating these is a failure:
 
 --- EMAILS (${emails.length} total) ---
 
-${emailList}
+${wrapUntrusted('untrusted_emails', emailList)}
 
 IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate information.`;
 
@@ -150,10 +155,6 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       deadlineCount: deadlineMatch ? Math.min(deadlineMatch.length, 10) : 0,
     });
   } catch (err) {
-    console.error('[API Error] Failed to synthesize emails:', err);
-    return NextResponse.json(
-      { error: 'Failed to synthesize emails' },
-      { status: 500 }
-    );
+    return safeError('Failed to synthesize emails', err);
   }
 });

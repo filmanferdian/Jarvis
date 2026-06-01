@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
+import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 function getWibToday(): string {
   const now = new Date();
@@ -96,21 +97,28 @@ export const POST = withAuth(async (_req: NextRequest) => {
     const changeDetails: string[] = [];
 
     if (newCalendar.length > 0) {
-      const items = newCalendar.map(e => `"${e.title}" at ${e.start_time || 'TBD'}`).join('; ');
+      const items = newCalendar.map(e =>
+        `"${sanitizeInline(e.title, 300)}" at ${sanitizeInline(e.start_time || 'TBD', 100)}`
+      ).join('; ');
       changeDetails.push(`${newCalendar.length} new calendar event(s): ${items}`);
     }
     if (removedCalCount > 0) {
       changeDetails.push(`${removedCalCount} calendar event(s) cancelled or removed`);
     }
     if (newTasks.length > 0) {
-      const items = newTasks.map(t => `"${t.title}" (${t.priority || 'normal'})`).join('; ');
+      const items = newTasks.map(t =>
+        `"${sanitizeInline(t.title, 300)}" (${sanitizeInline(t.priority || 'normal', 50)})`
+      ).join('; ');
       changeDetails.push(`${newTasks.length} new task(s): ${items}`);
     }
     if (removedTaskCount > 0) {
       changeDetails.push(`${removedTaskCount} task(s) completed or removed`);
     }
     if (newEmails.length > 0) {
-      const items = newEmails.map(e => `"${e.subject}" from ${e.sender || 'unknown'}${e.priority_label ? ` [${e.priority_label}]` : ''}`).join('; ');
+      const items = newEmails.map(e => {
+        const label = e.priority_label ? ` [${sanitizeInline(e.priority_label, 50)}]` : '';
+        return `"${sanitizeInline(e.subject, 300)}" from ${sanitizeInline(e.sender || 'unknown', 200)}${label}`;
+      }).join('; ');
       changeDetails.push(`${newEmails.length} new email(s): ${items}`);
     }
 
@@ -144,10 +152,12 @@ export const POST = withAuth(async (_req: NextRequest) => {
           role: 'user',
           content: `${ctx.systemPrompt}
 
+${UNTRUSTED_PREAMBLE}
+
 Provide a mid-day update for Mr. Ferdian.
 
 Since this morning's briefing, the following has changed:
-${changeDetails.map(c => `- ${c}`).join('\n')}
+${wrapUntrusted('untrusted_changes', changeDetails.map(c => `- ${c}`).join('\n'))}
 
 Write a concise update (under 150 words) that:
 1. Opens with "Since this morning, sir..." or similar butler phrasing

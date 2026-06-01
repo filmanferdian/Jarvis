@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-01 — v3.22.1 — Prompt-injection hardening for email and delta prompts
+
+Closed the remaining high-priority prompt-injection item from the 2026-05-31 security review. The manual email synthesis, email style-analysis, and briefing delta prompts now sanitize external fields, wrap externally sourced content with `wrapUntrusted`, and include the shared untrusted-content preamble.
+
+**Well:**
+- The change stayed narrow: three prompt surfaces plus one small validation schema for the caller-provided email synthesis payload.
+- The existing `promptEscape` helpers fit cleanly, so this is mostly standardization rather than new security machinery.
+- Build verification caught no regressions; the only output is the already-known Next middleware deprecation warning.
+
+**Wrong:**
+- The manual email synthesis endpoint had no runtime input schema, so prompt hardening also needed a small body contract before sanitization.
+- The style-analysis endpoint analyzes sent mail, but sent bodies can contain quoted external replies. Treating that path as untrusted is the safer rule, even though the primary author is Filman.
+
+**Next:**
+- Pick up the older B/C security findings: rate limits for sync/briefing/contact/cron routes, plus zod schemas and body-size caps for the remaining POST handlers.
+- Keep session-token redesign separate; it is more architectural and should not be bundled with request-boundary cleanup.
+
 ## 2026-05-31 — v3.22.0 — Security hardening: OAuth starts, Garmin scripts, dependency audit
 
 Implementation commit: `6dbecb78a6eb129721135d17ae5035104b883822`.
