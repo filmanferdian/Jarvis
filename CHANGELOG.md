@@ -6,6 +6,15 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Investments page: manual Refresh button to pick up new valuations (v3.22.3)
+
+The `/investments` valuation list is cached in server memory keyed by UTC date, so a newly published Notion valuation only appeared after the next UTC midnight or a redeploy. Added a manual refresh path so a new valuation surfaces on demand.
+
+- `src/lib/investments/valuation.ts`: exported `clearValuationCaches()` to drop the day-keyed valuation and memo caches.
+- `src/app/api/investments/route.ts`: a `?refresh=1` query param clears those caches before serving, so the next read re-queries Notion.
+- `src/app/investments/page.tsx`: added a Refresh button in the header that calls the refresh path, re-pulls valuations and quotes, and clears the client-side memo cache.
+- Stored quotes already read straight from Supabase (no in-memory cache), so prices were never the stale part; this only affects valuations.
+
 ### Investments quotes: replace blocked Yahoo with a Google Sheet (US+IDX) and the SGX API (v3.22.2)
 
 The investments price pull works again. Yahoo's quote endpoint returns HTTP 429 from datacenter IPs (both dev and Railway), so the few-times-a-day refresh was storing zero prices. Replaced Yahoo with two reachable, key-free sources.

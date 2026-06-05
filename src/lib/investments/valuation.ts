@@ -147,6 +147,13 @@ async function fetchPageMarkdown(pageId: string): Promise<string> {
 let valuationsCache: { day: string; props: MemoProps[] } | null = null;
 const memoCache = new Map<string, { day: string; result: MemoResult }>();
 
+/** Drop the in-memory caches so the next read re-queries Notion. Used by the
+ *  page's manual Refresh button after a new valuation is published. */
+export function clearValuationCaches(): void {
+  valuationsCache = null;
+  memoCache.clear();
+}
+
 /** Structured props (no memo body) for every valuation in the Notion DB. */
 export async function listValuations(): Promise<MemoProps[]> {
   const day = today();

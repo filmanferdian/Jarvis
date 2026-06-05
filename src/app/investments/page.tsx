@@ -105,9 +105,12 @@ export default function InvestmentsPage() {
   const [detail, setDetail] = useState<string | null>(null);
   const [loadingTable, setLoadingTable] = useState(true);
   const [loadingMemo, setLoadingMemo] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/investments', { credentials: 'include' })
+  const loadData = useCallback((refresh = false) => {
+    const p1 = fetch(refresh ? '/api/investments?refresh=1' : '/api/investments', {
+      credentials: 'include',
+    })
       .then((r) => (r.ok ? r.json() : { valuations: [] }))
       .then((d) => {
         const map: Record<string, MemoProps> = {};
@@ -117,7 +120,7 @@ export default function InvestmentsPage() {
       .catch(() => {})
       .finally(() => setLoadingTable(false));
 
-    fetch('/api/investments?quotes=1', { credentials: 'include' })
+    const p2 = fetch('/api/investments?quotes=1', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : { quotes: {}, asOf: null }))
       .then((d) => {
         setQuotes(d.quotes || {});
@@ -125,7 +128,23 @@ export default function InvestmentsPage() {
       })
       .catch(() => {})
       .finally(() => setQuotesLoaded(true));
+
+    return Promise.all([p1, p2]);
   }, []);
+
+  useEffect(() => {
+    loadData(false);
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setMemos({}); // drop client-side memo cache so details re-fetch fresh
+    try {
+      await loadData(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData]);
 
   const openDetail = useCallback(
     async (ticker: string) => {
@@ -165,17 +184,29 @@ export default function InvestmentsPage() {
 
   return (
     <AppShell>
-      <div className="mb-5">
-        <h1
-          className="text-[20px] text-jarvis-text-primary"
-          style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '-0.01em' }}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1
+            className="text-[20px] text-jarvis-text-primary"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '-0.01em' }}
+          >
+            Investments
+          </h1>
+          <p className="text-[12px] text-jarvis-text-faint mt-0.5">
+            Last price against our valuation fair-value range. Click a row for the full memo.
+            {quotesAsOf && <span className="ml-1">Prices as of {fmtAsOf(quotesAsOf)} WIB.</span>}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          title="Re-pull valuations from Notion"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] border border-jarvis-border bg-jarvis-bg-card px-2.5 py-1.5 text-[12px] text-jarvis-text-secondary hover:bg-jarvis-bg-deep disabled:opacity-50"
         >
-          Investments
-        </h1>
-        <p className="text-[12px] text-jarvis-text-faint mt-0.5">
-          Last price against our valuation fair-value range. Click a row for the full memo.
-          {quotesAsOf && <span className="ml-1">Prices as of {fmtAsOf(quotesAsOf)} WIB.</span>}
-        </p>
+          <span className={refreshing ? 'animate-spin' : ''}>↻</span>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
       <div className="space-y-7">
