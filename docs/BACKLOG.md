@@ -174,6 +174,28 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Low priority
 
+### 2026-06-05 — Valuation skill should set Fair value low/high on the Notion page
+
+**Context:** The valuation skill creates a page in the "Valuation models (DCF)" Notion database but only sets Fair value per share, not the Fair value low and Fair value high properties that already exist on the database. The investments page range column reads low/high and falls back to the single fair value, so a published valuation shows one number instead of the bear-to-bull range until the properties are backfilled by hand (as was done for BBRI: 2,635 low, 3,470 high).
+
+**Scope:**
+- Update the valuation skill's Notion page-creation step to populate Fair value low and Fair value high from the bear/bull ends of the computed fair-value range.
+- Keep the existing properties unchanged; this only adds the two range numbers.
+
+**Effort estimate:** ~15 min (skill instruction edit; no app code change).
+
+---
+
+### 2026-06-05 — Consider auto-refreshing valuations without a redeploy
+
+**Context:** v3.22.3 added a manual Refresh button because the investments valuation list is cached in server memory keyed by UTC date. The user refreshes roughly weekly, so the button is sufficient today. If valuation publishing becomes more frequent, a short TTL (5-10 min) or a cron-triggered cache bust would remove the manual step.
+
+**Why defer:** Current cadence does not justify re-hitting Notion on a timer. Revisit only if valuations start landing several times a week.
+
+**Effort estimate:** ~20 min (swap the day key for a TTL timestamp in valuation.ts).
+
+---
+
 ### 2026-04-18 — Speed up slow cron endpoints (Email Synthesis, Running Analysis)
 
 **Context:** Raised during v2.4.42 cron-log-coverage work. Email Synthesis and Running Analysis routinely take 30-60s server-side because they do sequential Claude + Gmail/Garmin/Notion calls. v2.4.42 masked this by returning 202 early and running work via `after()`, but the underlying latency is unchanged.

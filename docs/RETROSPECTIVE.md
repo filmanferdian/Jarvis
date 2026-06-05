@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-05 — v3.22.3 — Investments page manual Refresh button
+
+Ran a stage-by-stage equity DCF on BBRI (bank, so equity cash flow discounted at cost of equity, not enterprise DCF), published it to the Notion DCF library, then found it did not surface on the Jarvis investments page. Root cause was a day-keyed in-memory cache in the valuation reader; added a manual Refresh button so new valuations appear on demand.
+
+**Well:**
+- Read the actual reader/route/watchlist code before answering "why hasn't it updated" instead of guessing the integration was broken. The cause (UTC-day cache) was provable from the source.
+- Matched the fix to the user's stated cadence: they refresh roughly weekly, so a button beat a short TTL that would re-hit Notion every few minutes for no benefit.
+- Caught that stored quotes read straight from Supabase (no cache), so the button only needed to bust valuations, keeping the change surgical.
+
+**Wrong:**
+- Shipped the code as a lean manual push (version + CHANGELOG only) and skipped the retrospective, backlog, and Notion mirror. The user had to ask "have you done the ship protocol?" to get the close-out done. Should have either run the full protocol or stated clearly that the ship was intentionally partial and tracked the remainder.
+- The valuation skill created the Notion page without the Fair value low/high properties, so the investments range column would have shown a single number until I backfilled them by hand. The skill should populate the range. Flagged to BACKLOG.
+- Did not verify the deploy on the live page (auth-gated); relied on the build. Acceptable, but the "verified desktop + mobile" bar was not met.
+
+**Next:**
+- Update the valuation skill to set Fair value low/high when it creates the Notion page (now on BACKLOG).
+- When doing a quick manual push on a project with a strict Definition of Done, decide up front: full ship or explicitly-partial with the remainder tracked. Do not leave the close-out implicit.
+
+---
+
 ## 2026-05-31 — v3.22.2 — Investments quotes: Google Sheet (US+IDX) + SGX API
 
 The Investments price pull was storing zero prices: Yahoo returns HTTP 429 from datacenter IPs. Replaced it with a published Google Sheet of GOOGLEFINANCE formulas for US + IDX and SGX's own public JSON feed for the three Singapore banks. Both are key-free and reachable server-side.
