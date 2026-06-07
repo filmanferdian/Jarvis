@@ -6,6 +6,26 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Investments: 1D/7D/30D price changes + explicit fair value (v3.22.4)
+
+The `/investments` table now shows each name's last price against the previous day, 7 days, and 30 days, and shows the exact computed fair value alongside the range and the valuation date.
+
+- `src/app/investments/page.tsx`: the last-price cell renders 1D / 7D / 30D deltas (color-coded); the fair-value cell shows the explicit `Fair value per share` plus the low–high range and an "as of" valuation date; the detail view mirrors this (Fair value / Range / Last price / Upside / Valued on + period deltas).
+- `src/lib/investments/quotes.ts`, `sgxQuotes.ts`, `sheetQuotes.ts`: the `Quote` / `SourceQuote` types carry `changePct7d` / `changePct30d`; the sheet reader parses two new CSV columns; SGX has no history feed, so those stay null there.
+- `src/lib/sync/investmentQuotes.ts`: stores and reads `change_pct_7d` / `change_pct_30d`.
+- `src/data/watchlist.ts`: added ISAT (Indosat Ooredoo Hutchison) under Telecom; removed ASSA and JSMR.
+- Migration `031`: adds nullable `change_pct_7d` / `change_pct_30d` to `investment_quotes` (applied to prod).
+- Source: added two GOOGLEFINANCE-history columns and an ISAT row to the published "Jarvis Investment Quotes" sheet.
+
+### Investments quote pipeline hardening: percent-aware + quote-aware CSV + cache-bust (v3.22.5–3.22.7)
+
+Firing the cron against live data surfaced three parsing/caching issues, each fixed:
+
+- v3.22.5 — `parseNum` is now percent-aware: the sheet may format change cells as a percent (-6.45%) or a raw fraction (-0.0645); both normalize to a fraction, so a sheet formatting change can no longer skew values 100x (this also protected the existing 1-day change).
+- v3.22.6 — quote-aware CSV parsing: prices with a thousands separator are CSV-quoted with an internal comma ("5,075.00"); the old `line.split(',')` tore the field and shifted every later column (TLKM briefly stored as price 2). Replaced with a quote-respecting line splitter.
+- v3.22.7 — cache-bust the published-CSV fetch: Google serves it with a 5-minute edge cache (max-age=300), so the cron could read a stale snapshot taken while the slower GOOGLEFINANCE history columns were mid-recalc (empty), storing null 7d/30d. The fetch now appends a per-call cache-buster and sets `cache: 'no-store'`.
+- Verification: cron fired in prod, 46/46 priced; Supabase shows correct price + 1D/7D/30D for IDX and US names (TLKM 2,760 / −4.8% / −6.4% / −5.8%; ISAT 1,880 / −8.7% / −11.7% / −12.6%).
+
 ### Investments page: manual Refresh button to pick up new valuations (v3.22.3)
 
 The `/investments` valuation list is cached in server memory keyed by UTC date, so a newly published Notion valuation only appeared after the next UTC midnight or a redeploy. Added a manual refresh path so a new valuation surfaces on demand.

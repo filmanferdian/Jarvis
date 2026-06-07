@@ -33,6 +33,17 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-07 — Investments multi-period changes: SGX history + partial-fetch resilience
+
+**Context:** v3.22.4 added 1D/7D/30D price changes. US + IDX 7d/30d come from two GOOGLEFINANCE-history columns in the published sheet; SGX (DBS/OCBC/UOB) has no history feed, so SGX shows 1D only. GOOGLEFINANCE history is also volatile (a mid-recalc snapshot can be empty), and the cron overwrites the whole row, so a single fetch that misses 7d/30d blanks them until the next run.
+
+**Options (scope-later):**
+- Add a Supabase price-history table snapshotted by the existing cron and compute 7d/30d from it. Source-independent, covers SGX too, but no backfill (fills in over ~30 days).
+- Make the upsert preserve prior non-null `change_pct_7d` / `change_pct_30d` when a fetch returns null for them, so a momentary empty GOOGLEFINANCE snapshot does not blank the columns.
+- If GOOGLEFINANCE history proves unreliable, revisit a paid historical source (consistent with the v3.22.2 note on EODHD).
+
+**Trigger:** revisit if SGX multi-period is wanted, or if 7d/30d visibly flicker to blank between cron runs.
+
 ### 2026-05-30 – Investments price source: Yahoo blocked (RESOLVED 2026-05-31, v3.22.2)
 
 **Resolution (2026-05-31, v3.22.2):** replaced Yahoo with two key-free sources. US + IDX now come from a published-to-web Google Sheet of GOOGLEFINANCE formulas (one CSV fetch, parsed in `sheetQuotes.ts`); the three SGX banks come from SGX's own public delayed-price JSON feed (`sgxQuotes.ts`). Twelve Data was dropped: its free tier is US-only and IDX/SGX need the $229/mo Pro plan. Cron job 7705843 unchanged. Verified: published CSV returns all 44 US+IDX rows priced; SGX feed returns DBS/OCBC/UOB. Prod cron-trigger verification pending deploy.

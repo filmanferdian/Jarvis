@@ -4,6 +4,25 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-07 — v3.22.4–3.22.7 — Investments: multi-period price + explicit fair value
+
+Added 1D/7D/30D price changes and an explicit fair value (plus range and as-of date) to the investments page, added ISAT and dropped ASSA/JSMR, and sourced the 7d/30d history from two new GOOGLEFINANCE columns in the published sheet. Shipping it took four patch versions because firing the cron against live data exposed bugs the build could not catch.
+
+**Well:**
+- Did not blind-merge when a parallel ship had replaced the quote source (Yahoo to Google Sheet + SGX) underneath me. Read the new architecture first, then re-based the feature onto it instead of forcing a stale merge.
+- Each fix was driven by evidence from the live fire and Supabase reads, not guesswork: percent format (CSV showed -6.45%), comma-in-quotes (TLKM stored as 2), and the 5-minute edge cache (cache-control max-age=300).
+- Made the parser robust rather than format-dependent (percent-aware + quote-aware + cache-bust), so future sheet-formatting or cache quirks cannot silently skew values.
+
+**Wrong:**
+- Editing the sheet introduced the percent/comma formatting that broke parsing, and the first cron fire briefly stored corrupted IDX prices in prod (TLKM as 2). A dry run of the parser against the real published CSV before firing prod would have caught all three issues at once.
+- Took four deploys to converge. Verifying the end-to-end parse against the live CSV up front would have collapsed v3.22.5–3.22.7 into one.
+
+**Next:**
+- SGX names have no 7d/30d history (1D only). Consider a Supabase price-history table as a source-independent backstop so all exchanges get multi-period changes (now on BACKLOG).
+- The cron blanks 7d/30d if a single fetch misses them (no preserve-on-null). Consider preserving prior non-null values on a partial fetch (now on BACKLOG).
+
+---
+
 ## 2026-06-05 — v3.22.3 — Investments page manual Refresh button
 
 Ran a stage-by-stage equity DCF on BBRI (bank, so equity cash flow discounted at cost of equity, not enterprise DCF), published it to the Notion DCF library, then found it did not surface on the Jarvis investments page. Root cause was a day-keyed in-memory cache in the valuation reader; added a manual Refresh button so new valuations appear on demand.
