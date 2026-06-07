@@ -72,7 +72,13 @@ function parseNum(cell: string | undefined): number | null {
 /** Quotes keyed by uppercased ticker, read from the published-CSV Google Sheet. */
 export async function fetchSheetQuotes(): Promise<Record<string, SourceQuote>> {
   const out: Record<string, SourceQuote> = {};
-  const url = process.env.INVESTMENTS_SHEET_CSV_URL || DEFAULT_CSV_URL;
+  const base = process.env.INVESTMENTS_SHEET_CSV_URL || DEFAULT_CSV_URL;
+  // Cache-bust: Google serves the published CSV with a 5-minute edge cache
+  // (cache-control max-age=300), so a stale snapshot — e.g. one captured while
+  // the slower GOOGLEFINANCE history columns were mid-recalc and empty — can be
+  // served to the cron even after the sheet has settled. A unique param per call
+  // forces an origin read so the 7d/30d columns are not intermittently blank.
+  const url = `${base}${base.includes('?') ? '&' : '?'}cb=${Date.now()}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -81,6 +87,7 @@ export async function fetchSheetQuotes(): Promise<Record<string, SourceQuote>> {
       headers: { 'User-Agent': UA, Accept: 'text/csv' },
       signal: controller.signal,
       redirect: 'follow',
+      cache: 'no-store',
     });
     if (!res.ok) return out;
     const text = await res.text();
