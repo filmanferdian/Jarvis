@@ -6,6 +6,10 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Current Events outlet blocklist expansion (v3.22.8)
+
+Nine more low-signal outlets dropped at the RSS ingestion layer. International: Golf Channel, Defector, RACER (motorsports). Indonesia: industry.co.id, butota.id, Esports ID, niaga.asia, gadgetdiva, indonesiadefense.com. Same case-insensitive substring matching as prior sweeps; takes effect on the next news-synthesis cron slot. Salvaged from an abandoned worktree during branch cleanup.
+
 ### Investments: 1D/7D/30D price changes + explicit fair value (v3.22.4)
 
 The `/investments` table now shows each name's last price against the previous day, 7 days, and 30 days, and shows the exact computed fair value alongside the range and the valuation date.
