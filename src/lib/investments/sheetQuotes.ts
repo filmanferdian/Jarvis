@@ -5,9 +5,10 @@
 //
 // Expected CSV shape, one row per company (a header row is tolerated):
 //   ticker, price, changePct, changePct7d, changePct30d
-// where ticker matches our watchlist ticker and each change is already a fraction
-// (the sheet divides GOOGLEFINANCE "changepct" by 100). The 7d/30d columns are
-// optional: missing cells parse to null and the page renders a dash.
+// where ticker matches our watchlist ticker. Each change is a fraction; parseNum
+// also accepts a percent string ("-6.45%") in case the sheet cell is percent-
+// formatted, so a formatting change can't skew values 100x. The 7d/30d columns
+// are optional: missing cells parse to null and the page renders a dash.
 
 import type { SourceQuote } from '@/lib/investments/sgxQuotes';
 
@@ -23,10 +24,16 @@ const DEFAULT_CSV_URL =
 
 function parseNum(cell: string | undefined): number | null {
   if (cell == null) return null;
-  const t = cell.trim().replace(/^"|"$/g, '').replace(/,/g, '');
+  let t = cell.trim().replace(/^"|"$/g, '').replace(/,/g, '');
   if (!t) return null;
+  // The sheet may render the change columns as a percent ("-6.45%") or as a raw
+  // fraction ("-0.0645") depending on the cell number format. Normalize both to a
+  // fraction so a formatting change in the sheet can never skew the values 100x.
+  const isPct = t.endsWith('%');
+  if (isPct) t = t.slice(0, -1);
   const n = parseFloat(t);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  return isPct ? n / 100 : n;
 }
 
 /** Quotes keyed by uppercased ticker, read from the published-CSV Google Sheet. */
