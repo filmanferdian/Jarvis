@@ -47,7 +47,10 @@ export const WATCHLIST: WatchlistExchange[] = [
       },
       {
         industry: 'Telecom',
-        companies: [{ ticker: 'TLKM', name: 'Telkom Indonesia' }],
+        companies: [
+          { ticker: 'TLKM', name: 'Telkom Indonesia' },
+          { ticker: 'ISAT', name: 'Indosat Ooredoo Hutchison' },
+        ],
       },
       {
         industry: 'Super-app & fintech',
@@ -63,11 +66,7 @@ export const WATCHLIST: WatchlistExchange[] = [
       },
       {
         industry: 'Transport & infrastructure',
-        companies: [
-          { ticker: 'BIRD', name: 'Blue Bird' },
-          { ticker: 'ASSA', name: 'Adi Sarana Armada' },
-          { ticker: 'JSMR', name: 'Jasa Marga' },
-        ],
+        companies: [{ ticker: 'BIRD', name: 'Blue Bird' }],
       },
     ],
   },

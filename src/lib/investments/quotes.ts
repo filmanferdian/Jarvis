@@ -16,6 +16,8 @@ export interface Quote {
   price: number | null;
   currency: string | null;
   changePct: number | null;
+  changePct7d: number | null;
+  changePct30d: number | null;
 }
 
 const cache = new Map<string, { ts: number; quote: Quote }>();
@@ -24,7 +26,14 @@ async function fetchOne(symbol: string): Promise<Quote> {
   const cached = cache.get(symbol);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.quote;
 
-  const empty: Quote = { symbol, price: null, currency: null, changePct: null };
+  const empty: Quote = {
+    symbol,
+    price: null,
+    currency: null,
+    changePct: null,
+    changePct7d: null,
+    changePct30d: null,
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -50,6 +59,8 @@ async function fetchOne(symbol: string): Promise<Quote> {
       price,
       currency: typeof meta.currency === 'string' ? meta.currency : null,
       changePct: prev && prev !== 0 ? (price - prev) / prev : null,
+      changePct7d: null,
+      changePct30d: null,
     };
     cache.set(symbol, { ts: Date.now(), quote });
     return quote;

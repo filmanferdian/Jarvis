@@ -48,6 +48,8 @@ export async function syncInvestmentQuotes(): Promise<QuoteSyncResult> {
       price,
       currency: price !== null ? currencyForExchange(c.exchange) : null,
       change_pct: q?.changePct ?? null,
+      change_pct_7d: q?.changePct7d ?? null,
+      change_pct_30d: q?.changePct30d ?? null,
       fetched_at: now,
     };
   });
@@ -72,7 +74,7 @@ export interface StoredQuotesResult {
 export async function getStoredQuotes(): Promise<StoredQuotesResult> {
   const { data, error } = await supabase
     .from('investment_quotes')
-    .select('ticker, symbol, price, currency, change_pct, fetched_at');
+    .select('ticker, symbol, price, currency, change_pct, change_pct_7d, change_pct_30d, fetched_at');
   if (error) throw new Error(`investment_quotes read: ${error.message}`);
 
   const quotes: Record<string, Quote> = {};
@@ -83,6 +85,8 @@ export async function getStoredQuotes(): Promise<StoredQuotesResult> {
       price: row.price,
       currency: row.currency,
       changePct: row.change_pct,
+      changePct7d: row.change_pct_7d,
+      changePct30d: row.change_pct_30d,
     };
     if (!asOf || row.fetched_at > asOf) asOf = row.fetched_at;
   }

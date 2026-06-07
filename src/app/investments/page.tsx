@@ -33,6 +33,8 @@ interface Quote {
   price: number | null;
   currency: string | null;
   changePct: number | null;
+  changePct7d: number | null;
+  changePct30d: number | null;
 }
 
 const EMPTY = '–'; // en-dash placeholder for missing values
@@ -94,6 +96,29 @@ function fmtAsOf(iso: string | null): string | null {
     minute: '2-digit',
     hour12: false,
   });
+}
+
+function fmtValDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// One period change: a faint label (1D/7D/30D) and a colored percentage.
+function Delta({ label, pct }: { label: string; pct: number | null | undefined }) {
+  const has = pct !== null && pct !== undefined;
+  const color = !has
+    ? 'var(--color-jarvis-text-faint)'
+    : pct >= 0
+      ? 'var(--color-jarvis-success)'
+      : 'var(--color-jarvis-danger)';
+  return (
+    <span className="whitespace-nowrap">
+      <span className="text-jarvis-text-faint">{label} </span>
+      <span style={{ color }}>{has ? fmtPct(pct) : EMPTY}</span>
+    </span>
+  );
 }
 
 export default function InvestmentsPage() {
@@ -224,8 +249,8 @@ export default function InvestmentsPage() {
                 <thead>
                   <tr className="text-[10.5px] uppercase tracking-wide text-jarvis-text-faint">
                     <th className="text-left font-medium px-3.5 py-2">Company</th>
-                    <th className="text-right font-medium px-3.5 py-2">Last price</th>
-                    <th className="text-right font-medium px-3.5 py-2">Fair value range</th>
+                    <th className="text-right font-medium px-3.5 py-2">Last price · 1D / 7D / 30D</th>
+                    <th className="text-right font-medium px-3.5 py-2">Fair value</th>
                     <th className="text-left font-medium px-3.5 py-2">Verdict</th>
                     <th className="px-3.5 py-2"></th>
                   </tr>
@@ -265,28 +290,34 @@ export default function InvestmentsPage() {
                                 <span className="text-jarvis-text-primary">
                                   {fmtMoney(q?.currency ?? null, q?.price ?? null)}
                                 </span>
-                                {q?.changePct !== null && q?.changePct !== undefined && (
-                                  <span
-                                    className="block text-[10.5px]"
-                                    style={{
-                                      color:
-                                        q.changePct >= 0
-                                          ? 'var(--color-jarvis-success)'
-                                          : 'var(--color-jarvis-danger)',
-                                    }}
-                                  >
-                                    {fmtPct(q.changePct)}
-                                  </span>
-                                )}
+                                <span className="flex justify-end gap-2.5 text-[10px] mt-0.5">
+                                  <Delta label="1D" pct={q?.changePct} />
+                                  <Delta label="7D" pct={q?.changePct7d} />
+                                  <Delta label="30D" pct={q?.changePct30d} />
+                                </span>
                               </>
                             )}
                           </td>
                           <td className="px-3.5 py-2.5 text-right whitespace-nowrap font-mono text-jarvis-text-secondary">
-                            {fmtRange(
-                              v?.currency ?? null,
-                              v?.fairValueLow ?? null,
-                              v?.fairValueHigh ?? null,
-                              v?.fairValue ?? null,
+                            {v && v.fairValue !== null && v.fairValue !== undefined ? (
+                              <>
+                                <span className="text-jarvis-text-primary">
+                                  {fmtMoney(v.currency, v.fairValue)}
+                                </span>
+                                {v.fairValueLow !== null && v.fairValueHigh !== null && (
+                                  <span className="block text-[10px] text-jarvis-text-faint">
+                                    {fmtNum(v.currency, v.fairValueLow)} {EMPTY}{' '}
+                                    {fmtNum(v.currency, v.fairValueHigh)}
+                                  </span>
+                                )}
+                                {v.valuationDate && (
+                                  <span className="block text-[10px] text-jarvis-text-faint">
+                                    as of {fmtValDate(v.valuationDate)}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-jarvis-text-faint">{EMPTY}</span>
                             )}
                           </td>
                           <td className="px-3.5 py-2.5">
@@ -394,14 +425,25 @@ function MemoView({
           </div>
 
           {props && memo?.hasMemo && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              <Metric
-                label="Fair value range"
-                value={fmtRange(props.currency, props.fairValueLow, props.fairValueHigh, props.fairValue)}
-              />
-              <Metric label="Last price" value={fmtMoney(quote?.currency ?? null, quote?.price ?? null)} />
-              <Metric label="Upside" value={fmtPct(props.upside)} />
-            </div>
+            <>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <Metric label="Fair value" value={fmtMoney(props.currency, props.fairValue)} />
+                <Metric
+                  label="Range"
+                  value={fmtRange(props.currency, props.fairValueLow, props.fairValueHigh, props.fairValue)}
+                />
+                <Metric label="Last price" value={fmtMoney(quote?.currency ?? null, quote?.price ?? null)} />
+                <Metric label="Upside" value={fmtPct(props.upside)} />
+                {props.valuationDate && (
+                  <Metric label="Valued on" value={fmtValDate(props.valuationDate) ?? props.valuationDate} />
+                )}
+              </div>
+              <div className="flex gap-3 mt-2 text-[11px] font-mono">
+                <Delta label="1D" pct={quote?.changePct} />
+                <Delta label="7D" pct={quote?.changePct7d} />
+                <Delta label="30D" pct={quote?.changePct30d} />
+              </div>
+            </>
           )}
 
           {memo?.hasMemo && memo.markdown ? (

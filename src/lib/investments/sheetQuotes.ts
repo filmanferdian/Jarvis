@@ -4,9 +4,10 @@
 // SGX is handled separately (SGX revoked GOOGLEFINANCE); see sgxQuotes.ts.
 //
 // Expected CSV shape, one row per company (a header row is tolerated):
-//   ticker, price, changePct
-// where ticker matches our watchlist ticker and changePct is already a fraction
-// (the sheet divides GOOGLEFINANCE "changepct" by 100).
+//   ticker, price, changePct, changePct7d, changePct30d
+// where ticker matches our watchlist ticker and each change is already a fraction
+// (the sheet divides GOOGLEFINANCE "changepct" by 100). The 7d/30d columns are
+// optional: missing cells parse to null and the page renders a dash.
 
 import type { SourceQuote } from '@/lib/investments/sgxQuotes';
 
@@ -49,7 +50,12 @@ export async function fetchSheetQuotes(): Promise<Record<string, SourceQuote>> {
       const cells = line.split(',');
       const ticker = (cells[0] ?? '').trim().replace(/^"|"$/g, '').toUpperCase();
       if (!ticker || ticker === 'TICKER') continue; // skip header
-      out[ticker] = { price: parseNum(cells[1]), changePct: parseNum(cells[2]) };
+      out[ticker] = {
+        price: parseNum(cells[1]),
+        changePct: parseNum(cells[2]),
+        changePct7d: parseNum(cells[3]),
+        changePct30d: parseNum(cells[4]),
+      };
     }
     return out;
   } catch {
