@@ -1,70 +1,97 @@
-# Bank Central Asia (BBCA): Equity DCF
+# Bank Central Asia (BBCA): Equity DCF (driver-based)
 
-As of 2026-05-29 | billions IDR | Method: McKinsey equity DCF for financial institutions (midyear convention)
+As of 2026-06-08 | billions IDR | Method: McKinsey equity DCF for banks, built from fundamental drivers (NIM, cost of credit, loan growth, efficiency, capital). Companion files: `BBCA_drivers.json`, `BBCA_stress.json`, `BBCA_stress.xlsx`, `BBCA_stress.md`.
 
 ## Verdict
 
-Intrinsic value of about **IDR 5,782 per share** against a market price of **IDR 5,700**. On a disciplined equity DCF, BBCA looks **roughly fairly valued** (about 1.4% upside). After a roughly 38% drop from its 52-week high of 9,175, the market has repriced BBCA from a premium franchise multiple to a level a conservative model can broadly support. The whole plausible value range (about 4,900 to 7,300 across cost-of-equity and growth bounds) brackets today's price, so this is a fairly-valued call, not a deep-value or clear-overvalued one.
+Fair value about **IDR 6,049 per share** against a market price of **IDR 5,700**, roughly 6% upside. BBCA looks **fairly valued with a modest undervaluation tilt**: the base case sits a little above the quote, and a 10,000-run Monte Carlo puts about a **60% probability** that the shares are worth more than today's price. The plausible range is wide and brackets the price (about 4,600 to 7,950 from the 10th to the 90th percentile), so this is a fair-to-slightly-cheap call, not a deep-value one. Two things decide it: the cost of equity (the rate cycle) and the cost of credit (the asset-quality cycle).
 
 ## Why equity DCF (not enterprise DCF)
 
-BBCA is a bank, so operating and financing decisions are inseparable: interest income and expense are the raw material of the business, and the size and structure of deposits and equity are tied directly to operations. The book is explicit that the standard enterprise DCF fails here. We therefore value equity directly: discount equity cash flow (net income less the increase in book equity needed to support growth) at the cost of equity, and drive the model off ROE and growth rather than ROIC and WACC.
+BBCA is a bank, so operating and financing decisions are inseparable: interest income and expense are the raw material of the business, and the size and structure of deposits and equity are tied directly to operations. We value equity directly: discount equity cash flow (net income less the increase in book equity needed to support growth) at the cost of equity, and drive the model off ROE and growth rather than ROIC and WACC.
 
-## Thesis
+## How the model is built
 
-BBCA is an elite-ROE franchise: about IDR 57.5T of FY2025 net income on roughly IDR 282T of equity, a return on equity near 21% against an estimated cost of equity of about 12.2%. That ~9-point spread means growth genuinely creates value. The question is price, not quality: even crediting a high sustainable ROE and a long reinvestment runway in a growing economy, the discounted value lands close to the current quote. The premium the market paid a year ago (price-to-book above 4x) has compressed to about 2.5x, which is roughly what the fundamentals justify.
+This is a driver-based forecast (`driver_bank.py`), not a hand-built cash-flow line. Earning-asset growth, net interest margin, fee income, cost-to-income, cost of credit, tax, and capital intensity drive net income; equity cash flow is net income minus the increase in book equity required to fund growth at a steady capital ratio. ROE is an **output** of these drivers (about 20% near term, settling near 19.8%), not an assumption. The base year is calibrated to FY2025 actuals: net income about 57.6T, equity about 282T, ROE about 20%.
 
-## Key drivers (what the value hinges on)
+## Handling the cycle
 
-- **Cost of equity ~12.18%.** Local-currency CAPM: Indonesia 10-year government bond 6.68% (which already embeds sovereign and inflation risk) plus an equity risk premium of 5.5% at a beta of 1.0. Using the local risk-free rate avoids double-counting country risk in both the rate and a separate premium, per the emerging-markets guidance.
-- **ROE and reinvestment.** ROE held near 20% in the explicit period (a slight haircut from the reported ~21%), with retention set to g/ROE so book equity grows in step with earnings and capital adequacy is preserved. Return on new equity (RONE) of 18% in the continuing period.
-- **Growth path.** Net income grows about 7% near term, tapering to a 5.5% terminal rate, below Indonesia's ~8 to 9% nominal GDP growth, reflecting a large incumbent maturing rather than a high-growth challenger.
+We are in a tight part of the cycle: rates are high (the 10-year is near 6.9% and Bank Indonesia may hike), loan growth has slowed to 7.7%, and the margin is compressing. The model does not extrapolate that trough. Each driver follows a path from today's stressed level to a normalized through-cycle level, anchored on BBCA's own 15-year history, which spans the 2015 to 2016 slowdown and the 2020 COVID provision spike. The continuing value, about 62% of total value, runs off the normalized end state, not the trough. For BBCA the recovery shows up mainly as a lower discount rate as rates ease and a loan-growth recovery, not as a higher margin.
+
+## Key assumptions
+
+| Assumption | Base |
+|---|---|
+| Cost of equity | 12.0% (risk-free 6.5, ERP 5.5, beta 1.0) |
+| Terminal growth | 5.5% |
+| NIM | 5.5% |
+| Cost of credit | 0.50% |
+| Explicit loan growth | peaks near 10.5%, about 8.5% average, then fades |
+| RONE (return on new equity) | 18% |
+| Cost-to-income | 31% |
+| Capital (equity to assets) | 18% |
+| Effective tax | 20% |
+| Fee income | grows with the bank |
+
+The cost of equity uses a normalized 6.5% local risk-free rate rather than the 6.9% spot, to stay consistent with assuming the cycle improves, plus a mature-market equity premium (not a full country-risk premium on top of the local rate, which would double-count). Beta is set to 1.0 by judgment; the screen-reported near-zero is an illiquidity artifact, and the book recommends not lever-adjusting bank betas.
 
 ## Valuation bridge
 
-- PV of explicit equity cash flow: 320.5T
-- PV of continuing value: 390.1T
-- Equity value: 710.5T
+- PV of explicit equity cash flow: about 279T
+- PV of continuing value: about 464T (62% of value)
+- Equity value: about 743T
 - Shares outstanding: 122.88B
-- Value per share: 5,782
+- Value per share: about 6,049
 
-(For a bank the equity DCF yields equity value directly; there is no enterprise-to-equity net-debt bridge.)
+For a bank the equity DCF yields equity value directly; there is no enterprise-to-equity net-debt bridge.
 
-## Continuing value reliance
+## Thesis
 
-CV is 54.9% of total equity value, within a healthy range and well below the 75% stress threshold. The conclusion does not rest disproportionately on the terminal assumption.
+BBCA is an elite-ROE franchise: about 57.6T of FY2025 net income on about 282T of equity, a return on equity near 20% against a cost of equity near 12%. That roughly 8-point spread means growth genuinely creates value. The engine is the funding base: a CASA ratio of 84.6%, the cheapest deposit franchise in the system, which keeps the margin above peers through the cycle. The question is price, not quality. Even crediting the moat and a long under-banked runway (credit is only about 40% of GDP), the discounted value lands modestly above the quote. The premium the market paid a year ago (price-to-book above 4x) has compressed to about 2.5x.
 
-## Sensitivity (value per share, cost of equity by terminal growth)
+## Most important assumptions (tornado)
 
-The plausible value range runs from about IDR 4,928 (cost of equity 13.18%, g 4.5%) to about IDR 7,259 (cost of equity 11.18%, g 6.5%). The current price of 5,700 sits near the middle of this grid. Unlike a clear mispricing, BBCA's value is bracketed by reasonable assumptions: the call is sensitive to the cost of equity and terminal growth, which is exactly where an analyst should focus the debate.
+Varying each assumption one at a time to its plausible low and high, ranked by the swing in value per share:
 
-## Stress test (driver-based, 2026-06-08 update)
+| Driver | Swing (IDR/share) |
+|---|---|
+| Cost of equity | ~2,700 |
+| Cost of credit | ~1,250 |
+| Explicit growth (peak) | ~1,100 |
+| Cost-to-income | ~960 |
+| NIM | ~890 |
+| Terminal growth | ~640 |
+| RONE | ~640 |
+| Capital intensity | ~470 |
+| Fee income | ~330 |
+| Tax rate | ~290 |
 
-A fuller follow-up rebuilds this valuation from real bank drivers (NIM, cost of credit, loan growth, efficiency, capital) and stress-tests the assumptions three ways: a tornado, a reverse DCF, and a 10,000-run Monte Carlo. See `BBCA_stress.md` and `BBCA_stress.xlsx`.
+The discount rate and asset quality drive most of the uncertainty. NIM ranks below cost of credit because its plausible range is narrow, even though it is the biggest revenue lever per unit.
 
-- Driver-based base value: about IDR 6,049 per share, mildly above this memo's 5,782, because the explicit forecast now carries the under-banked, above-GDP growth runway (loan growth peaking near 10.5%) and uses a normalized 6.5% risk-free rate. Continuing value is about 62% of total.
-- Most important assumptions (tornado, ranked by swing): cost of equity first by a wide margin, then cost of credit, explicit growth, cost-to-income, and NIM. The macro/discount rate and asset quality drive most of the uncertainty. NIM ranks below credit cost because its plausible range is narrow.
-- What the 5,700 price implies (reverse DCF): the market prices BBCA modestly more conservatively than the base on every axis (cost of equity about 12.4%, terminal growth about 4.2%, NIM about 5.2% for an implied ROE near 18.9%, cost of credit about 0.83%, RONE about 14.9%).
-- Distribution (Monte Carlo, cycle factor co-moving rates, NIM, credit cost and growth): median about 6,000, likely band P25 to P75 about 5,200 to 6,900, full range P10 to P90 about 4,600 to 7,950, and about a 60% probability the value exceeds today's price.
+## What the market is pricing in (reverse DCF)
 
-Revised plausible range: about IDR 4,600 to 7,950 (P10 to P90), point estimate about 6,049, price near the lower-middle. The conclusion holds: fairly to modestly undervalued, with the cost of equity and the credit cycle as the swing factors.
+Solving for the driver value that makes the model equal today's 5,700, one driver at a time, the market is pricing BBCA modestly more conservatively than our base on every axis: cost of equity about 12.4%, terminal growth about 4.2%, NIM about 5.2% (an implied ROE near 18.9%), cost of credit about 0.83%, or RONE about 14.9%. None of these is extreme, which is why this is a fair-to-modestly-cheap call rather than a clear mispricing.
+
+## Range and probability (Monte Carlo)
+
+10,000 simulations with a single cycle factor that moves rates, NIM, credit cost, and growth together (a bad cycle lifts rates and provisions while cutting growth), plus idiosyncratic noise on each driver and a fat-tailed credit cost. Median about 6,000. Likely band (P25 to P75) about 5,200 to 6,900. Full range (P10 to P90) about 4,600 to 7,950. Probability the value exceeds today's price: about 60%.
 
 ## Cross-checks
 
-- **Implied market multiple.** At 5,700 with FY2025 equity of ~282T, BBCA trades at about 2.5x book and roughly 12x trailing earnings (net income ~57.5T, market cap ~700T). A Gordon decomposition at ROE 21% and cost of equity 12.2% implies a market terminal growth near 6.3%, modestly above our 5.5% base, which is why the model lands just above the quote.
-- **Economic profit.** Equity x (ROE − cost of equity) is strongly positive (about 282T x (21% − 12.2%) ≈ 25T per year of value creation), confirming the franchise earns well above its cost of capital. The valuation question is how long and how fast that spread compounds, not whether it exists.
+- **Implied multiple.** At 5,700, BBCA trades at about 2.5x book and roughly 12x trailing earnings, consistent with a high-ROE franchise normalizing toward a high-teens ROE.
+- **Economic profit.** Equity times (ROE minus cost of equity), about 282T times roughly 8%, is about 22T per year of value creation, confirming the franchise earns well above its cost of capital. The question is how long and fast that spread compounds, not whether it exists.
 
 ## Risks and what would change the call
 
-- **Cost of equity / country risk.** The single biggest swing factor. A sustained rise in Indonesian government yields or a wider risk premium pushes value toward the low-5,000s; easing rates push it well above 6,000. The book's preferred emerging-market treatment would model this through probability-weighted macro scenarios rather than a single discount rate.
-- **ROE durability.** BBCA's edge is its low-cost CASA deposit franchise. Erosion of that funding advantage, tighter net interest margins, or higher credit costs would compress ROE toward the cost of equity and remove the value-creation spread.
-- **Growth.** Slower loan growth (Indonesian banks saw tight liquidity and softer growth in 2025; FY2025 net income rose only ~4.9%) would pull the explicit path below the 7% assumed here.
-- **Currency and accounting.** This is a local-currency (IDR) valuation. A foreign investor bears rupiah translation risk not captured in the per-share figure. Bank balance sheets are also harder to read from outside (asset-liability mismatch, true loan quality); required risk capital is assumed equal to book equity.
+- **Cost of equity and rates.** The single biggest swing factor. A sustained rise in Indonesian yields or a wider risk premium pushes value toward the low-5,000s; durable easing pushes it well above 6,000.
+- **Credit cycle.** The biggest fundamental downside. Provisions have spiked before (about 2.0% in 2020); a move toward 1 to 2% would remove a large part of the value, and it tends to arrive together with the rate stress.
+- **Funding moat.** BBCA's edge is its low-cost CASA base. Erosion from digital-bank deposit competition or tighter margins would compress the ROE-to-cost-of-equity spread.
+- **Growth.** Slower loan growth than the recovery we assume would pull the explicit path down.
+- **Currency and accounting.** This is a local-currency (IDR) valuation; a foreign holder bears rupiah translation risk. Bank balance sheets are hard to read from outside; required risk capital is assumed equal to book equity.
 
 ## Inputs, sources, and caveats
 
-- FY2025 (ended December 2025): net income about IDR 57.54T (up ~4.9% YoY from ~54.84T); total equity about IDR 281.7T (FY2024 ~262.8T); total assets about IDR 1,587T; implied ROE ~21%. Dividend payout about 54% (forecast ~66%). Shares outstanding about 122.88B. Price IDR 5,700 as of 2026-05-29 (52-week range 5,700 to 9,175; market cap ~700T). Indonesia 10-year government bond yield 6.68% as of 2026-05-29. Sources: stockanalysis.com, Investing.com, TradingEconomics, company FY2025 release.
-- Beta set to 1.0 by judgment: the screen-reported 0.01 is an illiquidity/data artifact (BBCA is the most heavily weighted, most liquid IDX large cap). The book recommends not lever-adjusting bank betas and smoothing toward 1.0.
-- The equity cash flow path uses simplified driver assumptions (ROE, RONE, growth, retention = g/ROE) calibrated to recent results, suitable as a library entry and meant to be refined with a full income-statement and balance-sheet forecast that sizes equity against risk-weighted assets and the Tier 1 ratio.
-- Emerging-market caveat: country risk is reflected in the discount rate (via the local risk-free rate), a secondary/triangulation approach. The book prefers building at least two probability-weighted macro scenarios and keeping the discount rate free of an added country premium. A fuller version should do that and triangulate against global bank peer multiples.
+- FY2025 actuals: net income about 57.6T (up about 4.9%), equity about 282T, total assets about 1,587T, ROE about 20 to 21%, NIM 5.7%, cost of credit 0.42%, CASA ratio 84.6%, cost-to-income about 31%, effective tax about 19%, loan growth 7.7%. Price IDR 5,700; shares about 122.88B; market cap about 700T. Indonesia 10-year yield about 6.9% spot (a normalized 6.5% is used for discounting).
+- Normalized through-cycle anchors are grounded in BBCA's reported FY2011 to FY2025 history (spanning the 2015 to 2016 slowdown and the 2020 COVID spike), leaning on the recent lower-rate regime while blending in a downturn for cost of credit. Macro from IMF and OECD: real GDP about 5%, inflation heading toward 2.5 to 3%, nominal GDP about 8%.
+- Sources: company FY2025 release and annual reports, broker results notes, stockanalysis, Investing, TradingEconomics, IMF and OECD.
 - This is a methodology-grounded estimate, not investment advice.
