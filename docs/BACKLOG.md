@@ -33,6 +33,12 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-08, Valuations for the five new IDX watchlist names
+
+**Context:** v3.24.0 added ASII, BNLI, EXCL, DCII, and AMRT to the watchlist with prices wired through the source sheet, but no DCF valuations exist for them yet, so fair value and verdict render as a dash on the `/investments` page.
+
+**Scope-later:** run the valuation skill for each of the five and publish to the Notion "Valuation models (DCF)" database. ASII likely needs a sum-of-parts treatment (auto, financial services, heavy equipment, agribusiness). Lower priority than the existing investments-pipeline items.
+
 ### 2026-06-07 — Investments multi-period changes: SGX history + partial-fetch resilience
 
 **Update (2026-06-08, v3.22.9):** Partial-fetch blanking RESOLVED. The cron now preserves prior non-null `change_pct_7d` / `change_pct_30d` when a fetch returns null, and the current values were seeded directly into the table. Still open: the SGX-history gap, and the source-independent price-history table (the durable fix if regional published-snapshot lag keeps the cron from ever refreshing the history columns).

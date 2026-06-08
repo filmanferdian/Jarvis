@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.24] – 2026-06-08 – Investments: five new IDX watchlist names (v3.24.0)
+
+Five Indonesian names added to the `/investments` watchlist universe and mirrored on the Notion Investment page (Month 4 IDX Tier 1 table).
+
+- `src/data/watchlist.ts`: ASII (Astra International) joins BIRD under Transport & infrastructure; BNLI (Bank Permata) added under Banks; EXCL (XLSmart Telecom Sejahtera, formerly XL Axiata) added under Telecom; the Super-app & fintech group was renamed Tech and now holds GOTO plus DCII (DCI Indonesia); a new Retail group holds AMRT (Sumber Alfaria Trijaya, Alfamart).
+- Prices: rows for the five names added to the published "Jarvis Investment Quotes" sheet (GOOGLEFINANCE), so the quotes cron prices them.
+- Valuations pending: no DCF entries yet for these five, so fair value and verdict show a dash until a valuation is published. Flagged to backlog.
+- ASII and AMRT sit partly outside the page's stated circle of competence (heavy industrials, mining, palm oil for ASII; consumer staples for AMRT); included at the user's request with a note on the Notion page.
+
 ## [3.23] – 2026-06-08 – Investments: valuation-aware watchlist (v3.23.0)
 
 Release marker consolidating the investments work that landed across the 3.22.3 to 3.22.10 patch window into one minor version. The Investments page is now a working valuation-aware watchlist. No new code in this marker beyond the version bump; the detail for each item lives in the v3.22.x subsections below.

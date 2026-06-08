@@ -35,6 +35,7 @@ export const WATCHLIST: WatchlistExchange[] = [
           { ticker: 'BMRI', name: 'Bank Mandiri' },
           { ticker: 'BBNI', name: 'Bank Negara Indonesia' },
           { ticker: 'BBTN', name: 'Bank Tabungan Negara' },
+          { ticker: 'BNLI', name: 'Bank Permata' },
         ],
       },
       {
@@ -50,11 +51,15 @@ export const WATCHLIST: WatchlistExchange[] = [
         companies: [
           { ticker: 'TLKM', name: 'Telkom Indonesia' },
           { ticker: 'ISAT', name: 'Indosat Ooredoo Hutchison' },
+          { ticker: 'EXCL', name: 'XLSmart Telecom Sejahtera' },
         ],
       },
       {
-        industry: 'Super-app & fintech',
-        companies: [{ ticker: 'GOTO', name: 'GoTo Gojek Tokopedia' }],
+        industry: 'Tech',
+        companies: [
+          { ticker: 'GOTO', name: 'GoTo Gojek Tokopedia' },
+          { ticker: 'DCII', name: 'DCI Indonesia' },
+        ],
       },
       {
         industry: 'Media & entertainment',
@@ -66,7 +71,14 @@ export const WATCHLIST: WatchlistExchange[] = [
       },
       {
         industry: 'Transport & infrastructure',
-        companies: [{ ticker: 'BIRD', name: 'Blue Bird' }],
+        companies: [
+          { ticker: 'ASII', name: 'Astra International' },
+          { ticker: 'BIRD', name: 'Blue Bird' },
+        ],
+      },
+      {
+        industry: 'Retail',
+        companies: [{ ticker: 'AMRT', name: 'Sumber Alfaria Trijaya' }],
       },
     ],
   },

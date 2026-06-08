@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-08, v3.24.0, Investments: five new IDX watchlist names
+
+Added ASII, BNLI, EXCL, DCII, and AMRT to the investments watchlist, with a renamed Tech group (GOTO plus DCII) and a new Retail group, mirrored on the Notion Investment page. Source-sheet rows added; valuations still pending.
+
+**Well:**
+- Confirmed placement with the user before writing (transport grouping for ASII; DCII folded into a renamed Tech group), so the data model did not need rework.
+- Caught that main had already minted 3.23.0 from a parallel session; fetched and fast-forwarded before bumping, so the version landed at 3.24.0 with no conflict (the other commits only touched valuation skill files).
+
+**Wrong:**
+- Created a standalone Data centers group first, then folded DCII into Tech a step later. Asking the grouping intent up front would have saved an edit.
+
+**Next:**
+- Run valuations for the five new names so fair value and verdict stop showing dashes (backlog).
+- Confirm the GOOGLEFINANCE rows price correctly on the next quotes cron slot.
+
+---
+
 ## 2026-06-08, v3.22.10, Investments: live gap from last price to fair value
 
 The upside percent next to each verdict was reading the stored Notion Upside property, frozen at valuation time, so it never moved as the live price changed. Now computed live as (fair minus last) over last, in the watchlist row and the detail view, with a fallback to the stored value when there is no live quote.
