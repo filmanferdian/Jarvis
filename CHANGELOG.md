@@ -6,6 +6,10 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Investments: live gap from last price to fair value (v3.22.10)
+
+The upside percent next to each verdict was reading the stored Notion Upside property, which is frozen at valuation time against the price then, so it never moved as the live price changed. It now computes the gap from the live last price to fair value, (fair − last) / last, in both the watchlist row and the detail view, falling back to the stored value only when there is no live quote. The verdict badge itself is left as the analyst's stored call. Follow-up flagged: have the valuation skill also store Fair value low/high, and optionally re-derive the verdict band from the live gap.
+
 ### Investments quotes: preserve 7d/30d across a blank fetch (v3.22.9)
 
 The 7d/30d columns are GOOGLEFINANCE history formulas that blank out for a moment while recalculating. A scheduled refresh that landed in that window was overwriting the whole row and wiping good 7d/30d values for the entire table (price and the 1-day change survived because those columns never blank). The cron now reads the prior stored 7d/30d and keeps them when the new fetch returns null, so a single mistimed snapshot can no longer blank the columns. Follow-up to the v3.22.4 multi-period feature; closes the partial-fetch-resilience item from the 2026-06-07 backlog note.

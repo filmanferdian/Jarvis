@@ -84,6 +84,27 @@ function fmtPct(n: number | null): string {
   return `${sign}${(n * 100).toFixed(1)}%`;
 }
 
+// Gap from the live last price to fair value: (fair − price) / price.
+// Falls back to the stored Notion upside (frozen at valuation time) only when
+// there is no live quote, so the figure tracks the current price, not the price
+// when the valuation was published.
+function gapToFair(
+  fairValue: number | null | undefined,
+  livePrice: number | null | undefined,
+  storedUpside: number | null,
+): number | null {
+  if (
+    fairValue !== null &&
+    fairValue !== undefined &&
+    livePrice !== null &&
+    livePrice !== undefined &&
+    livePrice > 0
+  ) {
+    return (fairValue - livePrice) / livePrice;
+  }
+  return storedUpside;
+}
+
 function fmtAsOf(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -270,6 +291,7 @@ export default function InvestmentsPage() {
                       const q = quotes[c.ticker];
                       const analyzed = Boolean(v);
                       const vs = verdictStyle(v?.verdict ?? null);
+                      const liveUpside = v ? gapToFair(v.fairValue, q?.price, v.upside ?? null) : null;
                       return (
                         <tr
                           key={c.ticker}
@@ -329,9 +351,9 @@ export default function InvestmentsPage() {
                                 >
                                   {v.verdict}
                                 </span>
-                                {v.upside !== null && (
+                                {liveUpside !== null && (
                                   <span className="text-[10.5px] text-jarvis-text-faint font-mono">
-                                    {fmtPct(v.upside)} upside
+                                    {fmtPct(liveUpside)} upside
                                   </span>
                                 )}
                               </span>
@@ -433,7 +455,7 @@ function MemoView({
                   value={fmtRange(props.currency, props.fairValueLow, props.fairValueHigh, props.fairValue)}
                 />
                 <Metric label="Last price" value={fmtMoney(quote?.currency ?? null, quote?.price ?? null)} />
-                <Metric label="Upside" value={fmtPct(props.upside)} />
+                <Metric label="Upside" value={fmtPct(gapToFair(props.fairValue, quote?.price, props.upside))} />
                 {props.valuationDate && (
                   <Metric label="Valued on" value={fmtValDate(props.valuationDate) ?? props.valuationDate} />
                 )}
