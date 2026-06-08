@@ -219,7 +219,8 @@ class Bridge:
     nonoperating_assets: float = 0.0
     debt_and_equivalents: float = 0.0
     other_claims: float = 0.0  # minority interest, preferred, ESOs, etc.
-    shares_outstanding: float = 0.0
+    shares_outstanding: float = 0.0  # SAME scale as the cash flows (e.g. both billions)
+    current_price: float = 0.0  # optional: enables upside% + a units sanity check
 
 
 @dataclass
@@ -288,6 +289,25 @@ def value(model: Model) -> dict:
         else None
     )
 
+    current_price = model.bridge.current_price or None
+    upside = (
+        (per_share / current_price - 1)
+        if (per_share is not None and current_price)
+        else None
+    )
+    # A per-share wildly off the market price almost always means shares_outstanding
+    # was entered in a different scale than the cash flows (e.g. shares in millions
+    # while FCF is in billions: a 1000x error). Flag it instead of returning nonsense.
+    units_warning = None
+    if per_share is not None and current_price:
+        ratio = per_share / current_price
+        if ratio > 50 or ratio < 0.02:
+            units_warning = (
+                "value_per_share is far from current_price; check that "
+                "shares_outstanding uses the SAME scale as the cash flows "
+                "(e.g. both in billions)."
+            )
+
     return {
         "company": model.company,
         "ticker": model.ticker,
@@ -315,6 +335,9 @@ def value(model: Model) -> dict:
         "equity_value": equity_value,
         "shares_outstanding": model.bridge.shares_outstanding,
         "value_per_share": per_share,
+        "current_price": current_price,
+        "upside_pct": upside,
+        "units_warning": units_warning,
     }
 
 
@@ -366,6 +389,13 @@ def format_report(r: dict) -> str:
             f"/ Shares ({r['shares_outstanding']:,.1f}) "
             f"= Value per share: {cur} {r['value_per_share']:,.2f}"
         )
+    if r.get("current_price"):
+        lines.append(
+            f"  Current price: {cur} {r['current_price']:,.2f}  "
+            f"Upside: {_format_pct(r.get('upside_pct'))}"
+        )
+    if r.get("units_warning"):
+        lines.append(f"  WARNING: {r['units_warning']}")
     return "\n".join(lines)
 
 

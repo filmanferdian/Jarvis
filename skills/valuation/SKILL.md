@@ -119,12 +119,15 @@ If `.venv` does not exist yet (first use on a machine), create it once:
   },
   "bridge": {
     "nonoperating_assets": 50, "debt_and_equivalents": 400,
-    "other_claims": 20, "shares_outstanding": 100
+    "other_claims": 20, "shares_outstanding": 100,
+    "current_price": 0            // optional: enables upside% + a units sanity check
   }
 }
 ```
 
 `forecast[].fcf` is the free cash flow to all investors per year (you derive these from the reorganized NOPLAT and net investment in steps 1–3). The engine discounts at WACC (midyear by default), adds the continuing value at end of year N, bridges to equity, and divides by shares.
+
+**Units must be consistent.** `shares_outstanding` is in the SAME scale as `forecast[].fcf` — if cash flows are in billions, enter shares in billions (e.g. `99.062`, not `99062`), or the per-share comes out 1000× wrong. Set `current_price` (per share, same currency): the engine then prints upside% and **flags a likely units error** when the per-share is wildly off the price (the cheap guard against exactly that mistake).
 
 ## Writing the markdown summary
 
@@ -152,7 +155,8 @@ Each valuation becomes one row (page) in the running Notion database **"Valuatio
 Create one page per valuation with `notion-create-pages` using `parent: {"data_source_id": "9ad3a6c2-14c8-4250-a5f0-8f46f7324528"}`. Set these properties (names must match exactly):
 
 - `Company` (title), `Ticker`, `Market` (one of IDX / US / SGX / HK/China / Other), `Currency`
-- `Fair value per share` (number), `Current price` (number), `Upside %` (number, as a decimal e.g. 0.18 for +18%)
+- `Fair value per share` (number), `Fair value low` (number), `Fair value high` (number), `Current price` (number), `Upside %` (number, as a decimal e.g. 0.18 for +18%)
+  - **Always set `Fair value low` / `Fair value high`** from the sensitivity-grid corners (or the bear/bull scenario ends), not just the point estimate — the investments page renders the bear-to-bull range and only falls back to the single number when they are missing.
 - `Verdict` (Undervalued / Fairly valued / Overvalued), `Method` (Enterprise DCF / Equity DCF / Sum-of-parts / Multiples)
 - `CV share of value` (decimal from engine `continuing_value.share_of_operations`), `WACC` (decimal), `Valuation date` (ISO date)
 
@@ -164,5 +168,7 @@ The **page body** is the markdown memo (verdict, thesis, drivers, WACC, CV relia
 - Excess cash and marketable securities are **nonoperating** — out of invested capital and NOPLAT.
 - CV uses **RONIC** for incremental capital, and **WACC > g** (engine enforces this).
 - Reconcile DCF to the **economic-profit** view and the **implied EV/EBITA** multiple as independent cross-checks.
+- For **large minority interests / holding companies**, subtract minority on the **same basis** as the EV (consolidated multiple, or full sum-of-parts — never mix), and surface **book vs. fair value** as a checkpoint choice. See `reference/06-assemble.md`.
+- Separate **non-cash accounting changes** (useful-life cuts, accelerated depreciation, impairments) from cash economics — value on cash, not the reported book swing. See `reference/01-reorganize.md`.
 - If CV is >75% of value, say so and stress-test g and RONIC.
 - State assumptions explicitly; if data is missing or estimated, flag it rather than guessing silently.

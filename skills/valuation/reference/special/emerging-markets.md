@@ -65,6 +65,16 @@ The book recommends a triangulation approach, comparing estimates from three dis
 2. **Country risk premium DCF (secondary method):** adds a country risk premium to the discount rate of a comparable developed-market investment, then applies that higher discount rate to "business as usual" cash flows. Secondary because there is no systematic method to calculate the premium and it acts as a "black box."
 3. **Valuation by multiples (comparables):** a "best-practice multiples analysis" to check the DCF results. Analysts compare implied forward-looking multiples (like enterprise value to EBITDA) of the target against peer companies globally. In the ConsuCo case, if the implied multiple from the DCF is similar to that of international peers, it suggests that being domiciled in an emerging market "does not matter much for the relative pricing of its stock."
 
+## State-owned enterprises & governance (modern note)
+
+Many emerging-market champions are state-controlled. A government that directs capital allocation for non-economic ends — mandated rural/infrastructure build, instructed acquisitions, dividend pressure — plus corruption risk (inflated project costs, leakage) degrades both the **rate and the quality** of value creation. Reflect it where it actually bites:
+
+- **In the cash flows and returns, not (double) in the discount rate.** Lower long-run growth and especially **RONIC**: the return on *new* capital trends to ≈ WACC, or below, when the state forces value-dilutive investment — and when RONIC ≤ WACC, growth creates no value or destroys it. Keep WACC at the fair country level; do not also stack a governance premium on the rate, or you double-count the same risk.
+- **Treat "capex will fall" guidance skeptically** for a state-directed allocator; model reinvestment at the historical (higher) level unless there is hard evidence.
+- **A governance / conglomerate discount belongs in the cash-flow and return assumptions, or as an explicit separately-stated haircut** — not buried in a black-box WACC bump.
+
+*(Telkom Indonesia: 52% state-owned, mandated fiber build, fiber ~40% utilised. We held growth ~3%, set RONIC ≈ WACC, kept capex elevated, and reflected governance in returns rather than the discount rate.)*
+
 ## Common pitfalls (from the book)
 
 - **Double-counting risk:** a critical error where analysts "accounted for the probability of a crisis twice." The book warns: "Don't mix approaches. Use the cost of capital to discount the cash flows in a probability-weighted scenario approach. Do not add any risk premium, because you would be double-counting risk." This happens when a country risk premium is added to the discount rate and then applied to *expected* (already probability-weighted) cash flows.
