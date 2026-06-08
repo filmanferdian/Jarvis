@@ -45,6 +45,9 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'golf channel',
     'defector',
     'racer', // matches "RACER" motorsports
+    'tmz', // celebrity gossip, not current events
+    'chapelboro', // hyper-local Chapel Hill NC, matches "Chapelboro.com"
+    'dawgnation', // Georgia Bulldogs college-football fan site
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -81,6 +84,10 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'niaga.asia',
     'gadgetdiva',
     'indonesiadefense.com',
+    'pdiperjuanganbali', // PDI-P Bali political party site, not a news outlet
+    'gerbang indonesia', // low-credibility partisan site
+    'gerbangindonesia', // no-space domain variant
+    'gamereactor', // gaming news, matches "gamereactor.asia"
   ],
 };
 

@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.26] – 2026-06-08 – News: blacklist six non-current-events outlets (v3.26.0)
+
+Six outlets added to the `BLOCKED_OUTLETS` list in `src/lib/sources/googleNewsRss.ts` so they no longer surface in the Indonesia/International news synthesis or count toward outletScore corroboration.
+
+- International (WORLD): `tmz` (celebrity gossip), `chapelboro` (hyper-local Chapel Hill NC), `dawgnation` (Georgia Bulldogs fan site).
+- Indonesia (ID): `pdiperjuanganbali` (PDI-P Bali political party site, not journalism), `gerbang indonesia` / `gerbangindonesia` (low-credibility partisan site), `gamereactor` (gaming news).
+- ESPN and detikInet were considered but kept at the user's request.
+- Matching is case-insensitive substring against the normalised outlet name, applied both to an item's primary source (item dropped) and its related outlets (scrubbed, no longer counts toward outletScore).
+
 ## [3.25] – 2026-06-08 – Investments: market cap + last-FY net income columns, sorted by market cap (v3.25.0)
 
 The `/investments` table gains two columns and a new sort: each industry group is now ordered by market cap, largest on top.
