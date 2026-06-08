@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-08, v3.26.0, News: blacklist six non-current-events outlets
+
+Added TMZ, Chapelboro.com, DawgNation (International) and pdiperjuanganbali.id, Gerbang Indonesia, gamereactor.asia (Indonesia) to the existing `BLOCKED_OUTLETS` filter in `src/lib/sources/googleNewsRss.ts`, so they drop out of news synthesis and no longer count toward outletScore. ESPN and detikInet were flagged but kept at the user's request.
+
+**Well:**
+- The blacklist mechanism already existed, so the change was six list entries plus comments, no new code paths. Reused the case-insensitive substring matching that already handles spelling variants.
+- Sorted the candidates into clear tiers (not-news vs niche-but-legit) before recommending, so the user could make a fast, informed cut.
+
+**Wrong:**
+- Pre-bumped the version as a patch (3.25.1) before the ship; the project's tool-keyed rule makes `/ship` a minor bump, so I corrected to 3.26.0 and reopened the section. Minor friction, no harm.
+
+**Next:**
+- Watch for new low-quality outlets surfacing in the feed and extend the list as needed; the filter is the right home for it.
+
+---
+
 ## 2026-06-08, v3.25.0, Investments: market cap + net income columns, sorted by market cap
 
 Added a market cap column (GOOGLEFINANCE, automated) and a last-FY net income column (manual, researched) to the investments table, with each industry group ordered by market cap descending. Threaded two fields through the sheet, parser, quote types, a new migration, the sync, and the page.
