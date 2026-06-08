@@ -198,6 +198,7 @@ def build_model_dict(drivers: dict) -> dict:
             "debt_and_equivalents": 0.0,
             "other_claims": 0.0,
             "shares_outstanding": float(drivers.get("shares_outstanding", 0.0)),
+            "current_price": float(drivers.get("price", 0.0) or 0.0),
         },
     }
 

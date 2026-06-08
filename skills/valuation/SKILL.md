@@ -93,6 +93,15 @@ python3 sensitivity.py /path/to/model.json --metric enterprise
 
 # Excel artifact (needs the venv for openpyxl)
 $PY build_model.py /path/to/model.json -o /path/to/COMPANY_dcf.xlsx
+
+# Bank: driver-based equity DCF (NIM, credit cost, growth, capital -> equity CF)
+python3 driver_bank.py /path/to/COMPANY_drivers.json
+
+# Stress test: tornado + reverse DCF + Monte Carlo (bank driver model)
+python3 stress.py /path/to/COMPANY_drivers.json --stress /path/to/COMPANY_stress.json
+
+# Stress workbook (tornado + histogram charts; needs the venv)
+$PY build_stress_workbook.py /path/to/COMPANY_drivers.json --stress /path/to/COMPANY_stress.json -o /path/to/COMPANY_stress.xlsx
 ```
 
 If `.venv` does not exist yet (first use on a machine), create it once:
@@ -129,6 +138,40 @@ If `.venv` does not exist yet (first use on a machine), create it once:
 
 **Units must be consistent.** `shares_outstanding` is in the SAME scale as `forecast[].fcf` — if cash flows are in billions, enter shares in billions (e.g. `99.062`, not `99062`), or the per-share comes out 1000× wrong. Set `current_price` (per share, same currency): the engine then prints upside% and **flags a likely units error** when the per-share is wildly off the price (the cheap guard against exactly that mistake).
 
+### drivers.json schema (bank driver model)
+
+For **banks**, prefer the driver-based model over a hand-built FCF line. `driver_bank.py` turns fundamental drivers into the equity-cash-flow path and the continuing-value inputs (NI_next, RONE), then runs the engine. ROE is an **output** of the drivers, not an input.
+
+```json
+{
+  "company": "Bank X", "ticker": "BX", "currency": "IDR", "units": "billions",
+  "valuation_date": "2026-06-08", "shares_outstanding": 122.88, "price": 5700,
+  "base_year": {
+    "year": 2025, "earning_assets": 1430000, "noninterest_income": 27000,
+    "loans_to_earning_assets": 0.65, "earning_assets_to_total_assets": 0.90
+  },
+  "drivers": {
+    "earning_asset_growth": [0.08, 0.095, 0.105, 0.10, 0.09, 0.08, 0.07, 0.065, 0.06, 0.055],
+    "nim": 0.055, "cost_to_income": 0.31, "cost_of_credit": 0.005,
+    "tax_rate": 0.20, "equity_to_assets": 0.18, "fee_income_share_drift": 0.0
+  },
+  "cost_of_equity": { "risk_free": 0.065, "erp": 0.055, "beta": 1.0, "midyear": true },
+  "continuing_value": { "growth": 0.055, "rone": 0.18 }
+}
+```
+
+Calibrate `base_year.earning_assets` so the base year reproduces reported net income and equity. Carry any above-GDP growth in the `earning_asset_growth` path (the explicit period), fading to a terminal `growth` capped at the economy's nominal rate. Set `price` so the units guard and upside fire. See `examples/BBCA_drivers.json`.
+
+## Stress testing (tornado, reverse DCF, Monte Carlo)
+
+Run a stress test as the final step of a valuation, not just a sensitivity grid. It shows which assumptions move the number, what the market is already pricing in, and the full range of value with the odds.
+
+- **Tornado** — vary each key assumption one at a time to its low/high; rank by the swing in value per share. Empirically identifies the most important assumptions (often the discount rate first).
+- **Reverse DCF** — bisection-solve the driver value that makes the model equal today's price. Shows what the market is pricing in, one driver at a time.
+- **Monte Carlo** — draw the key drivers from distributions; report P10/P50/P90, the probability undervalued, and a probability-weighted value. For macro-sensitive businesses use a single **cycle factor** so the rate, margin, credit/volume and growth co-move (a bad cycle stresses them together) rather than drawing each independently.
+
+`stress.py` runs all three on a bank driver model (`drivers.json` + a `stress.json` spec); `build_stress_workbook.py` writes the Excel (tornado + histogram charts). For an enterprise `model.json`, `sensitivity.py` gives the 2-way grid (a generic tornado/reverse/MC for the enterprise model is a future add). See `examples/BBCA_stress.json` (spec) and `examples/BBCA_stress.md` (worked memo).
+
 ## Writing the markdown summary
 
 Write a tight memo (not a data dump):
@@ -156,7 +199,7 @@ Create one page per valuation with `notion-create-pages` using `parent: {"data_s
 
 - `Company` (title), `Ticker`, `Market` (one of IDX / US / SGX / HK/China / Other), `Currency`
 - `Fair value per share` (number), `Fair value low` (number), `Fair value high` (number), `Current price` (number), `Upside %` (number, as a decimal e.g. 0.18 for +18%)
-  - **Always set `Fair value low` / `Fair value high`** from the sensitivity-grid corners (or the bear/bull scenario ends), not just the point estimate — the investments page renders the bear-to-bull range and only falls back to the single number when they are missing.
+  - **Always set `Fair value low` / `Fair value high`** from the sensitivity-grid corners (or the bear/bull scenario ends; or, when a Monte Carlo stress test was run, its P10 / P90), not just the point estimate — the investments page renders the bear-to-bull range and only falls back to the single number when they are missing.
 - `Verdict` (Undervalued / Fairly valued / Overvalued), `Method` (Enterprise DCF / Equity DCF / Sum-of-parts / Multiples)
 - `CV share of value` (decimal from engine `continuing_value.share_of_operations`), `WACC` (decimal), `Valuation date` (ISO date)
 
