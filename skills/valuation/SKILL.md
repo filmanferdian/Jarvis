@@ -17,7 +17,7 @@ Value is created by investing capital at returns above the cost of capital. Only
 2. **Markdown summary** — a written valuation memo (thesis, key drivers, WACC, continuing-value reliance, bridge, sensitivity, a synthesis of the underlying assumptions, what it would take for the value to be higher, and risks).
 3. **Notion insights page** — one page per valuation in the running Notion library (see "Notion library" below).
 
-## The 7-step workflow
+## The 8-step workflow
 
 Work the steps in order. Each has a reference doc with the pure 4th-edition method; `reference/modern-updates.md` carries what changed since 2005 and **must be applied on top of every step** (it is keyed by step number).
 
@@ -31,10 +31,11 @@ Work the steps in order. Each has a reference doc with the pure 4th-edition meth
 | 5. Continuing value | `reference/05-continuing-value.md` | Key-value-driver CV with RONIC; choose g and RONIC defensibly. |
 | 6. Assemble | `reference/06-assemble.md` | PV of operations + nonoperating − debt − other claims = equity → per share. |
 | 7. Multiples cross-check | `reference/07-multiples.md` | EV/EBITA vs. peers; reconcile to the implied multiple. |
+| 8. Stress test | `reference/08-stress.md` | Tornado (rank the drivers), reverse DCF (what the price implies), Monte Carlo (value distribution + probability undervalued); set the published fair-value range. |
 
 ## How to run: checkpoint-gated and sequential (default)
 
-Run every valuation as a guided, step-by-step exercise. Do NOT compute the whole model silently and hand back a finished number. Work the 7 steps in order and STOP at the end of each one as a checkpoint, so the user can reason each assumption and verify progress before you continue. This sequential, gated mode is the default. Only skip the gating if the user explicitly says something like "just run it" or "give me the number".
+Run every valuation as a guided, step-by-step exercise. Do NOT compute the whole model silently and hand back a finished number. Work the 8 steps in order and STOP at the end of each one as a checkpoint, so the user can reason each assumption and verify progress before you continue. This sequential, gated mode is the default. Only skip the gating if the user explicitly says something like "just run it" or "give me the number".
 
 At every checkpoint:
 1. Show the recast numbers or driver outputs for that step as tight tables, not prose dumps.
@@ -42,7 +43,7 @@ At every checkpoint:
 3. Put those judgment calls to the user as quick structured choices using the AskUserQuestion tool (2 to 4 options each, the recommended option first and labelled "(Recommended)"). Never silently pick an assumption that moves value.
 4. Wait for the answer, lock it, then move to the next step.
 
-Number the checkpoints for the user (for example "Checkpoint 3 of 7") and say where you are. Carry locked assumptions forward and do not re-litigate them. Keep each checkpoint short: the user should reason one layer at a time, not read an essay.
+Number the checkpoints for the user (for example "Checkpoint 3 of 8") and say where you are. Carry locked assumptions forward and do not re-litigate them. Keep each checkpoint short: the user should reason one layer at a time, not read an essay.
 
 Surface the decisions that actually move value at the checkpoint where they first bite. A good default map:
 
@@ -55,6 +56,7 @@ Surface the decisions that actually move value at the checkpoint where they firs
 | 4. WACC | Country and equity risk premium level; beta source and level; risk-free normalization in distorted-rate environments. |
 | 5. Continuing value | RONIC in perpetuity (fade to WACC, a modest premium, or a durable moat); terminal growth g. |
 | 6 to 7. Assemble and cross-check | Which case is the headline number (for example fair-value vs book minority); whether to publish the memo and Notion page now. |
+| 8. Stress test | Which drivers to stress and their low/high ranges (grounded in history/peers, not round guesses); for Monte Carlo, the cycle coupling (rate, margin, credit, growth co-move) and sim count; the published fair-value range (P10/P90). |
 
 If the user asks to go faster, you may batch the remaining low-controversy choices into one AskUserQuestion call, but still show the step's numbers before asking.
 
@@ -164,7 +166,7 @@ Calibrate `base_year.earning_assets` so the base year reproduces reported net in
 
 ## Stress testing (tornado, reverse DCF, Monte Carlo)
 
-Run a stress test as the final step of a valuation, not just a sensitivity grid. It shows which assumptions move the number, what the market is already pricing in, and the full range of value with the odds.
+Run a stress test as the final step of a valuation (step 8; full procedure in `reference/08-stress.md`), not just a sensitivity grid. It shows which assumptions move the number, what the market is already pricing in, and the full range of value with the odds.
 
 - **Tornado** — vary each key assumption one at a time to its low/high; rank by the swing in value per share. Empirically identifies the most important assumptions (often the discount rate first).
 - **Reverse DCF** — bisection-solve the driver value that makes the model equal today's price. Shows what the market is pricing in, one driver at a time.
