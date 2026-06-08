@@ -35,6 +35,8 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ### 2026-06-07 — Investments multi-period changes: SGX history + partial-fetch resilience
 
+**Update (2026-06-08, v3.22.9):** Partial-fetch blanking RESOLVED. The cron now preserves prior non-null `change_pct_7d` / `change_pct_30d` when a fetch returns null, and the current values were seeded directly into the table. Still open: the SGX-history gap, and the source-independent price-history table (the durable fix if regional published-snapshot lag keeps the cron from ever refreshing the history columns).
+
 **Context:** v3.22.4 added 1D/7D/30D price changes. US + IDX 7d/30d come from two GOOGLEFINANCE-history columns in the published sheet; SGX (DBS/OCBC/UOB) has no history feed, so SGX shows 1D only. GOOGLEFINANCE history is also volatile (a mid-recalc snapshot can be empty), and the cron overwrites the whole row, so a single fetch that misses 7d/30d blanks them until the next run.
 
 **Options (scope-later):**
