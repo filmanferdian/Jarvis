@@ -1,0 +1,42 @@
+{
+  "company": "Bank Central Asia Tbk",
+  "ticker": "BBCA",
+  "currency": "IDR",
+  "units": "billions",
+  "valuation_date": "2026-05-29",
+  "_method_note": "Equity DCF (bank). forecast[].fcf = equity cash flow = net income x payout, retention = g/ROE to fund growth at capital adequacy. Discount rate is cost of equity (equity_weight=1). Continuing value uses NI_next with RONE in place of NOPLAT/RONIC. Zero net-debt bridge so engine outputs equity value directly.",
+  "forecast": [
+    {"year": 2026, "fcf": 40019},
+    {"year": 2027, "fcf": 42821},
+    {"year": 2028, "fcf": 47581},
+    {"year": 2029, "fcf": 50674},
+    {"year": 2030, "fcf": 55966},
+    {"year": 2031, "fcf": 59324},
+    {"year": 2032, "fcf": 62884},
+    {"year": 2033, "fcf": 69037},
+    {"year": 2034, "fcf": 72834},
+    {"year": 2035, "fcf": 76840}
+  ],
+  "wacc": {
+    "risk_free": 0.0668,
+    "erp": 0.055,
+    "beta": 1.0,
+    "pretax_cost_of_debt": 0.0,
+    "tax_rate": 0.0,
+    "equity_weight": 1.0,
+    "debt_weight": 0.0,
+    "midyear": true
+  },
+  "continuing_value": {
+    "method": "key_value_driver",
+    "growth": 0.055,
+    "ronic": 0.18,
+    "noplat_next": 111815
+  },
+  "bridge": {
+    "nonoperating_assets": 0,
+    "debt_and_equivalents": 0,
+    "other_claims": 0,
+    "shares_outstanding": 122.88
+  }
+}

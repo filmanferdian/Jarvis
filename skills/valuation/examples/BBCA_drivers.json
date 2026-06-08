@@ -1,0 +1,36 @@
+{
+  "company": "Bank Central Asia Tbk",
+  "ticker": "BBCA",
+  "currency": "IDR",
+  "units": "billions",
+  "valuation_date": "2026-06-08",
+  "shares_outstanding": 122.88,
+  "price": 5700,
+  "_note": "Driver-based equity DCF. Base year earning_assets (1,430,000 = ~1,430T) is calibrated so FY2025 actual drivers (NIM 5.7%, cost of credit 0.42%, cost-to-income ~30.7%, tax 19.2%, noninterest ~27T) reproduce FY2025 pretax ~71.3T and net income ~57.6T on ~282T equity (ROE ~20%). Forecast applies the 10 locked NORMALIZED assumptions from 2026. loans_to_earning_assets and earning_assets_to_total_assets are structural ratios held flat.",
+  "base_year": {
+    "year": 2025,
+    "earning_assets": 1430000,
+    "noninterest_income": 27000,
+    "loans_to_earning_assets": 0.65,
+    "earning_assets_to_total_assets": 0.90
+  },
+  "drivers": {
+    "earning_asset_growth": [0.08, 0.095, 0.105, 0.105, 0.10, 0.09, 0.08, 0.07, 0.065, 0.06],
+    "nim": 0.055,
+    "cost_to_income": 0.31,
+    "cost_of_credit": 0.005,
+    "tax_rate": 0.20,
+    "equity_to_assets": 0.18,
+    "fee_income_share_drift": 0.0
+  },
+  "cost_of_equity": {
+    "risk_free": 0.065,
+    "erp": 0.055,
+    "beta": 1.0,
+    "midyear": true
+  },
+  "continuing_value": {
+    "growth": 0.055,
+    "rone": 0.18
+  }
+}

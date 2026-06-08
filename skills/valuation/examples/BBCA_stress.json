@@ -1,0 +1,43 @@
+{
+  "_note": "Stress spec for the BBCA driver model. tornado: one-at-a-time low/base/high per driver. reverse: bisection brackets to solve the driver value implied by today's price. montecarlo: a single cycle factor co-moves the rate, NIM, credit cost and growth (a bad cycle raises rates and provisions while cutting growth), plus idiosyncratic noise per driver.",
+  "tornado": {
+    "cost_of_equity":       {"low": 0.11,  "base": 0.12,  "high": 0.14,  "label": "Cost of equity"},
+    "terminal_growth":      {"low": 0.045, "base": 0.055, "high": 0.065, "label": "Terminal growth (g)"},
+    "nim":                  {"low": 0.050, "base": 0.055, "high": 0.058, "label": "NIM"},
+    "cost_of_credit":       {"low": 0.003, "base": 0.005, "high": 0.015, "label": "Cost of credit"},
+    "explicit_growth_peak": {"low": 0.065, "base": 0.105, "high": 0.12,  "label": "Explicit growth (peak)"},
+    "rone":                 {"low": 0.14,  "base": 0.18,  "high": 0.20,  "label": "RONE"},
+    "cost_to_income":       {"low": 0.30,  "base": 0.31,  "high": 0.38,  "label": "Cost-to-income"},
+    "equity_to_assets":     {"low": 0.15,  "base": 0.18,  "high": 0.20,  "label": "Capital intensity"},
+    "tax_rate":             {"low": 0.19,  "base": 0.20,  "high": 0.22,  "label": "Tax rate"},
+    "fee_income_share_drift": {"low": -0.01, "base": 0.0, "high": 0.01,  "label": "Fee income drift"}
+  },
+  "reverse": {
+    "cost_of_equity":       {"lo": 0.10,  "hi": 0.20,  "label": "Implied cost of equity"},
+    "terminal_growth":      {"lo": 0.00,  "hi": 0.075, "label": "Implied terminal growth"},
+    "nim":                  {"lo": 0.035, "hi": 0.07,  "label": "Implied NIM"},
+    "cost_of_credit":       {"lo": 0.001, "hi": 0.04,  "label": "Implied cost of credit"},
+    "explicit_growth_peak": {"lo": 0.0,   "hi": 0.20,  "label": "Implied explicit growth peak"},
+    "rone":                 {"lo": 0.121, "hi": 0.30,  "label": "Implied RONE"}
+  },
+  "montecarlo": {
+    "n": 10000,
+    "seed": 42,
+    "cycle": {
+      "rf_sens": 0.006,
+      "nim_sens": 0.001,
+      "coc_log_sens": 0.5,
+      "growth_sens": 0.15,
+      "g_term_sens": 0.002
+    },
+    "noise": {
+      "rf": 0.002, "erp": 0.003, "nim": 0.0015, "coc_log": 0.20,
+      "growth": 0.05, "g_term": 0.004, "rone": 0.015, "cir": 0.015, "tax": 0.01
+    },
+    "clamp": {
+      "rf": [0.04, 0.10], "erp": [0.04, 0.07], "nim": [0.045, 0.065],
+      "coc": [0.002, 0.030], "g_term_floor": 0.03, "rone": [0.13, 0.24],
+      "cir": [0.27, 0.42], "tax": [0.18, 0.24], "growth_factor": [0.30, 2.0]
+    }
+  }
+}
