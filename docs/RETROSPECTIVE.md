@@ -4,6 +4,24 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-08, v3.22.10, Investments: live gap from last price to fair value
+
+The upside percent next to each verdict was reading the stored Notion Upside property, frozen at valuation time, so it never moved as the live price changed. Now computed live as (fair minus last) over last, in the watchlist row and the detail view, with a fallback to the stored value when there is no live quote.
+
+**Well:**
+- Confirmed the staleness from the render path before touching anything: the cell bound to the stored Upside property while the Last price column right next to it was live. Diagnosis first, then a one-helper fix.
+- Kept it surgical: one shared helper, fallback to the stored value, verdict badge left as the analyst's call. Build passed first try.
+
+**Wrong:**
+- Left the verdict badge static while the percent is now live, so a large price move could make the badge and the gap disagree. Chose surgical over re-deriving the band; it is a latent inconsistency, flagged to backlog.
+- Main advanced twice underneath me from parallel sessions; the first fast-forward merge failed and I had to rebase. No conflict (the other commit only touched skill files), but a reminder to fetch and rebase right before merging on a busy repo.
+
+**Next:**
+- Optionally re-derive the verdict band from the live gap so badge and percent stay consistent (backlog).
+- The Fair value low/high follow-up from 2026-06-05 looks addressed by the same-day valuation skill update; confirm and close it.
+
+---
+
 ## 2026-06-07 — v3.22.4–3.22.7 — Investments: multi-period price + explicit fair value
 
 Added 1D/7D/30D price changes and an explicit fair value (plus range and as-of date) to the investments page, added ISAT and dropped ASSA/JSMR, and sourced the 7d/30d history from two new GOOGLEFINANCE columns in the published sheet. Shipping it took four patch versions because firing the cron against live data exposed bugs the build could not catch.

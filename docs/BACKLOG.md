@@ -187,6 +187,20 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Low priority
 
+### 2026-06-08: Re-derive the investments verdict badge from the live gap
+
+**Context:** v3.22.10 made the upside percent next to each verdict dynamic (live last price to fair value), but the verdict badge (Undervalued, Fairly valued, Overvalued) is still the analyst's stored call from valuation time. If the live price moves far enough, the badge and the percent can disagree (for example the badge reads Fairly valued while the gap reads plus eighteen percent).
+
+**Scope:**
+- Decide bands (for example undervalued at or above plus fifteen percent, overvalued at or below minus fifteen percent, else fairly valued), anchored so the stored verdict reproduces at the stored price.
+- Re-derive the badge label and color from the live gap in the watchlist row and the detail view, with a fallback to the stored verdict when there is no live quote.
+
+**Why defer:** Today every analyzed name sits near fair value, so badge and percent agree. Only worth doing if a holding swings far from its valuation price.
+
+**Effort estimate:** About 20 minutes (a small bands helper plus wiring in two render sites).
+
+---
+
 ### 2026-06-05 — Valuation skill should set Fair value low/high on the Notion page
 
 **Context:** The valuation skill creates a page in the "Valuation models (DCF)" Notion database but only sets Fair value per share, not the Fair value low and Fair value high properties that already exist on the database. The investments page range column reads low/high and falls back to the single fair value, so a published valuation shows one number instead of the bear-to-bull range until the properties are backfilled by hand (as was done for BBRI: 2,635 low, 3,470 high).
