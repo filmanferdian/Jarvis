@@ -4,6 +4,16 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.23] – 2026-06-08 – Investments: valuation-aware watchlist (v3.23.0)
+
+Release marker consolidating the investments work that landed across the 3.22.3 to 3.22.10 patch window into one minor version. The Investments page is now a working valuation-aware watchlist. No new code in this marker beyond the version bump; the detail for each item lives in the v3.22.x subsections below.
+
+- Manual Refresh button so a newly published Notion valuation appears on demand instead of on the next day or a redeploy (v3.22.3).
+- Multi-period price changes (1D, 7D, 30D) and an explicit fair value next to the range and as-of date; ISAT added, ASSA and JSMR dropped; 7D and 30D sourced from new GOOGLEFINANCE history columns, with parser, quoting, and cache-bust fixes found by firing against live data (v3.22.4 to v3.22.7).
+- Quote refresh preserves prior 7D and 30D values across a momentary blank fetch, so a mistimed snapshot no longer wipes the columns (v3.22.9).
+- Live gap from the last price to fair value beside each verdict, replacing the stored upside that was frozen at valuation time (v3.22.10).
+- Alongside this arc, a stage-by-stage equity DCF of Bank Rakyat Indonesia was added to the valuation library.
+
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
 ### Investments: live gap from last price to fair value (v3.22.10)
