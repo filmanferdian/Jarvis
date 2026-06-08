@@ -22,6 +22,10 @@ export interface SourceQuote {
   changePct7d: number | null;
   /** 30-day change as a fraction; null when the source has no history. */
   changePct30d: number | null;
+  /** Latest market capitalization in the listing currency; null when unavailable. */
+  marketCap: number | null;
+  /** Last full-year net income in the listing currency; null when unavailable. */
+  netIncome: number | null;
 }
 
 function toNum(v: unknown): number {
@@ -55,7 +59,9 @@ export async function fetchSgxQuotes(codes: string[]): Promise<Record<string, So
       const price = Number.isFinite(lt) && lt > 0 ? lt : null;
       const cp = toNum(row.change_vs_pc_percentage);
       const changePct = Number.isFinite(cp) ? cp / 100 : null;
-      out[code] = { price, changePct, changePct7d: null, changePct30d: null };
+      // SGX's feed carries no fundamentals; market cap and net income for the
+      // SGX names come from manual rows in the quotes sheet (merged in the sync).
+      out[code] = { price, changePct, changePct7d: null, changePct30d: null, marketCap: null, netIncome: null };
     }
     return out;
   } catch {

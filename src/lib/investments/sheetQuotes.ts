@@ -4,11 +4,14 @@
 // SGX is handled separately (SGX revoked GOOGLEFINANCE); see sgxQuotes.ts.
 //
 // Expected CSV shape, one row per company (a header row is tolerated):
-//   ticker, price, changePct, changePct7d, changePct30d
+//   ticker, price, changePct, changePct7d, changePct30d, marketCap, netIncome
 // where ticker matches our watchlist ticker. Each change is a fraction; parseNum
 // also accepts a percent string ("-6.45%") in case the sheet cell is percent-
 // formatted, so a formatting change can't skew values 100x. The 7d/30d columns
 // are optional: missing cells parse to null and the page renders a dash.
+// marketCap comes from GOOGLEFINANCE("...","marketcap") (US + IDX); netIncome is a
+// manual last-full-year figure in the listing currency (negative for loss-makers).
+// Both are optional and parse to null when blank.
 
 import type { SourceQuote } from '@/lib/investments/sgxQuotes';
 
@@ -102,6 +105,8 @@ export async function fetchSheetQuotes(): Promise<Record<string, SourceQuote>> {
         changePct: parseNum(cells[2]),
         changePct7d: parseNum(cells[3]),
         changePct30d: parseNum(cells[4]),
+        marketCap: parseNum(cells[5]),
+        netIncome: parseNum(cells[6]),
       };
     }
     return out;

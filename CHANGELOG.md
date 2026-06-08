@@ -4,6 +4,17 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.25] – 2026-06-08 – Investments: market cap + last-FY net income columns, sorted by market cap (v3.25.0)
+
+The `/investments` table gains two columns and a new sort: each industry group is now ordered by market cap, largest on top.
+
+- `src/app/investments/page.tsx`: added Market cap and Net income (last FY) columns with a compact T/B/M money formatter; each group is sorted by market cap descending (names without a market cap sort to the bottom); both also surface in the detail view.
+- `src/lib/investments/sheetQuotes.ts`, `sgxQuotes.ts`, `quotes.ts`: the quote types carry `marketCap` and `netIncome`; the sheet reader parses two new CSV columns.
+- `src/lib/sync/investmentQuotes.ts`: stores and reads `market_cap` and `last_fy_net_income`, preserving prior values across a blank fetch (same pattern as the 7d/30d history). For SGX, price comes from the live feed while market cap and net income come from manual sheet rows.
+- Migration `032`: adds nullable `market_cap` and `last_fy_net_income` to `investment_quotes` (applied to prod).
+- Source sheet: market cap via GOOGLEFINANCE marketcap (US + IDX) plus a manual snapshot for the three SGX banks; net income is a manual last-FY figure per name (mostly FY2025), researched and filled. Verified end to end: the cron priced 51/51 and the new columns populated in Supabase.
+- Caveat: GOOGLEFINANCE's IDX market caps derive from its own price feed (which runs lower than headline figures), so absolute IDX market caps are understated and within-IDX ordering reflects that feed, not exchange-reported market cap.
+
 ## [3.24] – 2026-06-08 – Investments: five new IDX watchlist names (v3.24.0)
 
 Five Indonesian names added to the `/investments` watchlist universe and mirrored on the Notion Investment page (Month 4 IDX Tier 1 table).

@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-08, v3.25.0, Investments: market cap + net income columns, sorted by market cap
+
+Added a market cap column (GOOGLEFINANCE, automated) and a last-FY net income column (manual, researched) to the investments table, with each industry group ordered by market cap descending. Threaded two fields through the sheet, parser, quote types, a new migration, the sync, and the page.
+
+**Well:**
+- Reused the proven 7d/30d threading pattern end to end, so the change was mechanical and low-risk; the build passed and the cron priced 51/51 on the first local run.
+- Built the market cap column by copying column B and find-replacing price to marketcap, avoiding 50 hand-typed formulas. Verified the data in Supabase before shipping rather than trusting the UI.
+- Confirmed the exact sheet row order from the published CSV before pasting net income positionally.
+
+**Wrong:**
+- First net income paste relied on blank lines for the two non-watchlist rows (ASSA, JSMR) and shifted the whole US block up by one. Caught it on spot-check and re-entered in two contiguous blocks. Lesson: do not rely on empty cells to advance during a positional paste.
+- GOOGLEFINANCE IDX market caps come in lower than headline figures (its price feed quirk), so absolute IDX market caps are understated; flagged to the user and backlog.
+- The auth-gated page blocked a local visual screenshot (declined to type the dev token), so verification leaned on the data layer plus the build.
+
+**Next:**
+- Net income is static; refresh after each annual results season (backlog).
+- If the IDX market cap understatement affects ordering, switch IDX market cap to manual or a fundamentals source (backlog).
+
+---
+
 ## 2026-06-08, v3.24.0, Investments: five new IDX watchlist names
 
 Added ASII, BNLI, EXCL, DCII, and AMRT to the investments watchlist, with a renamed Tech group (GOTO plus DCII) and a new Retail group, mirrored on the Notion Investment page. Source-sheet rows added; valuations still pending.

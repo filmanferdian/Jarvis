@@ -18,6 +18,10 @@ export interface Quote {
   changePct: number | null;
   changePct7d: number | null;
   changePct30d: number | null;
+  /** Latest market capitalization in the listing currency; null when unavailable. */
+  marketCap: number | null;
+  /** Last full-year net income in the listing currency; null when unavailable. */
+  netIncome: number | null;
 }
 
 const cache = new Map<string, { ts: number; quote: Quote }>();
@@ -33,6 +37,8 @@ async function fetchOne(symbol: string): Promise<Quote> {
     changePct: null,
     changePct7d: null,
     changePct30d: null,
+    marketCap: null,
+    netIncome: null,
   };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -61,6 +67,8 @@ async function fetchOne(symbol: string): Promise<Quote> {
       changePct: prev && prev !== 0 ? (price - prev) / prev : null,
       changePct7d: null,
       changePct30d: null,
+      marketCap: null,
+      netIncome: null,
     };
     cache.set(symbol, { ts: Date.now(), quote });
     return quote;

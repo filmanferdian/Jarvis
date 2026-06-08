@@ -34,18 +34,29 @@ function sgxCode(c: FlatCompany): string {
   return (c.yahoo ?? c.ticker).replace(/\.SI$/i, '').toUpperCase();
 }
 
-/** Prior stored 7d/30d per ticker, used to preserve them when a fetch returns
- *  null (the GOOGLEFINANCE history columns blank out during recalculation). */
-async function fetchPriorHistory(): Promise<
-  Record<string, { change_pct_7d: number | null; change_pct_30d: number | null }>
-> {
-  const out: Record<string, { change_pct_7d: number | null; change_pct_30d: number | null }> = {};
+interface PriorValues {
+  change_pct_7d: number | null;
+  change_pct_30d: number | null;
+  market_cap: number | null;
+  last_fy_net_income: number | null;
+}
+
+/** Prior stored 7d/30d, market cap, and net income per ticker, used to preserve
+ *  them when a fetch returns null (the GOOGLEFINANCE history and marketcap columns
+ *  blank out during recalculation; net income is manual and rarely blanks). */
+async function fetchPriorValues(): Promise<Record<string, PriorValues>> {
+  const out: Record<string, PriorValues> = {};
   const { data, error } = await supabase
     .from('investment_quotes')
-    .select('ticker, change_pct_7d, change_pct_30d');
+    .select('ticker, change_pct_7d, change_pct_30d, market_cap, last_fy_net_income');
   if (error || !data) return out;
   for (const row of data) {
-    out[row.ticker] = { change_pct_7d: row.change_pct_7d, change_pct_30d: row.change_pct_30d };
+    out[row.ticker] = {
+      change_pct_7d: row.change_pct_7d,
+      change_pct_30d: row.change_pct_30d,
+      market_cap: row.market_cap,
+      last_fy_net_income: row.last_fy_net_income,
+    };
   }
   return out;
 }
@@ -58,12 +69,16 @@ export async function syncInvestmentQuotes(): Promise<QuoteSyncResult> {
   const [sheet, sgx, prior] = await Promise.all([
     fetchSheetQuotes(),
     fetchSgxQuotes(sgxCodes),
-    fetchPriorHistory(),
+    fetchPriorValues(),
   ]);
 
   const now = new Date().toISOString();
   const rows = companies.map((c) => {
-    const q = c.exchange === 'SGX' ? sgx[sgxCode(c)] : sheet[c.ticker.toUpperCase()];
+    const sheetRow = sheet[c.ticker.toUpperCase()];
+    // SGX price and day change come from the live SGX feed; the feed carries no
+    // fundamentals, so SGX market cap and net income come from manual rows in the
+    // sheet (same ticker). US/IDX take everything from the sheet.
+    const q = c.exchange === 'SGX' ? sgx[sgxCode(c)] : sheetRow;
     const price = q?.price ?? null;
     const prev = prior[c.ticker];
     return {
@@ -78,6 +93,11 @@ export async function syncInvestmentQuotes(): Promise<QuoteSyncResult> {
       // 1-day change never blank, so they always take the fresh value.
       change_pct_7d: q?.changePct7d ?? prev?.change_pct_7d ?? null,
       change_pct_30d: q?.changePct30d ?? prev?.change_pct_30d ?? null,
+      // Market cap (GOOGLEFINANCE for US/IDX, manual for SGX) and the manual last-FY
+      // net income both come from the sheet; preserve prior values so a momentary
+      // blank marketcap recalc cannot wipe the column.
+      market_cap: sheetRow?.marketCap ?? prev?.market_cap ?? null,
+      last_fy_net_income: sheetRow?.netIncome ?? prev?.last_fy_net_income ?? null,
       fetched_at: now,
     };
   });
@@ -102,7 +122,9 @@ export interface StoredQuotesResult {
 export async function getStoredQuotes(): Promise<StoredQuotesResult> {
   const { data, error } = await supabase
     .from('investment_quotes')
-    .select('ticker, symbol, price, currency, change_pct, change_pct_7d, change_pct_30d, fetched_at');
+    .select(
+      'ticker, symbol, price, currency, change_pct, change_pct_7d, change_pct_30d, market_cap, last_fy_net_income, fetched_at',
+    );
   if (error) throw new Error(`investment_quotes read: ${error.message}`);
 
   const quotes: Record<string, Quote> = {};
@@ -115,6 +137,8 @@ export async function getStoredQuotes(): Promise<StoredQuotesResult> {
       changePct: row.change_pct,
       changePct7d: row.change_pct_7d,
       changePct30d: row.change_pct_30d,
+      marketCap: row.market_cap,
+      netIncome: row.last_fy_net_income,
     };
     if (!asOf || row.fetched_at > asOf) asOf = row.fetched_at;
   }

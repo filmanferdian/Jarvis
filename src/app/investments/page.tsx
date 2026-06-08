@@ -35,6 +35,8 @@ interface Quote {
   changePct: number | null;
   changePct7d: number | null;
   changePct30d: number | null;
+  marketCap: number | null;
+  netIncome: number | null;
 }
 
 const EMPTY = '–'; // en-dash placeholder for missing values
@@ -76,6 +78,29 @@ function fmtRange(
   if (low !== null && high !== null) return `${code}${fmtNum(currency, low)} ${EMPTY} ${fmtNum(currency, high)}`;
   if (fair !== null) return `${code}${fmtNum(currency, fair)}`;
   return EMPTY;
+}
+
+// Compact money for large figures (market cap, net income): T / B / M suffixes,
+// keeping the currency code prefix used elsewhere. 1 decimal under 100, else 0.
+// Negative values (loss-makers) keep their sign.
+function fmtCompact(currency: string | null, n: number | null): string {
+  if (n === null || n === undefined) return EMPTY;
+  const code = currency ? currency + ' ' : '';
+  const abs = Math.abs(n);
+  let scaled = n;
+  let suffix = '';
+  if (abs >= 1e12) {
+    scaled = n / 1e12;
+    suffix = ' T';
+  } else if (abs >= 1e9) {
+    scaled = n / 1e9;
+    suffix = ' B';
+  } else if (abs >= 1e6) {
+    scaled = n / 1e6;
+    suffix = ' M';
+  }
+  const d = Math.abs(scaled) >= 100 ? 0 : 1;
+  return `${code}${scaled.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}${suffix}`;
 }
 
 function fmtPct(n: number | null): string {
@@ -140,6 +165,22 @@ function Delta({ label, pct }: { label: string; pct: number | null | undefined }
       <span style={{ color }}>{has ? fmtPct(pct) : EMPTY}</span>
     </span>
   );
+}
+
+// Order companies within a group by latest market cap, largest first. Names with
+// no market cap (no quote yet, or a source that lacks it) sort to the bottom.
+function sortByMarketCap<T extends { ticker: string }>(
+  companies: T[],
+  quotes: Record<string, Quote>,
+): T[] {
+  return [...companies].sort((a, b) => {
+    const ma = quotes[a.ticker]?.marketCap ?? null;
+    const mb = quotes[b.ticker]?.marketCap ?? null;
+    if (ma === null && mb === null) return 0;
+    if (ma === null) return 1;
+    if (mb === null) return -1;
+    return mb - ma;
+  });
 }
 
 export default function InvestmentsPage() {
@@ -266,10 +307,12 @@ export default function InvestmentsPage() {
             </div>
 
             <div className="overflow-x-auto rounded-[12px] border border-jarvis-border bg-jarvis-bg-card">
-              <table className="w-full min-w-[640px] border-collapse">
+              <table className="w-full min-w-[860px] border-collapse">
                 <thead>
                   <tr className="text-[10.5px] uppercase tracking-wide text-jarvis-text-faint">
                     <th className="text-left font-medium px-3.5 py-2">Company</th>
+                    <th className="text-right font-medium px-3.5 py-2">Market cap</th>
+                    <th className="text-right font-medium px-3.5 py-2">Net income · last FY</th>
                     <th className="text-right font-medium px-3.5 py-2">Last price · 1D / 7D / 30D</th>
                     <th className="text-right font-medium px-3.5 py-2">Fair value</th>
                     <th className="text-left font-medium px-3.5 py-2">Verdict</th>
@@ -280,13 +323,13 @@ export default function InvestmentsPage() {
                   <tbody key={ind.industry}>
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={7}
                         className="px-3.5 pt-3 pb-1 text-[10.5px] uppercase tracking-wide text-jarvis-text-faint border-t border-jarvis-border"
                       >
                         {ind.industry}
                       </td>
                     </tr>
-                    {ind.companies.map((c) => {
+                    {sortByMarketCap(ind.companies, quotes).map((c) => {
                       const v = valuations[c.ticker];
                       const q = quotes[c.ticker];
                       const analyzed = Boolean(v);
@@ -303,6 +346,20 @@ export default function InvestmentsPage() {
                           <td className="px-3.5 py-2.5">
                             <span className="font-mono font-medium text-jarvis-text-primary">{c.ticker}</span>
                             <span className="text-jarvis-text-faint ml-2">{c.name}</span>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap font-mono text-jarvis-text-secondary">
+                            {!quotesLoaded ? (
+                              <span className="text-jarvis-text-faint">…</span>
+                            ) : (
+                              fmtCompact(q?.currency ?? null, q?.marketCap ?? null)
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap font-mono text-jarvis-text-secondary">
+                            {!quotesLoaded ? (
+                              <span className="text-jarvis-text-faint">…</span>
+                            ) : (
+                              fmtCompact(q?.currency ?? null, q?.netIncome ?? null)
+                            )}
                           </td>
                           <td className="px-3.5 py-2.5 text-right whitespace-nowrap font-mono">
                             {!quotesLoaded ? (
@@ -455,6 +512,8 @@ function MemoView({
                   value={fmtRange(props.currency, props.fairValueLow, props.fairValueHigh, props.fairValue)}
                 />
                 <Metric label="Last price" value={fmtMoney(quote?.currency ?? null, quote?.price ?? null)} />
+                <Metric label="Market cap" value={fmtCompact(quote?.currency ?? null, quote?.marketCap ?? null)} />
+                <Metric label="Net income (FY)" value={fmtCompact(quote?.currency ?? null, quote?.netIncome ?? null)} />
                 <Metric label="Upside" value={fmtPct(gapToFair(props.fairValue, quote?.price, props.upside))} />
                 {props.valuationDate && (
                   <Metric label="Valued on" value={fmtValDate(props.valuationDate) ?? props.valuationDate} />

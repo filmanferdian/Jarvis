@@ -33,6 +33,14 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-08, Investments market cap + net income: data-source upkeep
+
+**Context:** v3.25.0 added a market cap column (GOOGLEFINANCE marketcap, US + IDX) and a manual last-FY net income column to the investments table, ordered by market cap per group.
+
+**Two upkeep items:**
+- Net income is a manual figure in the source sheet (mostly FY2025), so refresh it once a year after annual results land. The three SGX market caps are also manual snapshots that drift with price; refresh when convenient.
+- GOOGLEFINANCE's IDX market caps derive from its own price feed, which runs below headline market caps, so absolute IDX figures are understated and within-IDX ordering reflects that feed. If exact ordering matters, switch IDX market cap to a manual value or a fundamentals API.
+
 ### 2026-06-08, Valuations for the five new IDX watchlist names
 
 **Context:** v3.24.0 added ASII, BNLI, EXCL, DCII, and AMRT to the watchlist with prices wired through the source sheet, but no DCF valuations exist for them yet, so fair value and verdict render as a dash on the `/investments` page.
