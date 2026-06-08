@@ -8,6 +8,9 @@
 //   - SGX: SGX's own public delayed-price JSON feed.
 // Each source degrades to empty on failure; we only overwrite a stored quote
 // when a price actually came back, so a transient outage never blanks good data.
+// The 7d/30d history columns are additionally preserved across a fetch that
+// returns null for them, because those GOOGLEFINANCE history columns briefly
+// blank out while recalculating.
 
 import { supabase } from '@/lib/supabase';
 import { flatCompanies, FlatCompany } from '@/data/watchlist';
@@ -31,25 +34,50 @@ function sgxCode(c: FlatCompany): string {
   return (c.yahoo ?? c.ticker).replace(/\.SI$/i, '').toUpperCase();
 }
 
+/** Prior stored 7d/30d per ticker, used to preserve them when a fetch returns
+ *  null (the GOOGLEFINANCE history columns blank out during recalculation). */
+async function fetchPriorHistory(): Promise<
+  Record<string, { change_pct_7d: number | null; change_pct_30d: number | null }>
+> {
+  const out: Record<string, { change_pct_7d: number | null; change_pct_30d: number | null }> = {};
+  const { data, error } = await supabase
+    .from('investment_quotes')
+    .select('ticker, change_pct_7d, change_pct_30d');
+  if (error || !data) return out;
+  for (const row of data) {
+    out[row.ticker] = { change_pct_7d: row.change_pct_7d, change_pct_30d: row.change_pct_30d };
+  }
+  return out;
+}
+
 /** Pull fresh quotes for every watchlist company and upsert the priced ones. */
 export async function syncInvestmentQuotes(): Promise<QuoteSyncResult> {
   const companies = flatCompanies();
   const sgxCodes = companies.filter((c) => c.exchange === 'SGX').map(sgxCode);
 
-  const [sheet, sgx] = await Promise.all([fetchSheetQuotes(), fetchSgxQuotes(sgxCodes)]);
+  const [sheet, sgx, prior] = await Promise.all([
+    fetchSheetQuotes(),
+    fetchSgxQuotes(sgxCodes),
+    fetchPriorHistory(),
+  ]);
 
   const now = new Date().toISOString();
   const rows = companies.map((c) => {
     const q = c.exchange === 'SGX' ? sgx[sgxCode(c)] : sheet[c.ticker.toUpperCase()];
     const price = q?.price ?? null;
+    const prev = prior[c.ticker];
     return {
       ticker: c.ticker,
       symbol: c.symbol,
       price,
       currency: price !== null ? currencyForExchange(c.exchange) : null,
       change_pct: q?.changePct ?? null,
-      change_pct_7d: q?.changePct7d ?? null,
-      change_pct_30d: q?.changePct30d ?? null,
+      // Preserve prior non-null 7d/30d: these GOOGLEFINANCE history columns blank
+      // out briefly during recalculation, and overwriting the whole row would
+      // otherwise wipe good values on a single mistimed fetch. Live price and the
+      // 1-day change never blank, so they always take the fresh value.
+      change_pct_7d: q?.changePct7d ?? prev?.change_pct_7d ?? null,
+      change_pct_30d: q?.changePct30d ?? prev?.change_pct_30d ?? null,
       fetched_at: now,
     };
   });

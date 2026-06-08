@@ -6,6 +6,10 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.22] – 2026-05-31 – Security hardening: OAuth starts, Garmin secrets, dependency audit (v3.22.0)
 
+### Investments quotes: preserve 7d/30d across a blank fetch (v3.22.9)
+
+The 7d/30d columns are GOOGLEFINANCE history formulas that blank out for a moment while recalculating. A scheduled refresh that landed in that window was overwriting the whole row and wiping good 7d/30d values for the entire table (price and the 1-day change survived because those columns never blank). The cron now reads the prior stored 7d/30d and keeps them when the new fetch returns null, so a single mistimed snapshot can no longer blank the columns. Follow-up to the v3.22.4 multi-period feature; closes the partial-fetch-resilience item from the 2026-06-07 backlog note.
+
 ### Current Events outlet blocklist expansion (v3.22.8)
 
 Nine more low-signal outlets dropped at the RSS ingestion layer. International: Golf Channel, Defector, RACER (motorsports). Indonesia: industry.co.id, butota.id, Esports ID, niaga.asia, gadgetdiva, indonesiadefense.com. Same case-insensitive substring matching as prior sweeps; takes effect on the next news-synthesis cron slot. Salvaged from an abandoned worktree during branch cleanup.
