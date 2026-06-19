@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-19, v3.29.0, Quran synthesis: four-section deep-dive structure
+
+Coordinator ship that also reconciles Notion after the v3.28.1 ship-stream (per-section word budgets) deferred its Notion mirror. The v3.29.0 change itself is another Ubayy edit to the synthesis prompt: dropped the Key terms and Cross-references sections, folded them into a deeper Meaning walk-through (budget ~450 to ~700 words), so the note is now four sections.
+
+**Well:**
+- Read the diff before shipping and caught that this is a consumer-visible format change (two headings removed), so the CHANGELOG and Notion entries call it out for Ubayy rather than describing it as a silent tweak.
+- Used the coordinator ship to close the Notion version lag (was stuck at v3.28 while code moved to 3.28.1 then 3.29.0) in one pass.
+
+**Wrong:**
+- Four same-day ships of one endpoint, all originating as edits in the main worktree. The cross-system handoff with Ubayy still has no guardrail, so each lands as untracked or modified files I move to a worktree by hand. This is now a clear pattern, not a one-off.
+- The per-section budgets shipped in v3.28.1 were obsolete within the same day, so that patch carried little lasting value on its own.
+
+**Next:**
+- Give Ubayy its own worktree or a PR-based handoff so its edits stop landing directly on main.
+- Still pending since v3.27.0: wire the endpoint into the briefing or 15:30 callback so it is actually invoked.
+
 ## 2026-06-19, v3.28.0, Quran synthesis: longer five-minute read
 
 Same-day follow-up to v3.27.0, again originating as a Ubayy edit left in the main worktree. Lengthened the synthesis target to 1000-1100 words, switched the Meaning section to thematic clusters, added a firm "finish all six sections" length rule, and raised max_tokens to 4096.
