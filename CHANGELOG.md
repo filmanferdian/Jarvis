@@ -6,6 +6,10 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.28] – 2026-06-19 – Quran synthesis: longer five-minute read (v3.28.0)
 
+### Quran synthesis: per-section word budgets (v3.28.1)
+
+Refined the length rule in the `POST /api/quran/synthesis` prompt. Instead of one flat 1000-1100 word cap, the model now gets rough per-section word budgets (Overview ~80, Historical context ~150, Meaning ~450 with verse clustering, Key terms ~120, Cross-references ~100, Sources a short list) so the piece reliably fits the five-minute target and always completes all six sections. Prompt-only, no schema or signature change.
+
 Tuned the `POST /api/quran/synthesis` prompt so the generated note is a fuller five-minute read instead of a short summary.
 
 - `src/app/api/quran/synthesis/route.ts`: target length raised from 700-800 to 1000-1100 words; the Meaning section now groups verses into a few thematic clusters rather than a strict verse-by-verse walk, to keep the longer piece tight; a firm length rule was added telling the model to complete all six sections (never stop mid-sentence or drop Sources) over going deep.
