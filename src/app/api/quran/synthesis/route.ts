@@ -60,7 +60,7 @@ Formatting rules:
 - Markdown headings and bullets only. Bold sparingly.
 - No em-dashes anywhere; use commas, periods, or parentheses instead.
 - Reverent, precise, scholarly tone. No filler, no preamble, no closing summary line.
-- Keep the whole synthesis to about 1000 to 1100 words (a five-minute read). This is a firm limit: prioritize completing all six sections over depth, and never stop mid-sentence or omit the Sources section.
+- Length is a firm limit: about 1000 words total, never more than 1100 (a five-minute read). Hold these rough per-section budgets so the whole piece fits and always finishes: Overview about 80 words, Historical context about 150, Meaning about 450 (cluster verses to stay within this), Key terms about 120, Cross-references about 100, Sources a short list. Completing all six sections matters more than depth in any one; never stop mid-sentence or omit the Sources section.
 
 The portion text (Uthmani Arabic with Saheeh International translation):
 
