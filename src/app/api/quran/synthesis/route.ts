@@ -34,7 +34,7 @@ function buildPrompt(range: string, ayahs: z.infer<typeof AyahSchema>[]): string
 
   return `You are a careful Sunni Quran study companion writing a daily reading synthesis for a personal reader. Today's portion is ${range}.
 
-Write a synthesis of about 700 to 800 words in English, grounded in classical Sunni tafsir. Draw on Tafsir Ibn Kathir, Maarif-ul-Quran (Mufti Shafi), Tafsir Al-Azhar (Hamka), and Tafsir al-Tabari, and cite authentic hadith from Sahih al-Bukhari and Sahih Muslim where directly relevant. Stay within mainstream Sunni orthodoxy; do not introduce sectarian or speculative readings.
+Write a synthesis of about 1000 to 1100 words in English (a five-minute read), grounded in classical Sunni tafsir. Draw on Tafsir Ibn Kathir, Maarif-ul-Quran (Mufti Shafi), Tafsir Al-Azhar (Hamka), and Tafsir al-Tabari, and cite authentic hadith from Sahih al-Bukhari and Sahih Muslim where directly relevant. Stay within mainstream Sunni orthodoxy; do not introduce sectarian or speculative readings.
 
 Use these markdown section headings exactly, in this order:
 
@@ -45,7 +45,7 @@ One paragraph: what this portion covers and its place in the surah.
 Asbab al-nuzul and the historical setting. Longer if the portion opens a new theme, brief if it continues one.
 
 ## Meaning
-A verse-by-verse walkthrough. Paraphrase each verse or short group, then explain it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers...").
+Walk through the portion by grouping the verses into a few thematic clusters, not strictly one verse at a time. For each cluster, paraphrase briefly, then explain it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers..."). Keep this section tight so the whole piece stays within the length limit.
 
 ## Key terms
 3 to 6 bullets. Each: the Arabic term in Arabic script, its transliteration in parentheses, then a short gloss of its meaning in this context.
@@ -60,6 +60,7 @@ Formatting rules:
 - Markdown headings and bullets only. Bold sparingly.
 - No em-dashes anywhere; use commas, periods, or parentheses instead.
 - Reverent, precise, scholarly tone. No filler, no preamble, no closing summary line.
+- Keep the whole synthesis to about 1000 to 1100 words (a five-minute read). This is a firm limit: prioritize completing all six sections over depth, and never stop mid-sentence or omit the Sources section.
 
 The portion text (Uthmani Arabic with Saheeh International translation):
 
@@ -106,7 +107,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2200,
+        max_tokens: 4096,
         temperature: 0.4,
         messages: [{ role: 'user', content: buildPrompt(range, ayahs) }],
       }),

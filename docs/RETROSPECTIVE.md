@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-19, v3.28.0, Quran synthesis: longer five-minute read
+
+Same-day follow-up to v3.27.0, again originating as a separate-agent (Codex) edit left in the main worktree. Lengthened the synthesis target to 1000-1100 words, switched the Meaning section to thematic clusters, added a firm "finish all six sections" length rule, and raised max_tokens to 4096.
+
+**Well:**
+- Confirmed the diff was scoped to exactly the prompt text and the token cap before shipping, so the minor bump carried no hidden behavior change.
+- Reused the now-established flow: fast-forward the worktree branch to main, copy the edit in, bump, document, build, merge.
+
+**Wrong:**
+- Second same-day ship of the same endpoint from a separate agent writing into the main worktree. The handoff still has no guardrail, so each refinement repeats the move-to-worktree cleanup by hand.
+- The 4096-token cap leaves little headroom for a 1100-word output plus Arabic; if outputs ever truncate, the cap is the first thing to raise.
+
+**Next:**
+- Wire the endpoint into the briefing or 15:30 callback (still pending from v3.27.0).
+- Consider giving the separate agent a worktree to write into so these stop landing on main.
+
 ## 2026-06-19, v3.27.0, Quran: on-demand daily reading synthesis endpoint
 
 Shipped a Codex-authored `POST /api/quran/synthesis` route that generates the daily Sunni-tafsir reading synthesis and caches it per `(user, date)`. Work was produced by a separate agent (Codex) and left as untracked files in the main worktree; this session moved it into a Claude worktree, added the missing migration, and shipped.

@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.28] – 2026-06-19 – Quran synthesis: longer five-minute read (v3.28.0)
+
+Tuned the `POST /api/quran/synthesis` prompt so the generated note is a fuller five-minute read instead of a short summary.
+
+- `src/app/api/quran/synthesis/route.ts`: target length raised from 700-800 to 1000-1100 words; the Meaning section now groups verses into a few thematic clusters rather than a strict verse-by-verse walk, to keep the longer piece tight; a firm length rule was added telling the model to complete all six sections (never stop mid-sentence or drop Sources) over going deep.
+- `max_tokens` raised 2200 → 4096 so the longer output is not truncated.
+- Prompt-only change; no schema or signature change. The `(user, date)` cache means a regenerate is needed to refresh any note already cached for a given day.
+
 ## [3.27] – 2026-06-19 – Quran: on-demand daily reading synthesis endpoint (v3.27.0)
 
 New `POST /api/quran/synthesis` route generates the daily Sunni-tafsir reading synthesis for the Ubayy reader on demand and caches it per `(user, date)`, so the briefing and the 15:30 callback reuse one generated text instead of regenerating.
