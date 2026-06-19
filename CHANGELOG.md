@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.27] – 2026-06-19 – Quran: on-demand daily reading synthesis endpoint (v3.27.0)
+
+New `POST /api/quran/synthesis` route generates the daily Sunni-tafsir reading synthesis for the Ubayy reader on demand and caches it per `(user, date)`, so the briefing and the 15:30 callback reuse one generated text instead of regenerating.
+
+- `src/app/api/quran/synthesis/route.ts`: `withAuth`-protected, rate-limited via `checkRateLimit`. Validates the request body with zod (date, surah 1-114, range, 1-60 ayahs each capped at 4k chars). Returns the cached row unless `regenerate: true` is passed; otherwise calls Claude (Sonnet), upserts on `user_id,date`, and best-effort logs usage. Errors route through `safeError`.
+- Prompt asks for a 700-800 word synthesis grounded in Ibn Kathir, Maarif-ul-Quran, Tafsir Al-Azhar, and al-Tabari, with fixed markdown headings (Overview / Historical context / Meaning / Key terms / Cross-references / Sources) and no em-dashes.
+- Migration `033`: idempotent backfill of `quran_synthesis` (the table was created directly in prod; this file restores repo/schema sync). RLS enabled, service-role only.
+- Authored by a separate agent (Codex); shipped from a Claude worktree. No caller wired up yet, so the endpoint is reachable but not yet invoked by the briefing or cron (flagged to backlog).
+
 ## [3.26] – 2026-06-08 – News: blacklist six non-current-events outlets (v3.26.0)
 
 Six outlets added to the `BLOCKED_OUTLETS` list in `src/lib/sources/googleNewsRss.ts` so they no longer surface in the Indonesia/International news synthesis or count toward outletScore corroboration.
