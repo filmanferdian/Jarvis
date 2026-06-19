@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.30] – 2026-06-19 – Quran synthesis: harden the length cap (v3.30.0)
+
+Tightened the `POST /api/quran/synthesis` prompt so the note holds the five-minute length on long or dense portions. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.
+
+- `src/app/api/quran/synthesis/route.ts`: the length rule changes from a "firm limit" to a "hard cap" of about 1000 words, never above 1100, explicitly even for long or dense portions, with selectivity over exhaustiveness called out as the priority.
+- The Meaning guidance is reworded to match: it now tells the model to be selective rather than exhaustive on a long or dense portion so the whole piece stays within the cap, and drops the "give it the most room" framing that pulled it toward overruns.
+- Four-section shape (Overview, Historical context, Meaning, Sources) and per-section budgets are unchanged. Prompt-only; no schema or signature change. Cached notes need a regenerate to adopt the tighter cap.
+
 ## [3.29] – 2026-06-19 – Quran synthesis: four-section deep-dive structure (v3.29.0)
 
 Restructured the `POST /api/quran/synthesis` output from six sections to four, shifting weight onto the explanation. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.
