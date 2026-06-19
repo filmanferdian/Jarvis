@@ -23,7 +23,7 @@ New `POST /api/quran/synthesis` route generates the daily Sunni-tafsir reading s
 - `src/app/api/quran/synthesis/route.ts`: `withAuth`-protected, rate-limited via `checkRateLimit`. Validates the request body with zod (date, surah 1-114, range, 1-60 ayahs each capped at 4k chars). Returns the cached row unless `regenerate: true` is passed; otherwise calls Claude (Sonnet), upserts on `user_id,date`, and best-effort logs usage. Errors route through `safeError`.
 - Prompt asks for a 700-800 word synthesis grounded in Ibn Kathir, Maarif-ul-Quran, Tafsir Al-Azhar, and al-Tabari, with fixed markdown headings (Overview / Historical context / Meaning / Key terms / Cross-references / Sources) and no em-dashes.
 - Migration `033`: idempotent backfill of `quran_synthesis` (the table was created directly in prod; this file restores repo/schema sync). RLS enabled, service-role only.
-- Authored by a separate agent (Codex); shipped from a Claude worktree. No caller wired up yet, so the endpoint is reachable but not yet invoked by the briefing or cron (flagged to backlog).
+- Authored by the Ubayy system (a separate Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree. No caller wired up yet, so the endpoint is reachable but not yet invoked by the briefing or cron (flagged to backlog).
 
 ## [3.26] – 2026-06-08 – News: blacklist six non-current-events outlets (v3.26.0)
 

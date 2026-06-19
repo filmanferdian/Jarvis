@@ -35,7 +35,7 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ### 2026-06-19, Quran synthesis: wire up the endpoint + close schema drift
 
-**Context:** v3.27.0 added `POST /api/quran/synthesis` (Codex-authored), which generates and caches the daily reading synthesis per `(user, date)` in `quran_synthesis`. Migration `033` was added as an idempotent backfill since the table was created directly in prod.
+**Context:** v3.27.0 added `POST /api/quran/synthesis` (authored by the Ubayy system, which piggybacks on Jarvis's Anthropic API), which generates and caches the daily reading synthesis per `(user, date)` in `quran_synthesis`. Migration `033` was added as an idempotent backfill since the table was created directly in prod.
 
 **Two follow-ups:**
 - The endpoint has no caller yet. Wire it into the morning briefing and/or the 15:30 callback so the synthesis is generated and surfaced, not just reachable. Decide who triggers generation (cron pre-warm vs. on-read).
