@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-19, v3.27.0, Quran: on-demand daily reading synthesis endpoint
+
+Shipped a Codex-authored `POST /api/quran/synthesis` route that generates the daily Sunni-tafsir reading synthesis and caches it per `(user, date)`. Work was produced by a separate agent (Codex) and left as untracked files in the main worktree; this session moved it into a Claude worktree, added the missing migration, and shipped.
+
+**Well:**
+- Verified the route against the real codebase before shipping: confirmed `checkRateLimit` / `trackServiceUsage` / `incrementUsage` exist, the `quran_synthesis` table is live in prod, and the schema (columns, `UNIQUE (user_id, date)`, RLS) matches what the route assumes for its upsert.
+- Caught the schema-sync gap: the table existed in prod but had no migration file, so I added an idempotent backfill (migration 033) rather than a plain CREATE that would have failed on re-run.
+
+**Wrong:**
+- A separate system writing code straight into the main worktree (plus an AGENTS.md scaffold with templated "Codex API" errors) is exactly the branch-discipline hazard CLAUDE.md warns about. Caught it, but the cross-agent handoff has no guardrail yet.
+- The endpoint ships with no caller, so it is reachable but inert until wired into the briefing/cron.
+
+**Next:**
+- Wire the synthesis endpoint into the briefing and/or 15:30 callback.
+- Backfill migrations for the other drifted Quran tables (`quran_progress`, `quran_plan`, `quran_plan_days`).
+- Decide whether AGENTS.md belongs in the repo; if so, fix its copy-pasted errors first.
+
 ## 2026-06-08, v3.26.0, News: blacklist six non-current-events outlets
 
 Added TMZ, Chapelboro.com, DawgNation (International) and pdiperjuanganbali.id, Gerbang Indonesia, gamereactor.asia (Indonesia) to the existing `BLOCKED_OUTLETS` filter in `src/lib/sources/googleNewsRss.ts`, so they drop out of news synthesis and no longer count toward outletScore. ESPN and detikInet were flagged but kept at the user's request.
