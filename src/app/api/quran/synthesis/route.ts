@@ -45,13 +45,7 @@ One paragraph: what this portion covers and its place in the surah.
 Asbab al-nuzul and the historical setting. Longer if the portion opens a new theme, brief if it continues one.
 
 ## Meaning
-Walk through the portion by grouping the verses into a few thematic clusters, not strictly one verse at a time. For each cluster, paraphrase briefly, then explain it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers..."). Keep this section tight so the whole piece stays within the length limit.
-
-## Key terms
-3 to 6 bullets. Each: the Arabic term in Arabic script, its transliteration in parentheses, then a short gloss of its meaning in this context.
-
-## Cross-references
-2 to 4 bullets linking verses in this portion to related verses elsewhere in the Quran, each with a one-line note on the connection.
+This is the heart of the piece; give it the most room. Walk through the portion by grouping the verses into thematic clusters, not strictly one verse at a time. For each cluster, paraphrase briefly, then go deep on the insight: what it means, why it matters, and how the classical mufassirun read it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers...").
 
 ## Sources
 A bullet list of the tafsir and hadith works you actually drew on.
@@ -60,7 +54,7 @@ Formatting rules:
 - Markdown headings and bullets only. Bold sparingly.
 - No em-dashes anywhere; use commas, periods, or parentheses instead.
 - Reverent, precise, scholarly tone. No filler, no preamble, no closing summary line.
-- Length is a firm limit: about 1000 words total, never more than 1100 (a five-minute read). Hold these rough per-section budgets so the whole piece fits and always finishes: Overview about 80 words, Historical context about 150, Meaning about 450 (cluster verses to stay within this), Key terms about 120, Cross-references about 100, Sources a short list. Completing all six sections matters more than depth in any one; never stop mid-sentence or omit the Sources section.
+- Length is a firm limit: about 1000 words total, never more than 1100 (a five-minute read). Hold these rough per-section budgets so the whole piece fits and always finishes: Overview about 80 words, Historical context about 170, Meaning about 700 (the heart of the piece, give it the room), Sources a short list. Completing all four sections matters more than depth in any one; never stop mid-sentence or omit the Sources section.
 
 The portion text (Uthmani Arabic with Saheeh International translation):
 

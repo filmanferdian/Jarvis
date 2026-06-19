@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.29] – 2026-06-19 – Quran synthesis: four-section deep-dive structure (v3.29.0)
+
+Restructured the `POST /api/quran/synthesis` output from six sections to four, shifting weight onto the explanation. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.
+
+- `src/app/api/quran/synthesis/route.ts`: the standalone Key terms and Cross-references sections are removed. The note is now Overview, Historical context, Meaning, Sources. Arabic terms and cross-references are woven into the Meaning walk-through instead of listed separately.
+- Meaning is now the heart of the piece: its budget rises from ~450 to ~700 words and it is told to go deep on each thematic cluster (what it means, why it matters, how the mufassirun read it). Historical context nudged ~150 to ~170. Overall cap stays ~1000-1100 words; the "complete every section, never stop mid-sentence or drop Sources" rule now covers four sections.
+- Prompt-only; no schema or signature change. Note for consumers: the rendered output no longer contains Key terms or Cross-references headings. Cached notes need a regenerate to adopt the new structure.
+
 ## [3.28] – 2026-06-19 – Quran synthesis: longer five-minute read (v3.28.0)
 
 ### Quran synthesis: per-section word budgets (v3.28.1)
