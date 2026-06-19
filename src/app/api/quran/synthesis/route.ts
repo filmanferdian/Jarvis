@@ -45,7 +45,7 @@ One paragraph: what this portion covers and its place in the surah.
 Asbab al-nuzul and the historical setting. Longer if the portion opens a new theme, brief if it continues one.
 
 ## Meaning
-This is the heart of the piece; give it the most room. Walk through the portion by grouping the verses into thematic clusters, not strictly one verse at a time. For each cluster, paraphrase briefly, then go deep on the insight: what it means, why it matters, and how the classical mufassirun read it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers...").
+The main section. Walk through the portion by grouping the verses into thematic clusters, not strictly one verse at a time. For each cluster, paraphrase briefly, then explain the insight: what it means, why it matters, and how the classical mufassirun read it, naming the tafsir you draw on (for example, "Maarif-ul-Quran reads...", "Ibn Kathir gathers..."). On a long or dense portion, be selective rather than exhaustive so the whole piece stays within the length cap.
 
 ## Sources
 A bullet list of the tafsir and hadith works you actually drew on.
@@ -54,7 +54,7 @@ Formatting rules:
 - Markdown headings and bullets only. Bold sparingly.
 - No em-dashes anywhere; use commas, periods, or parentheses instead.
 - Reverent, precise, scholarly tone. No filler, no preamble, no closing summary line.
-- Length is a firm limit: about 1000 words total, never more than 1100 (a five-minute read). Hold these rough per-section budgets so the whole piece fits and always finishes: Overview about 80 words, Historical context about 170, Meaning about 700 (the heart of the piece, give it the room), Sources a short list. Completing all four sections matters more than depth in any one; never stop mid-sentence or omit the Sources section.
+- Length is a hard cap: aim for about 1000 words and never exceed 1100 (a five-minute read), even for long or dense portions. Staying within the cap matters more than covering every detail, so be selective. Rough per-section budgets: Overview about 80 words, Historical context about 170, Meaning about 700, Sources a short list. Always finish all four sections; never stop mid-sentence or omit the Sources section.
 
 The portion text (Uthmani Arabic with Saheeh International translation):
 

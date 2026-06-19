@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-19, v3.30.0, Quran synthesis: harden the length cap
+
+Another Ubayy prompt edit to `POST /api/quran/synthesis`: turned the length guidance from a "firm limit" into a "hard cap" (about 1000 words, never above 1100, even on long or dense portions, selectivity over exhaustiveness) and softened the Meaning section's "give it the most room" wording that was pulling toward overruns. Four-section shape unchanged.
+
+**Well:**
+- Read the diff and recognized it as a tuning follow-up to v3.29.0's longer Meaning section: the deeper Meaning was overrunning on dense portions, so this caps it. Framed the changelog around that intent rather than as an isolated wording change.
+- Confirmed the version label with the user before this ship after last turn's minor-versus-patch mix-up, so v3.30.0 was a deliberate choice, not a surprise.
+
+**Wrong:**
+- Fifth same-day ship of this one endpoint, still arriving as edits in the main worktree from Ubayy. The handoff guardrail (Ubayy gets its own worktree or a PR flow) is still not in place, so the manual move-to-worktree step repeats.
+- Each tiny prompt tweak consumes a full minor bump under `/ship`; the version is climbing fast for prompt-only changes. `/ship-stream` (patch) is the lighter cadence if the user prefers it for these.
+
+**Next:**
+- Give Ubayy its own worktree or a pull-request handoff.
+- Wire the endpoint into the briefing or 15:30 callback (pending since v3.27.0).
+
 ## 2026-06-19, v3.29.0, Quran synthesis: four-section deep-dive structure
 
 Coordinator ship that also reconciles Notion after the v3.28.1 ship-stream (per-section word budgets) deferred its Notion mirror. The v3.29.0 change itself is another Ubayy edit to the synthesis prompt: dropped the Key terms and Cross-references sections, folded them into a deeper Meaning walk-through (budget ~450 to ~700 words), so the note is now four sections.
