@@ -33,6 +33,14 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-20, Model selection: monitor token cost and retune tiers
+
+**Context:** v3.31.0 centralized the Claude model id into `src/lib/models.ts` and tuned model + effort per task (Haiku for voice intent, email-triage classification, and job scoring; Sonnet 4.6 at low/medium/high effort by task). Previously every call ran on Sonnet 4.6 at the implicit `high`-effort default after the model-id fix.
+
+**Follow-ups:**
+- Monitor real token usage on the Utilities page after a few cron cycles. Adjust tiers if quality dips or cost runs higher than expected: e.g. bump news or email synthesis back to `medium`, or drop job scoring to Sonnet `low` if Haiku relevance is weak.
+- The Quran synthesis route moved from `claude-sonnet-4-5` to `claude-sonnet-4-6` and stayed at default effort. That endpoint is Ubayy-owned, so flag both the model change and the Haiku/effort recommendation to Ubayy so they can decide.
+
 ### 2026-06-19, Quran synthesis: wire up the endpoint + close schema drift
 
 **Context:** v3.27.0 added `POST /api/quran/synthesis` (authored by the Ubayy system, which piggybacks on Jarvis's Anthropic API), which generates and caches the daily reading synthesis per `(user, date)` in `quran_synthesis`. Migration `033` was added as an idempotent backfill since the table was created directly in prod.
