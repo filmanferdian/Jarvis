@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-20, v3.34.0, garmin_activity_details for the Charge (FP) app
+
+Added a plaintext `garmin_activity_details` table so the Charge iOS app (reads Supabase with the publishable key, can't decrypt) gets per-km splits, raw HR samples, the cadence/max-HR/elevation tiles, and time-in-zone. New `src/lib/sync/activityDetails.ts` fetches the splits + details endpoints and builds the FP-shaped record; wired into `syncGarmin` for new runs only.
+
+**Well:**
+- Pressure-tested the premise before building. The ask was framed as "just persist the decrypted fields," but decrypting a real `raw_json` row showed it holds only the activity summary — splits and HR samples aren't in it. Surfaced that to Filman to relay to the Charge team rather than silently shipping half a feature.
+- Found and reused the existing fetch/parse path (`running-analysis/garmin-enrich.ts` already pulls `/splits` and `/details`), instead of writing a second Garmin client path. Kept that file untouched so the weekly Notion analysis was unaffected.
+- Respected the most rate-limit-fragile integration in the app: forward-only (no 200-call backfill), capped enrichment per sync, tracked the extra calls against the daily budget, and halted on the circuit breaker. Verified live with only ~6 Garmin calls via a targeted script rather than a full local sync that would have risked the night's scheduled run.
+- Verified end-to-end against the real publishable key, including the treadmill km-correction math (km1=1000 m, km2=670 m remainder, pace recomputed).
+
+**Wrong:**
+- The verification script silently produced no output twice before I instrumented it — root cause was wrong relative paths to `.env.local` (the worktree has none; the real file is three levels up at the repo root). Should have echoed the loaded-env state on the first run instead of chasing a phantom stdout-flush bug.
+
+**Next:**
+- If the Charge team wants history, a throttled backfill of the ~102 existing runs (spread over days within the rate-limit budget) can be added — deliberately deferred. Backlogged.
+- Rows whose `/splits` or `/details` failed once persist with null splits/samples and are then skipped (treated as "already have a row"). A "retry incomplete details" pass would heal them. Backlogged.
+
 ## 2026-06-20, v3.32.0, News outlet blocklist expansion from a 14-day source audit
 
 Audited the outlets pulled into the Current Events feed (41 slots over 14 days, both tabs) to find non-current-events noise, then expanded `BLOCKED_OUTLETS` by ~48 entries. Set up a weekly scheduled review (Sunday morning WIB, over the previous 7 days, run from the Claude app) to keep proposing candidates for confirmation, without auto-editing.

@@ -1,6 +1,7 @@
 import { GarminConnect } from 'garmin-connect';
 import { supabase } from '@/lib/supabase';
 import { decrypt, encryptJson, wrapJsonb, unwrapJsonb } from '@/lib/crypto';
+import { buildAndUpsertActivityDetails } from '@/lib/sync/activityDetails';
 
 // --- Rate limiting constants ---
 const GARMIN_DAILY_CALL_BUDGET = 50;
@@ -9,6 +10,9 @@ const GARMIN_MAX_BACKFILL_PER_RUN = 0;    // disabled — building data forward 
 const GARMIN_BACKFILL_DELAY_MS = 5000;    // was 2000
 const GARMIN_MAX_CONSECUTIVE_FAILURES = 3;
 const GARMIN_LOGIN_RETRIES = 1;           // was 3
+// Max NEW runs to enrich with Charge (FP) activity-details per sync. Each costs 2 Garmin
+// calls (/splits + /details). Ongoing this is ~1/day; the cap only bounds a post-deploy burst.
+const GARMIN_MAX_ACTIVITY_DETAILS_PER_SYNC = 5;
 
 export interface GarminSyncResult {
   date: string;
@@ -535,6 +539,51 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
         unit: 'seconds',
         source: 'garmin',
       });
+    }
+
+    // --- Charge (FP) rich run details: persist per-km splits + HR samples for NEW runs ---
+    // Forward-only (no backfill). Reuses the live `client`; capped per sync to bound a
+    // post-deploy burst. Each enrich = 2 Garmin calls (/splits + /details).
+    const rawActs = activities.value as unknown as Record<string, unknown>[];
+    const runActs = rawActs.filter((a) =>
+      String((a.activityType as Record<string, unknown>)?.typeKey ?? '').includes('run'),
+    );
+    if (runActs.length > 0) {
+      const runIds = runActs.map((a) => String(a.activityId));
+      const { data: existingDetails } = await supabase
+        .from('garmin_activity_details')
+        .select('activity_id')
+        .in('activity_id', runIds);
+      const haveDetails = new Set((existingDetails ?? []).map((r) => r.activity_id));
+      const toEnrich = runActs
+        .filter((a) => !haveDetails.has(String(a.activityId)))
+        .slice(0, GARMIN_MAX_ACTIVITY_DETAILS_PER_SYNC);
+
+      for (const act of toEnrich) {
+        const block = await isGarminBlocked();
+        if (block.blocked) {
+          console.log('[garmin] activity-details enrichment halted: circuit breaker tripped');
+          break;
+        }
+        try {
+          await buildAndUpsertActivityDetails(client, act);
+          console.log(`[garmin] activity-details persisted for ${act.activityId}`);
+        } catch (err) {
+          const { isRateLimit, retryAfterMs } = isRateLimitError(err);
+          if (isRateLimit) {
+            await setGarminBlocked('429-activity-details', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+            console.log('[garmin] activity-details enrichment halted: rate-limited');
+            await trackGarminCalls(2);
+            break;
+          }
+          console.error(
+            `[garmin] activity-details enrich failed for ${act.activityId}:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+        await trackGarminCalls(2); // /splits + /details
+        await new Promise((r) => setTimeout(r, GARMIN_INTER_CALL_DELAY_MS));
+      }
     }
   }
 
