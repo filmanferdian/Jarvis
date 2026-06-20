@@ -4,6 +4,16 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.34] – 2026-06-20 – garmin_activity_details: rich per-run data for the Charge (FP) app (v3.34.0)
+
+The Charge iOS app reads Supabase directly with the publishable key and cannot decrypt `garmin_activities.raw_json`. New table `public.garmin_activity_details` (one row per run, keyed by `activity_id`) persists the rich per-run fields as plaintext: per-km `splits`, raw `hr_samples` (bpm ints, for the app's configurable HR-zone binning), the cadence / max-HR / elevation tiles, `total_distance_m`, and `hr_zone_seconds` (Garmin's own zones, as a fallback). Read-only RLS (`anon, authenticated`, `using (true)`) mirrors the policies already on `garmin_activities` / `garmin_daily`; writes stay service-role only. Migration 034.
+
+- **Key finding (relayed to the Charge team):** `raw_json` holds only the activity *summary*. The tiles + `hr_zone_seconds` come from it with zero extra calls, but per-km splits and per-second HR samples are NOT in it — they live behind two extra Garmin endpoints. New `src/lib/sync/activityDetails.ts` fetches `/activity/{id}/splits` + `/activity/{id}/details` and builds the FP-shaped record.
+- **Forward-only, no backfill** (per Filman): only runs synced from this deploy onward get a row; the ~102 existing runs stay without one. The Charge app must render gracefully when a row is absent or `splits` / `hr_samples` are null.
+- **Treadmill correction** (`activity_type = 'treadmill_running'`): GPS is unreliable and the user laps each km manually, so `total_distance_m` uses the watch field and splits are re-segmented — first N−1 laps forced to 1.0 km, last split carries the remainder, paces recomputed off the corrected distances. Outdoor runs use the watch's per-km auto-laps as-is.
+- Wired into `syncGarmin` after the activities upsert: for each NEW run (capped at 5/sync to bound a post-deploy burst, ~1/day ongoing), enrich + upsert. Each enrich = 2 Garmin calls, tracked against the daily budget, halted if the circuit breaker trips. A `/splits` or `/details` failure is non-fatal — the row still gets tiles + zones.
+- Units contract: meters / seconds / sec-per-km / bpm / spm / meters. Verified end-to-end on a live outdoor run (7 splits, 1813 HR samples) and a treadmill run (2 splits, km1=1000 m / km2=670 m remainder, pace recomputed), and confirmed readable via the publishable key.
+
 ## [3.33] – 2026-06-20 – News blocklist expansion from the first weekly review (v3.33.0)
 
 First weekly scheduled review (7-day window) of outlets pulled into the Current Events feed, confirmed by Filman before applying. Added 46 outlets to `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` (20 International, 26 Indonesia). The filter stayed healthy: most recurring junk was already caught by the v3.32 batch, so this pass is mostly the previously-deferred Tier-3 long tail.

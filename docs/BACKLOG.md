@@ -33,6 +33,14 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-20, garmin_activity_details: optional history backfill + retry incomplete rows
+
+**Context:** v3.34.0 added the plaintext `garmin_activity_details` table for the Charge (FP) iOS app (per-km splits, HR samples, tiles, time-in-zone), populated forward-only via `syncGarmin` → `src/lib/sync/activityDetails.ts`. Two things were intentionally deferred.
+
+**Follow-ups:**
+- **History backfill (only if Charge asks for it).** The ~102 existing runs have no detail row by design (no backfill). Each run needs 2 Garmin calls (`/splits` + `/details`), so ~200 calls vs a 50/day budget — it would have to be a throttled, resumable pass spread over several days, respecting the circuit breaker, processing runs missing from the table oldest-or-newest first. The fetch/build code already exists; only the throttled driver is missing.
+- **Retry incomplete rows.** A run whose `/splits` or `/details` failed once persists with null `splits` / `hr_samples`, and the sync then skips it because a row exists. Add a pass (or relax the "skip if row exists" check) to re-enrich rows where `splits is null` or `hr_samples is null`, so transient endpoint failures self-heal on a later sync.
+
 ### 2026-06-20, News blocklist: word-boundary matcher + Tier-3 calls + long-tail heuristic
 
 **Context:** v3.32.0 expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` by ~48 entries from a 14-day source audit, and set up a weekly scheduled review (Sunday morning, over the previous 7 days, run from the Claude app, not in-app code) to keep proposing candidates for confirmation. Three things were intentionally deferred.
