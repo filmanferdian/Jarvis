@@ -48,6 +48,29 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'tmz', // celebrity gossip, not current events
     'chapelboro', // hyper-local Chapel Hill NC, matches "Chapelboro.com"
     'dawgnation', // Georgia Bulldogs college-football fan site
+    // --- added 2026-06-20: sports ---
+    'espn',
+    'yahoo sports',
+    'cbs sports',
+    'bleacher report',
+    'opta analyst', // sports stats
+    // --- added 2026-06-20: entertainment / lifestyle ---
+    'variety', // entertainment trade, like Hollywood Reporter / Deadline
+    'entertainment weekly',
+    'billboard', // music industry
+    'page six', // celebrity gossip, like TMZ
+    'the cut', // NY Mag fashion/lifestyle
+    'instyle.com', // fashion
+    // --- added 2026-06-20: gaming ---
+    'gamesindustry.biz',
+    // --- added 2026-06-20: vendor newsroom / promotional ---
+    'apple', // Apple newsroom press releases
+    // --- added 2026-06-20: hyper-local US TV affiliates ---
+    'abc7 los angeles',
+    'abc7 new york',
+    'nbc los angeles',
+    // NOTE: 'ign' (gaming) deliberately NOT added — bare substring would match
+    // "Foreign Policy" etc. Needs a word-boundary match before it can be blocked.
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -88,6 +111,44 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'gerbang indonesia', // low-credibility partisan site
     'gerbangindonesia', // no-space domain variant
     'gamereactor', // gaming news, matches "gamereactor.asia"
+    // --- added 2026-06-20: detik non-current-events verticals ---
+    'detikoto', // automotive
+    'detikfood', // food/lifestyle
+    'wolipop', // celebrity / women's lifestyle (detik network)
+    // --- added 2026-06-20: gaming / gadget-review / UGC ---
+    'gamebrott.com', // gaming
+    'telset.id', // gadget-review clickbait
+    'kompasiana.com', // user-generated blog farm (distinct from kompas.com)
+    // --- added 2026-06-20: sports / automotive hobby ---
+    'juara.net', // sports
+    'otoplus-online', // automotive
+    'ridertua.com', // motorcycle hobby
+    // --- added 2026-06-20: health / corporate PR ---
+    'prohealth.id', // health vertical
+    'mayapada hospital', // hospital corporate PR
+    'samsung', // vendor newsroom, promotional
+    // --- added 2026-06-20: government / institutional PR ---
+    'direktorat jenderal pemasyarakatan', // corrections-dept press releases
+    'pemerintah provinsi gorontalo', // provincial govt PR
+    'infopublik', // govt info portal
+    'universitas airlangga', // matches "Universitas Airlangga Official Website"
+    'uinjkt.ac.id',
+    'umy', // Universitas Muhammadiyah Yogyakarta
+    'universitas muhammadiyah surakarta',
+    // --- added 2026-06-20: hyper-local / regional ---
+    'pontianakpost', // no-space variant of blocked 'pontianak post'
+    'sumbawanews',
+    'kabar6.com',
+    'rakyatpos.id',
+    'baubaupost',
+    'radar karawang',
+    'antara news sulteng', // regional bureau, not the national ANTARA wire
+    'gentra news',
+    'jurnal borneo',
+    'telstar1027fm.com', // local radio
+    'tandaseru.id',
+    'media alkhairaat',
+    'news.schoolmedia.id',
   ],
 };
 
