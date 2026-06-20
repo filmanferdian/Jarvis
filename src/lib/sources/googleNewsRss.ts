@@ -69,6 +69,30 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'abc7 los angeles',
     'abc7 new york',
     'nbc los angeles',
+    // --- added 2026-06-20 (weekly review batch 2): gadget-review / rumor blogs ---
+    '9to5mac',
+    '9to5google',
+    'macrumors',
+    'gsmarena.com',
+    'bgr.com',
+    'notebookcheck',
+    'wccftech',
+    // --- added 2026-06-20 (weekly review batch 2): sports ---
+    'sports illustrated',
+    'mma fighting',
+    'ufc.com',
+    'covers.com', // sports betting/odds; domain form avoids matching "discovers"
+    // --- added 2026-06-20 (weekly review batch 2): entertainment / lifestyle / fashion ---
+    'e! news',
+    'wwd', // Women's Wear Daily, fashion trade
+    'marthastewart.com',
+    'yourtango',
+    'time out worldwide',
+    'today.com', // morning-show lifestyle; domain form so it never matches "USA Today"
+    'eater los angeles',
+    'hollywoodreporter.com', // domain variant that slips past the spaced 'hollywood reporter'
+    // --- added 2026-06-20 (weekly review batch 2): government / institutional PR ---
+    'texas department of public safety',
     // NOTE: 'ign' (gaming) deliberately NOT added — bare substring would match
     // "Foreign Policy" etc. Needs a word-boundary match before it can be blocked.
   ],
@@ -149,6 +173,38 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'tandaseru.id',
     'media alkhairaat',
     'news.schoolmedia.id',
+    // --- added 2026-06-20 (weekly review batch 2): lifestyle / entertainment / vertical ---
+    'detiktravel', // detik travel/lifestyle vertical
+    'wowkeren', // celebrity / entertainment
+    'sindonews lifestyle', // lifestyle vertical; full phrase so it never matches sindonews.com / nasional / ekbis
+    'the lazy media', // pop-culture / gaming
+    // --- added 2026-06-20 (weekly review batch 2): vendor / gadget ---
+    'xiaomi-miui', // Xiaomi fan/vendor site (matches id.xiaomi-miui.gr)
+    // --- added 2026-06-20 (weekly review batch 2): government / institutional PR ---
+    'presiden ri', // Office-of-President press feed
+    'bmkg', // weather/quake agency PR
+    'badan riset dan inovasi nasional', // BRIN research-agency PR (long phrase, not bare 'brin')
+    // --- added 2026-06-20 (weekly review batch 2): religious / community org ---
+    'nu online', // Nahdlatul Ulama org outlet
+    'suara muhammadiyah', // Muhammadiyah org outlet
+    'sh terate madiun', // PSHT martial-arts org / hyper-local
+    // --- added 2026-06-20 (weekly review batch 2): hyper-local / regional ---
+    'batamnews',
+    'sumeks', // Palembang (Sumatera Ekspres)
+    'bantendaily',
+    'kilasjatim.com', // East Java
+    'radar bontang',
+    'mnc trijaya kendari', // local radio
+    'beritajatim.com', // East Java
+    // --- added 2026-06-20 (weekly review batch 2): low-credibility / niche portals ---
+    'carapandang',
+    'langitselatan', // astronomy hobby blog
+    'artik.id',
+    'tebaran.com',
+    'atnews.id',
+    'merahputih.com', // lifestyle/general portal
+    'realestat.id', // property vertical
+    'ajaib', // investing-app content marketing
   ],
 };
 
