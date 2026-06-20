@@ -4,6 +4,15 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.32] – 2026-06-20 – News outlet blocklist expansion from a 14-day source audit (v3.32.0)
+
+Audited every outlet pulled into the Current Events feed over 14 days (41 slots, both Indonesia and International tabs) and expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` to drop non-current-events noise. The filter itself was confirmed healthy (already-blocked outlets stopped appearing after the Jun 7-8 additions); this is a curation pass, not a bug fix.
+
+- Added ~48 outlets across both locales: sports (espn, yahoo sports, cbs sports, bleacher report, opta analyst, juara.net), entertainment and lifestyle (variety, entertainment weekly, billboard, page six, the cut, instyle.com, wolipop), gaming and gadget-review (gamesindustry.biz, gamebrott.com, telset.id), automotive and food verticals (detikoto, detikfood, otoplus-online, ridertua.com), vendor and corporate PR (apple, samsung, mayapada hospital), government and institutional PR (direktorat jenderal pemasyarakatan, pemerintah provinsi gorontalo, infopublik, four university sites), a UGC blog farm (kompasiana.com, kept distinct from the legit kompas.com), and recurring hyper-local outlets (US TV affiliates abc7 los angeles / abc7 new york / nbc los angeles, plus Indonesian regionals sumbawanews, kabar6.com, rakyatpos.id, baubaupost, radar karawang, antara news sulteng, gentra news, jurnal borneo, telstar1027fm.com, tandaseru.id, media alkhairaat, news.schoolmedia.id).
+- Fixed a real gap: `pontianakpost` (no-space, seen 5x) was slipping past the existing `'pontianak post'` entry because the substring matcher cannot bridge the missing space. Added the no-space variant.
+- Deliberately excluded: finance content (stockbit snips, ajaib) and fact-checkers (turnbackhoax, jala hoaks) since they are relevant; Tier-3 borderline outlets (detik tech vertical, Apple/gadget-rumor blogs, US regional papers) pending review; and `ign`, which is left out because a bare substring would wrongly match outlets like "Foreign Policy" — it needs a word-boundary matcher first.
+- A 3x/day cloud routine (aligned to the 07:01 / 13:01 / 19:01 WIB news pulls) now re-runs this audit and proposes new blocklist candidates for confirmation; it never auto-edits the list.
+
 ## [3.31] – 2026-06-20 – Fix retired Sonnet model id; centralize + tune model selection (v3.31.0)
 
 Claude Sonnet 4 (`claude-sonnet-4-20250514`) retired on 2026-06-15, so every Claude call still hardcoding that id returned `404 not_found_error`. This broke the morning briefing, email triage, and email synthesis (visible as red on the Utilities page), with briefing delta/regenerate, on-demand email synthesize, email style-analysis, fitness insights, voice intent, and running-analysis latently broken too. Root cause: the model id was a string literal copy-pasted across ~14 call sites.
