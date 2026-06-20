@@ -10,9 +10,10 @@ const GARMIN_MAX_BACKFILL_PER_RUN = 0;    // disabled — building data forward 
 const GARMIN_BACKFILL_DELAY_MS = 5000;    // was 2000
 const GARMIN_MAX_CONSECUTIVE_FAILURES = 3;
 const GARMIN_LOGIN_RETRIES = 1;           // was 3
-// Max NEW runs to enrich with Charge (FP) activity-details per sync. Each costs 2 Garmin
-// calls (/splits + /details). Ongoing this is ~1/day; the cap only bounds a post-deploy burst.
-const GARMIN_MAX_ACTIVITY_DETAILS_PER_SYNC = 5;
+// Max NEW runs to enrich with Charge (FP) activity-details per sync. Each costs up to 3 Garmin
+// calls (/splits + /weather + /details). Ongoing this is ~1/day; the cap bounds a post-deploy
+// burst and keeps the sync under cron-job.org's 30s HTTP timeout.
+const GARMIN_MAX_ACTIVITY_DETAILS_PER_SYNC = 3;
 
 export interface GarminSyncResult {
   date: string;
@@ -541,9 +542,9 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
       });
     }
 
-    // --- Charge (FP) rich run details: persist per-km splits + HR samples for NEW runs ---
+    // --- Charge (FP) rich run details: persist splits, HR samples + coaching metrics for NEW runs ---
     // Forward-only (no backfill). Reuses the live `client`; capped per sync to bound a
-    // post-deploy burst. Each enrich = 2 Garmin calls (/splits + /details).
+    // post-deploy burst. Each enrich = up to 3 Garmin calls (/splits + /weather + /details).
     const rawActs = activities.value as unknown as Record<string, unknown>[];
     const runActs = rawActs.filter((a) =>
       String((a.activityType as Record<string, unknown>)?.typeKey ?? '').includes('run'),
@@ -573,7 +574,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
           if (isRateLimit) {
             await setGarminBlocked('429-activity-details', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
             console.log('[garmin] activity-details enrichment halted: rate-limited');
-            await trackGarminCalls(2);
+            await trackGarminCalls(3);
             break;
           }
           console.error(
@@ -581,7 +582,7 @@ export async function syncGarmin(): Promise<GarminSyncResult> {
             err instanceof Error ? err.message : err,
           );
         }
-        await trackGarminCalls(2); // /splits + /details
+        await trackGarminCalls(3); // /splits + /weather + /details
         await new Promise((r) => setTimeout(r, GARMIN_INTER_CALL_DELAY_MS));
       }
     }

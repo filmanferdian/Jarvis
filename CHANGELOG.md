@@ -4,6 +4,30 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.35] – 2026-06-20 – Running insights for the Charge (FP) app (v3.35.0)
+
+Two-part extension of the v3.34 Charge integration: richer per-run metrics persisted at sync time, and
+a Claude-written coaching insight per run fetched on demand.
+
+- **12 new plaintext columns on `garmin_activity_details`** (all nullable, forward-only): `decoupling_pct`,
+  `perf_condition`, `temp_c`, `feels_like_c`, `humidity_pct`, `weather_desc`, `gct_ms`, `vertical_ratio`,
+  `vo2_max`, `training_effect`, `training_load`, `avg_power_w`, plus `lap_detail` (rich classified per-lap
+  form data for the coach prompt). The Charge-facing `splits` column is unchanged. Decoupling uses the
+  same formula as the weekly analysis (180s/300s warmup, first 80%, split-half, ×100, 1 dp). Migration 035.
+- **Reuse:** `src/lib/running-analysis/garmin-enrich.ts` now exports its pure helpers (`calcDecoupling`,
+  `extractPerfCondition`, `findDescriptorIndex`, `fToC`) and a new `parseLapDTOs`; `src/lib/sync/activityDetails.ts`
+  adds a `/weather` fetch (skipped for treadmill) and computes the new fields off the data it already pulls.
+  Per-sync enrich cap lowered 5→3 (each run now costs up to 3 Garmin calls) to stay under the cron timeout.
+- **`POST /api/running/insight`** (new): `withAuth` Bearer (`JARVIS_AUTH_TOKEN`), body `{ activity_id,
+  regenerate? }`. Assembles the run, the `program_schedule.cardio` prescription for the run's WIB date, the
+  Garmin time-in-zone + LTHR, and (for VO2/tempo) the most recent comparable prior session — all from
+  Supabase, so it works even when the Garmin breaker is open. Runs the supplied coach prompt on Sonnet
+  (effort high, max_tokens 1200, temp 0.4), caches to the new `running_insights` table (read RLS for the
+  app; pull incrementally by `updated_at`), and returns `{ insight }`. Errors: 401 / 404 / 429 / 500.
+- Verified live: all 12 columns + `lap_detail` populate on a real outdoor run; the route returns a
+  data-grounded markdown insight (verdict + plan-vs-actual + lap-by-lap), caches on the second call,
+  regenerates on demand, and is readable via the publishable key.
+
 ## [3.34] – 2026-06-20 – garmin_activity_details: rich per-run data for the Charge (FP) app (v3.34.0)
 
 The Charge iOS app reads Supabase directly with the publishable key and cannot decrypt `garmin_activities.raw_json`. New table `public.garmin_activity_details` (one row per run, keyed by `activity_id`) persists the rich per-run fields as plaintext: per-km `splits`, raw `hr_samples` (bpm ints, for the app's configurable HR-zone binning), the cadence / max-HR / elevation tiles, `total_distance_m`, and `hr_zone_seconds` (Garmin's own zones, as a fallback). Read-only RLS (`anon, authenticated`, `using (true)`) mirrors the policies already on `garmin_activities` / `garmin_daily`; writes stay service-role only. Migration 034.

@@ -31,7 +31,11 @@ async function main() {
   const outdoor = runs.find((a) => (a.activityType as Record<string, unknown>)?.typeKey === 'running');
   const treadmill = runs.find((a) => (a.activityType as Record<string, unknown>)?.typeKey === 'treadmill_running');
 
-  const picks = [outdoor, treadmill].filter(Boolean) as Record<string, unknown>[];
+  // Optional: pass an activity_id to enrich just that one (keeps Garmin calls low).
+  const onlyId = process.argv[2];
+  const picks = (onlyId
+    ? runs.filter((a) => String(a.activityId) === onlyId)
+    : [outdoor, treadmill].filter(Boolean)) as Record<string, unknown>[];
   console.log('Picked:', picks.map((a) => `${a.activityId}(${(a.activityType as Record<string, unknown>)?.typeKey}, dist=${a.distance})`).join(', '));
 
   for (const act of picks) {

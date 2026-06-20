@@ -53,7 +53,7 @@ export interface EnrichedActivityData {
   decouplingPct: number | null;
 }
 
-function fToC(f: number | null): number | null {
+export function fToC(f: number | null): number | null {
   if (f == null) return null;
   return Math.round((f - 32) * 5 / 9 * 10) / 10;
 }
@@ -67,7 +67,7 @@ function speedToPace(speedMs: number): string {
 }
 
 /** Find descriptor index by key, checking both 'key' and 'metricsKey' field names */
-function findDescriptorIndex(
+export function findDescriptorIndex(
   descriptors: Record<string, unknown>[],
   keyName: string
 ): number {
@@ -77,7 +77,7 @@ function findDescriptorIndex(
   return idx;
 }
 
-function calcDecoupling(
+export function calcDecoupling(
   metricDescriptors: Record<string, unknown>[],
   activityDetailMetrics: { metrics: number[] }[]
 ): number | null {
@@ -147,7 +147,7 @@ function calcDecoupling(
   return Math.round(decoupling * 10) / 10;
 }
 
-function extractPerfCondition(
+export function extractPerfCondition(
   metricDescriptors: Record<string, unknown>[],
   activityDetailMetrics: { metrics: number[] }[]
 ): number | null {
@@ -452,6 +452,43 @@ export function parseLapsFromProperty(json: string | null | undefined): LapData[
   }
 }
 
+/** Parse Garmin lapDTOs into SplitData[] (raw lap distances, "M:SS" pace, all per-lap form
+ *  metrics). Does NOT classify segments — callers run classifyLaps() if they want segment types. */
+export function parseLapDTOs(laps: Record<string, unknown>[]): SplitData[] {
+  const splits: SplitData[] = [];
+  for (let i = 0; i < laps.length; i++) {
+    const lap = laps[i];
+    const distM = (lap.distance as number) ?? (lap.distanceInMeters as number) ?? 0;
+    const durS = (lap.duration as number) ?? (lap.elapsedDuration as number) ?? 0;
+    const avgSpeed = (lap.averageSpeed as number) ?? 0;
+    const avgRunCadence = (lap.averageRunCadence as number) ?? null;
+    const strideLen = (lap.strideLength as number) ?? null;
+
+    splits.push({
+      lapIndex: i + 1,
+      distanceMeters: distM,
+      durationSeconds: durS,
+      pacePerKm: avgSpeed > 0 ? speedToPace(avgSpeed) : '--:--',
+      avgHr: (lap.averageHR as number) ?? null,
+      maxHr: (lap.maxHR as number) ?? null,
+      cadence: avgRunCadence ? Math.round(avgRunCadence) : null,
+      strideCm: strideLen ? Math.round(strideLen * 10) / 10 : null,
+      gctMs: (lap.groundContactTime as number) != null ? Math.round(lap.groundContactTime as number) : null,
+      powerW: (lap.averagePower as number) ?? null,
+      vertOscCm: (lap.verticalOscillation as number) != null
+        ? Math.round((lap.verticalOscillation as number) * 10) / 10
+        : null,
+      vertRatioPct: (lap.verticalRatio as number) != null
+        ? Math.round((lap.verticalRatio as number) * 10) / 10
+        : null,
+      elevGain: (lap.elevationGain as number) ?? null,
+      elevLoss: (lap.elevationLoss as number) ?? null,
+      segmentType: 'main',
+    });
+  }
+  return splits;
+}
+
 export async function enrichActivity(activityId: string): Promise<EnrichedActivityData> {
   const client = await createGarminClient();
 
@@ -486,40 +523,8 @@ export async function enrichActivity(activityId: string): Promise<EnrichedActivi
   }
 
   // Parse splits
-  const splits: SplitData[] = [];
-  if (splitsResult) {
-    const splitsData = splitsResult as { lapDTOs?: Record<string, unknown>[] };
-    const laps = splitsData?.lapDTOs ?? [];
-    for (let i = 0; i < laps.length; i++) {
-      const lap = laps[i];
-      const distM = (lap.distance as number) ?? (lap.distanceInMeters as number) ?? 0;
-      const durS = (lap.duration as number) ?? (lap.elapsedDuration as number) ?? 0;
-      const avgSpeed = (lap.averageSpeed as number) ?? 0;
-      const avgRunCadence = (lap.averageRunCadence as number) ?? null;
-      const strideLen = (lap.strideLength as number) ?? null;
-
-      splits.push({
-        lapIndex: i + 1,
-        distanceMeters: distM,
-        durationSeconds: durS,
-        pacePerKm: avgSpeed > 0 ? speedToPace(avgSpeed) : '--:--',
-        avgHr: (lap.averageHR as number) ?? null,
-        maxHr: (lap.maxHR as number) ?? null,
-        cadence: avgRunCadence ? Math.round(avgRunCadence) : null,
-        strideCm: strideLen ? Math.round(strideLen * 10) / 10 : null,
-        gctMs: (lap.groundContactTime as number) != null ? Math.round(lap.groundContactTime as number) : null,
-        powerW: (lap.averagePower as number) ?? null,
-        vertOscCm: (lap.verticalOscillation as number) != null
-          ? Math.round((lap.verticalOscillation as number) * 10) / 10
-          : null,
-        vertRatioPct: (lap.verticalRatio as number) != null
-          ? Math.round((lap.verticalRatio as number) * 10) / 10
-          : null,
-        elevGain: (lap.elevationGain as number) ?? null,
-        elevLoss: (lap.elevationLoss as number) ?? null,
-        segmentType: 'main',
-      });
-    }
+  const splits = parseLapDTOs((splitsResult as { lapDTOs?: Record<string, unknown>[] })?.lapDTOs ?? []);
+  if (splits.length > 0) {
     classifyLaps(splits);
   }
 
