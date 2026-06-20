@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
 import { buildJarvisContext } from '@/lib/context';
+import { CLAUDE_MODEL } from '@/lib/models';
 
 function getWibToday(): string {
   const now = new Date();
@@ -118,7 +119,8 @@ export const GET = withAuth(async () => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
+        output_config: { effort: 'low' },
         max_tokens: 700,
         temperature: 0.3,
         messages: [{

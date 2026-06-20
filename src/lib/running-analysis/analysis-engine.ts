@@ -10,6 +10,7 @@
  */
 
 import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import { CLAUDE_MODEL } from '@/lib/models';
 import type { PlannedDay } from './plan-loader';
 import type { WeeklyInsightEntry } from './weekly-insights-db';
 import { parseLapsFromProperty, type LapData } from './garmin-enrich';
@@ -369,7 +370,8 @@ Respond in this exact JSON format:
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_MODEL,
+      output_config: { effort: 'high' },
       max_tokens: 1000,
       temperature: 0.4,
       messages: [{ role: 'user', content: prompt }],

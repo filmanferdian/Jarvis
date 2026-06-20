@@ -6,6 +6,7 @@ import { detectRedFlags, RedFlag } from '@/lib/fitness/redflags';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
 import { sanitizeBriefing } from '@/lib/briefingText';
+import { CLAUDE_MODEL } from '@/lib/models';
 
 // POST: Regenerate today's morning briefing using real calendar + tasks + fitness data
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -415,7 +416,8 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
+        output_config: { effort: 'medium' },
         max_tokens: 2000,
         temperature: 0.4,
         messages: [{ role: 'user', content: prompt }],

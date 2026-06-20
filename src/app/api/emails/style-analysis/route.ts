@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { safeError } from '@/lib/errors';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
+import { CLAUDE_MODEL } from '@/lib/models';
 import {
   getValidAccessToken as getMicrosoftToken,
   fetchSentEmailsWithBody as fetchOutlookSent,
@@ -122,7 +123,8 @@ ${wrapUntrusted('untrusted_sent_emails', emailList)}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
+        output_config: { effort: 'high' },
         max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }],
       }),
