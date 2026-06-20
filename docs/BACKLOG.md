@@ -35,13 +35,13 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ### 2026-06-20, News blocklist: word-boundary matcher + Tier-3 calls + long-tail heuristic
 
-**Context:** v3.32.0 expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` by ~48 entries from a 14-day source audit, and stood up a 3x/day cloud routine to keep proposing candidates for confirmation. Three things were intentionally deferred.
+**Context:** v3.32.0 expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` by ~48 entries from a 14-day source audit, and stood up a weekly cloud routine (Sunday morning, over the previous 7 days) to keep proposing candidates for confirmation. Three things were intentionally deferred.
 
 **Follow-ups:**
 - **Word-boundary matcher.** The matcher is `n === b || n.includes(b)`, which forces both hand-fixes (e.g. the `pontianakpost` no-space variant) and unsafe omissions: `ign` (gaming) was left out because a bare substring would wrongly block "Foreign Policy". Add an optional exact / word-boundary match mode so short distinctive tokens can be blocked safely, then add `ign`.
 - **Tier-3 borderline decisions.** Still unblocked pending a call: detik tech vertical (detikinet, high volume), Apple / gadget-rumor blogs (macrumors, 9to5mac, 9to5google, gizmodo, gsmarena, wccftech), and US regional papers (sfgate, the seattle times, dallas news, san francisco chronicle, the texas tribune, chicago sun-times). Finance content (stockbit snips, ajaib) and fact-checkers (turnbackhoax, jala hoaks) were decided as keep.
 - **Long-tail heuristic.** There is a long tail of ~30 one-off hyper-local Indonesian regionals and US call-sign TV stations that is not worth hand-listing. Consider a structural rule (drop an outlet seen once in a slot with no corroborating outlets) instead of growing the list forever.
-- **Cloud-routine data access.** Verify the 3x/day routine can reach Supabase (project voycxhchxtggncosfzuf, table `news_synthesis`) on its first fire. If headless cloud runs lack the Supabase MCP, add a small `withCronAuth` read endpoint returning the latest slot's `indonesia_sources` / `international_sources` so the routine can fetch over HTTP instead.
+- **Cloud-routine data access.** Verify the weekly routine can reach Supabase (project voycxhchxtggncosfzuf, table `news_synthesis`) on its first run. If headless cloud runs lack the Supabase MCP, add a small `withCronAuth` read endpoint returning recent `indonesia_sources` / `international_sources` so the routine can fetch over HTTP instead.
 
 ### 2026-06-20, Model selection: monitor token cost and retune tiers
 

@@ -6,7 +6,7 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ## 2026-06-20, v3.32.0, News outlet blocklist expansion from a 14-day source audit
 
-Audited the outlets pulled into the Current Events feed (41 slots over 14 days, both tabs) to find non-current-events noise, then expanded `BLOCKED_OUTLETS` by ~48 entries. Set up a 3x/day cloud routine (aligned to the 07:01 / 13:01 / 19:01 WIB pulls) to keep proposing candidates for confirmation, without auto-editing.
+Audited the outlets pulled into the Current Events feed (41 slots over 14 days, both tabs) to find non-current-events noise, then expanded `BLOCKED_OUTLETS` by ~48 entries. Set up a weekly cloud routine (Sunday morning WIB, over the previous 7 days) to keep proposing candidates for confirmation, without auto-editing.
 
 **Well:**
 - Verified the existing filter was actually working before adding to it: already-blocked outlets only showed in pre-Jun-8 rows and nothing leaked in the last 3 days, so this was confirmed as curation, not a bug chase.
@@ -19,7 +19,7 @@ Audited the outlets pulled into the Current Events feed (41 slots over 14 days, 
 **Next:**
 - Add a word-boundary matcher so short distinctive tokens (ign, and future ones) can be blocked safely. Backlogged.
 - Decide the Tier-3 borderline outlets (detik tech vertical, Apple/gadget-rumor blogs, US regional papers) and consider a "seen once, no corroboration" heuristic to kill the hyper-local long tail instead of hand-listing. Backlogged.
-- Confirm the cloud routine can reach Supabase on its first fire; if headless runs lack the MCP, add a small cron-authed read endpoint exposing the latest slot's source arrays.
+- Confirm the cloud routine can reach Supabase on its first fire; if headless runs lack the MCP, add a small cron-authed read endpoint exposing the past week's source arrays.
 
 ## 2026-06-20, v3.31.0, Fix retired Sonnet model id; centralize model config
 
