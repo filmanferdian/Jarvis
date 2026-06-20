@@ -4,13 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
-## [3.31] – 2026-06-20 – Fix retired Sonnet model id; centralize model config (v3.31.0)
+## [3.31] – 2026-06-20 – Fix retired Sonnet model id; centralize + tune model selection (v3.31.0)
 
 Claude Sonnet 4 (`claude-sonnet-4-20250514`) retired on 2026-06-15, so every Claude call still hardcoding that id returned `404 not_found_error`. This broke the morning briefing, email triage, and email synthesis (visible as red on the Utilities page), with briefing delta/regenerate, on-demand email synthesize, email style-analysis, fitness insights, voice intent, and running-analysis latently broken too. Root cause: the model id was a string literal copy-pasted across ~14 call sites.
 
 - New `src/lib/models.ts` exports a single `CLAUDE_MODEL` constant (now `claude-sonnet-4-6`, the active Sonnet and documented drop-in for the retired one). All 14 call sites import it instead of hardcoding an id, so the next model migration is a one-line change.
 - Restores the 11 broken/latent call sites and unifies the 3 that were on the `claude-sonnet-4-5` alias (news synthesis, career-jobs, and the Ubayy-driven Quran synthesis) onto the same constant.
 - Pure id swap: verified no call site uses assistant-turn prefills, `budget_tokens`, `output_format`, or `top_p`/`top_k` (all of which 4.6 rejects), so no other request changes were needed.
+- Tuned model and effort per task instead of running everything at Sonnet 4.6's implicit `high` default. Added a `CLAUDE_MODEL_FAST` tier (`claude-haiku-4-5`) for latency-sensitive and bulk-classification work: voice intent parsing, email-triage classification, and job scoring now run on Haiku. The Sonnet calls set `output_config.effort` explicitly: `low` for frequent digests and deltas (email synthesis, news synthesis, briefing delta, fitness insights), `medium` for the daily briefing and email reply drafting, `high` for the weekly running analysis and the rare email style analysis. Quran synthesis is Ubayy-owned, so it stays on the default Sonnet model with no effort change (the Haiku/effort note is flagged to Ubayy).
 
 ## [3.30] – 2026-06-19 – Quran synthesis: harden the length cap (v3.30.0)
 

@@ -10,3 +10,9 @@
 // Current: Claude Sonnet 4.6 (claude-sonnet-4-6), the active Sonnet and the
 // documented drop-in replacement for the retired Sonnet 4.
 export const CLAUDE_MODEL = 'claude-sonnet-4-6';
+
+// Fast/cheap tier for latency-sensitive or bulk classification work: voice
+// intent parsing, email triage classification, and job scoring. Note: Haiku
+// does not accept the `output_config.effort` parameter, so omit effort on calls
+// that use this model (sending it returns a 400).
+export const CLAUDE_MODEL_FAST = 'claude-haiku-4-5';

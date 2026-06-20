@@ -327,6 +327,7 @@ ${wrapUntrusted('untrusted_international_news', intlBlock)}
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
+      output_config: { effort: 'low' },
       max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     }),

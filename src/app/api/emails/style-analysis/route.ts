@@ -124,6 +124,7 @@ ${wrapUntrusted('untrusted_sent_emails', emailList)}`;
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
+        output_config: { effort: 'high' },
         max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }],
       }),

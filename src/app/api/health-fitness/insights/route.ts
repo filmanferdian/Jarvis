@@ -120,6 +120,7 @@ export const GET = withAuth(async () => {
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
+        output_config: { effort: 'low' },
         max_tokens: 700,
         temperature: 0.3,
         messages: [{

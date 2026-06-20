@@ -147,6 +147,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
+        output_config: { effort: 'low' },
         max_tokens: 400,
         temperature: 0.3,
         messages: [{

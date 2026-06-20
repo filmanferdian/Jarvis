@@ -17,8 +17,8 @@ Claude Sonnet 4 (`claude-sonnet-4-20250514`) retired 2026-06-15, 404ing every Cl
 - The id was duplicated across 14 files in the first place; a single retirement took down multiple core features. Should have been centralized from the start.
 
 **Next:**
-- Sonnet 4.6 defaults to `effort: high`; watch token cost/latency on the high-frequency jobs (triage, news) and set `output_config: { effort: 'low' }` if it spikes.
-- The Quran synthesis route moved from `claude-sonnet-4-5` to `claude-sonnet-4-6`; that endpoint is Ubayy-owned, so flag the model change to Ubayy.
+- Model/effort are now tuned per task in the same ship (Haiku for voice intent, triage classification, and job scoring; Sonnet at `low`/`medium`/`high` effort by task) rather than everything at the implicit `high` default. Monitor real token usage on the Utilities page after a few cron cycles and adjust tiers if quality or cost looks off.
+- The Quran synthesis route moved from `claude-sonnet-4-5` to `claude-sonnet-4-6` and was left at default effort; that endpoint is Ubayy-owned, so flag both the model change and the Haiku/effort recommendation to Ubayy.
 
 ## 2026-06-19, v3.30.0, Quran synthesis: harden the length cap
 

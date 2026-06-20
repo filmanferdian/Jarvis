@@ -371,6 +371,7 @@ Respond in this exact JSON format:
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
+      output_config: { effort: 'high' },
       max_tokens: 1000,
       temperature: 0.4,
       messages: [{ role: 'user', content: prompt }],

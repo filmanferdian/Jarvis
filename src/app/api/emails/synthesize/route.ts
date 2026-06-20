@@ -89,6 +89,7 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
+        output_config: { effort: 'low' },
         max_tokens: 600,
         messages: [{ role: 'user', content: prompt }],
       }),

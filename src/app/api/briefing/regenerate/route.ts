@@ -417,6 +417,7 @@ ${sundayContext ? `SUNDAY CONTEXT:\n${sundayContext}` : ''}`;
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
+        output_config: { effort: 'medium' },
         max_tokens: 2000,
         temperature: 0.4,
         messages: [{ role: 'user', content: prompt }],
