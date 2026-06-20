@@ -4,6 +4,16 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.33] – 2026-06-20 – News blocklist expansion from the first weekly review (v3.33.0)
+
+First weekly scheduled review (7-day window) of outlets pulled into the Current Events feed, confirmed by Filman before applying. Added 46 outlets to `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` (20 International, 26 Indonesia). The filter stayed healthy: most recurring junk was already caught by the v3.32 batch, so this pass is mostly the previously-deferred Tier-3 long tail.
+
+- International (20): gadget-review and rumor blogs (9to5mac, 9to5google, macrumors, gsmarena.com, bgr.com, notebookcheck, wccftech), sports (sports illustrated, mma fighting, ufc.com, covers.com), entertainment/lifestyle/fashion (e! news, wwd, marthastewart.com, yourtango, time out worldwide, today.com, eater los angeles, hollywoodreporter.com), and government PR (texas department of public safety).
+- Indonesia (26): lifestyle/entertainment verticals (detiktravel, wowkeren, sindonews lifestyle, the lazy media), vendor/gadget (xiaomi-miui), government/institutional PR (presiden ri, bmkg, badan riset dan inovasi nasional), religious/community org outlets (nu online, suara muhammadiyah, sh terate madiun), hyper-local regionals (batamnews, sumeks, bantendaily, kilasjatim.com, radar bontang, mnc trijaya kendari, beritajatim.com), and low-credibility/niche portals (carapandang, langitselatan, artik.id, tebaran.com, atnews.id, merahputih.com, realestat.id, ajaib).
+- Matcher-safety forms used to avoid false positives under the includes() rule: today.com (not today, which would match "USA Today"), sindonews lifestyle (not sindonews, which would match the kept .com / nasional / ekbis verticals), badan riset dan inovasi nasional (not bare brin), and domain forms covers.com / hollywoodreporter.com. The latter also closes a real gap: hollywoodreporter.com slipped past the spaced hollywood reporter entry.
+- Deliberately kept per Filman's call: harapan rakyat (the highest-frequency ID candidate, wanted for coverage), plus inilah.com, viva.co.id, and suara.com. Still excluded pending a word-boundary matcher: ign (bare substring would match "Foreign Policy").
+- Note: ajaib was kept as finance-relevant in v3.32 but is now blocked per this review's Tier-3 selection (it is investing-app content marketing, not journalism).
+
 ## [3.32] – 2026-06-20 – News outlet blocklist expansion from a 14-day source audit (v3.32.0)
 
 Audited every outlet pulled into the Current Events feed over 14 days (41 slots, both Indonesia and International tabs) and expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` to drop non-current-events noise. The filter itself was confirmed healthy (already-blocked outlets stopped appearing after the Jun 7-8 additions); this is a curation pass, not a bug fix.
