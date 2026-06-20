@@ -4,6 +4,37 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-20, v3.35.0, Running insights for the Charge (FP) app
+
+Added 12 coaching metrics + `lap_detail` to `garmin_activity_details` (forward-only) and a new
+`POST /api/running/insight` route that runs a supplied coach prompt on Sonnet over the run's metrics +
+`program_schedule` prescription + comparable session, cached in `running_insights`.
+
+**Well:**
+- Reuse paid off again. The decoupling formula in the spec was already implemented verbatim in
+  `garmin-enrich.ts` (`calcDecoupling`); exported it plus the other pure helpers and a new `parseLapDTOs`
+  rather than re-deriving, and left `enrichActivity` (the weekly Notion path) behavior-unchanged.
+- Kept `activityDetails.ts` doing its own fetches instead of routing through `enrichActivity`, specifically
+  so it can re-throw a Garmin rate-limit and let `syncGarmin` trip the circuit breaker — `enrichActivity`
+  swallows fetch errors, which would have silently broken rate-limit safety.
+- Protected the Charge contract: the richer per-lap data went into a separate `lap_detail` column so the
+  `splits` shape Charge is actively coding against stayed byte-for-byte stable.
+- Made the insight route read only from Supabase (no Garmin call at request time), so insights generate
+  even when the Garmin breaker is open. Verified the whole route live (200 + cache + regenerate + 401/404).
+- Didn't guess HR-zone bands: rather than impose a Friel/LTHR model that contradicted the runner's stated
+  zones, passed the authoritative Garmin time-in-zone seconds and let the prompt's own fallback bands apply.
+
+**Wrong:**
+- Garmin budget was tight (38/50) during verification, so only the outdoor run was enriched live; the
+  treadmill weather-skip path was verified by reading code, not exercised. Acceptable, but a dedicated
+  low-budget test fixture would remove the guesswork next time.
+
+**Next:**
+- Optional dedicated `CHARGE_API_TOKEN` for independent revocation (currently reuses `JARVIS_AUTH_TOKEN`).
+  Backlogged.
+- The history-backfill and retry-incomplete-rows items from v3.34 still stand and now also cover the new
+  columns. Backlogged.
+
 ## 2026-06-20, v3.34.0, garmin_activity_details for the Charge (FP) app
 
 Added a plaintext `garmin_activity_details` table so the Charge iOS app (reads Supabase with the publishable key, can't decrypt) gets per-km splits, raw HR samples, the cadence/max-HR/elevation tiles, and time-in-zone. New `src/lib/sync/activityDetails.ts` fetches the splits + details endpoints and builds the FP-shaped record; wired into `syncGarmin` for new runs only.
