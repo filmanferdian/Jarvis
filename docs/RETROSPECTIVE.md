@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-20, v3.31.0, Fix retired Sonnet model id; centralize model config
+
+Claude Sonnet 4 (`claude-sonnet-4-20250514`) retired 2026-06-15, 404ing every Claude call that still hardcoded it: morning briefing, email triage, and email synthesis were failing in cron, with several on-demand routes latently broken. Diagnosed from the Utilities page → `cron_run_log` / `sync_status` error text, confirmed the retirement against the model reference, then centralized the id into one `CLAUDE_MODEL` constant (`claude-sonnet-4-6`) consumed by all 14 call sites.
+
+**Well:**
+- Read the actual error before theorizing: the `not_found_error` payload named the dead model id, which immediately ruled out "API access / credentials" and pointed at a retired model.
+- Checked the whole blast radius (grep found 14 hardcoded ids, not just the 3 visibly-failing jobs) and verified the swap was safe (no prefills / `budget_tokens` / sampling params that 4.6 rejects) before editing.
+- Fixed the root cause (scattered string literals) not just the symptom, so the next retirement is a one-line change.
+
+**Wrong:**
+- The id was duplicated across 14 files in the first place; a single retirement took down multiple core features. Should have been centralized from the start.
+
+**Next:**
+- Sonnet 4.6 defaults to `effort: high`; watch token cost/latency on the high-frequency jobs (triage, news) and set `output_config: { effort: 'low' }` if it spikes.
+- The Quran synthesis route moved from `claude-sonnet-4-5` to `claude-sonnet-4-6`; that endpoint is Ubayy-owned, so flag the model change to Ubayy.
+
 ## 2026-06-19, v3.30.0, Quran synthesis: harden the length cap
 
 Another Ubayy prompt edit to `POST /api/quran/synthesis`: turned the length guidance from a "firm limit" into a "hard cap" (about 1000 words, never above 1100, even on long or dense portions, selectivity over exhaustiveness) and softened the Meaning section's "give it the most room" wording that was pulling toward overruns. Four-section shape unchanged.

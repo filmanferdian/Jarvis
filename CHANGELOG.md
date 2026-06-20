@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.31] – 2026-06-20 – Fix retired Sonnet model id; centralize model config (v3.31.0)
+
+Claude Sonnet 4 (`claude-sonnet-4-20250514`) retired on 2026-06-15, so every Claude call still hardcoding that id returned `404 not_found_error`. This broke the morning briefing, email triage, and email synthesis (visible as red on the Utilities page), with briefing delta/regenerate, on-demand email synthesize, email style-analysis, fitness insights, voice intent, and running-analysis latently broken too. Root cause: the model id was a string literal copy-pasted across ~14 call sites.
+
+- New `src/lib/models.ts` exports a single `CLAUDE_MODEL` constant (now `claude-sonnet-4-6`, the active Sonnet and documented drop-in for the retired one). All 14 call sites import it instead of hardcoding an id, so the next model migration is a one-line change.
+- Restores the 11 broken/latent call sites and unifies the 3 that were on the `claude-sonnet-4-5` alias (news synthesis, career-jobs, and the Ubayy-driven Quran synthesis) onto the same constant.
+- Pure id swap: verified no call site uses assistant-turn prefills, `budget_tokens`, `output_format`, or `top_p`/`top_k` (all of which 4.6 rejects), so no other request changes were needed.
+
 ## [3.30] – 2026-06-19 – Quran synthesis: harden the length cap (v3.30.0)
 
 Tightened the `POST /api/quran/synthesis` prompt so the note holds the five-minute length on long or dense portions. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.

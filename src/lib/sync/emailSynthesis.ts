@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { CLAUDE_MODEL } from '@/lib/models';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import {
   getValidAccessToken as getMicrosoftToken,
@@ -135,7 +136,7 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_MODEL,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     }),

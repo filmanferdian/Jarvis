@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { VoiceIntentSchema } from '@/lib/validation';
+import { CLAUDE_MODEL } from '@/lib/models';
 import { safeError } from '@/lib/errors';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
@@ -120,7 +121,7 @@ ${wrapUntrusted('untrusted_user_transcript', safeTranscript)}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
         max_tokens: 400,
         temperature: 0.3,
         messages: [{ role: 'user', content: prompt }],

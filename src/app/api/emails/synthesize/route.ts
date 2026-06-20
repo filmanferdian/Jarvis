@@ -5,6 +5,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { buildJarvisContext } from '@/lib/context';
 import { safeError } from '@/lib/errors';
 import { EmailSynthesisSchema } from '@/lib/validation';
+import { CLAUDE_MODEL } from '@/lib/models';
 import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 // POST: Trigger email synthesis on-demand using Gmail MCP data
@@ -87,7 +88,7 @@ IMPORTANT: If there are no actionable emails, say so briefly. Do not fabricate i
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
         max_tokens: 600,
         messages: [{ role: 'user', content: prompt }],
       }),

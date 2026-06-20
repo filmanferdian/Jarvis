@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
+import { CLAUDE_MODEL } from '@/lib/models';
 import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 function getWibToday(): string {
@@ -145,7 +146,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_MODEL,
         max_tokens: 400,
         temperature: 0.3,
         messages: [{

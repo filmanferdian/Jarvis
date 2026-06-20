@@ -10,9 +10,10 @@ import {
 import { CAREER_SOURCES, type RawJob } from '@/lib/sources/careers';
 import { shouldScore } from '@/lib/sources/careers/filter';
 import { PROFILE_BLOCK } from '@/lib/sources/careers/profile';
+import { CLAUDE_MODEL } from '@/lib/models';
 
 const SYNC_TYPE = 'career-jobs';
-const MODEL = 'claude-sonnet-4-5';
+const MODEL = CLAUDE_MODEL;
 const MAX_SCORE_PER_RUN = 40; // cost guardrail; volume is normally far below this
 
 // Static half of every scoring call — paired with PROFILE_BLOCK and cached.

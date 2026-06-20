@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeError } from '@/lib/errors';
+import { CLAUDE_MODEL } from '@/lib/models';
 
 // POST /api/quran/synthesis
 // Generates the daily Quran reading synthesis for the Ubayy reader, on demand.
@@ -25,7 +26,7 @@ const Body = z.object({
 });
 
 const USER_ID = 'filman';
-const MODEL = 'claude-sonnet-4-5';
+const MODEL = CLAUDE_MODEL;
 
 function buildPrompt(range: string, ayahs: z.infer<typeof AyahSchema>[]): string {
   const passage = ayahs

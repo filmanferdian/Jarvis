@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { CLAUDE_MODEL } from '@/lib/models';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import {
   getValidAccessToken as getMicrosoftToken,
@@ -325,7 +326,7 @@ ${wrapUntrusted('untrusted_international_news', intlBlock)}
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model: CLAUDE_MODEL,
       max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     }),
