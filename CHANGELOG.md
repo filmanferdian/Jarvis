@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.36] – 2026-06-20 – Quran synthesis: shorten to a tight three-to-four-minute read (v3.36.0)
+
+Reversed direction on synthesis length. The note now targets about 600-700 words (a tight three to four minute read) instead of the ~1000-1100 set in v3.28-v3.30; Ubayy found the longer format too long. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.
+
+- `src/app/api/quran/synthesis/route.ts`: target length lowered to ~600-700 words; the hard cap drops from "about 1000, never above 1100" to "about 600, never above 700". Per-section budgets lowered across the board: Overview ~80→~60, Historical context ~170→~120, Meaning ~700→~400.
+- Meaning is now capped at three thematic clusters (fewer for short portions), two to three sentences each, with "pick the three that carry the portion, leaving lesser points out" made explicit. "Selective and short beats exhaustive" replaces the prior depth-first framing.
+- Four-section shape (Overview, Historical context, Meaning, Sources) unchanged. Prompt-only; no schema or signature change. Cached notes need a regenerate to adopt the shorter length.
+
 ## [3.35] – 2026-06-20 – Running insights for the Charge (FP) app (v3.35.0)
 
 Two-part extension of the v3.34 Charge integration: richer per-run metrics persisted at sync time, and
