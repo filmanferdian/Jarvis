@@ -4,6 +4,22 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-20, v3.36.0, Quran synthesis: shorten to a tight three-to-four-minute read
+
+Another Ubayy prompt edit to `POST /api/quran/synthesis`, this one a direction reversal: synthesis length drops from ~1000-1100 words (set across v3.28-v3.30) back down to ~600-700, with Meaning capped at three thematic clusters and all per-section budgets lowered. Four-section shape unchanged.
+
+**Well:**
+- Rebased cleanly onto a main that had moved five minors ahead (3.30 to 3.35) while this worktree was idle, and confirmed the only intervening change to the Quran route was the v3.31 model-id centralization, so the incoming prompt edit applied without conflict and the diff stayed prompt-only.
+- Called the change out as a deliberate reversal in the changelog (longer in v3.28-v3.30, now shorter) rather than presenting it as a fresh idea, so the history reads honestly.
+
+**Wrong:**
+- The length target has now swung long then short within a day or two across several minor versions, each a full ship. The endpoint is still finding its shape by trial; a single round of review on real generated days (which the user is doing now) would have converged faster than shipping each guess.
+- Same unresolved pattern: Ubayy edits keep landing in the main worktree with no handoff guardrail.
+
+**Next:**
+- Give Ubayy its own worktree or a pull-request handoff.
+- Wire the endpoint into the briefing or 15:30 callback (pending since v3.27.0).
+
 ## 2026-06-20, v3.35.0, Running insights for the Charge (FP) app
 
 Added 12 coaching metrics + `lap_detail` to `garmin_activity_details` (forward-only) and a new
