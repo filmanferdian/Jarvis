@@ -33,12 +33,13 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
-### 2026-06-28, Morning briefing: pause the external cron job + consider consolidating generators
+### 2026-06-28, Morning briefing: consider consolidating the two generators
 
 **Context:** v3.37.0 disabled the automated daily briefing via the `MORNING_BRIEFING_ENABLED` gate (default off) in `/api/cron/morning-briefing` and made it on-demand only, with on-demand runs anchored to the closest previous 07:30 WIB slot.
 
-**Follow-ups:**
-- **Manual, do soon:** pause the morning-briefing job in the cron-job.org dashboard so it stops pinging the endpoint daily. The in-code gate already prevents any API spend (returns `skipped`), but pausing the job removes the noise entirely. Re-enabling later = set `MORNING_BRIEFING_ENABLED=true` in Railway + un-pause the job.
+**Decision (2026-06-28):** Filman chose to leave the cron-job.org job running and not re-enable the briefing anytime soon. The in-code gate already prevents any API spend (the endpoint returns `skipped` with a 200), so the only cost is one harmless no-op ping per day. No action needed in cron-job.org. If re-enabled later, it is just `MORNING_BRIEFING_ENABLED=true` in Railway (the job is still live, nothing to un-pause).
+
+**Follow-up:**
 - **Scope-later:** two briefing generators write to the same `briefing_cache` row — the lightweight cron `generateBriefing` (`src/lib/sync/morningBriefing.ts`) and the rich `regenerate` route. Consider consolidating, or documenting which is canonical, to avoid drift.
 
 ### 2026-06-20, garmin_activity_details: optional history backfill + retry incomplete rows
