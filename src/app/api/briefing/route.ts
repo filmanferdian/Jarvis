@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getAudioSignedUrl } from '@/lib/tts';
+import { briefingAnchorWib } from '@/lib/briefingSchedule';
 
 // GET: Fetch today's cached briefing + any delta updates
 export const GET = withAuth(async (_req: NextRequest) => {
   try {
-    // Use WIB timezone (UTC+7) for date
-    const now = new Date();
-    const wibOffset = 7 * 60 * 60 * 1000;
-    const wibDate = new Date(now.getTime() + wibOffset);
-    const today = wibDate.toISOString().split('T')[0];
+    // Anchor the lookup to the most recent past 07:30 WIB slot so the dashboard
+    // reads the same date the (on-demand) briefing was written under, including
+    // the pre-slot window where "the latest briefing" is the previous day's.
+    const today = briefingAnchorWib().toISOString().split('T')[0];
 
     const { data, error } = await supabase
       .from('briefing_cache')

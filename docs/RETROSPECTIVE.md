@@ -4,6 +4,23 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-06-28, v3.37.0, Morning briefing disabled and made on-demand only
+
+Turned the scheduled daily briefing off to save API spend, kept it runnable on demand, and made on-demand runs reproduce the closest previous 07:30 WIB slot instead of re-scoping to now.
+
+**Well:**
+- Used a default-off env gate (`MORNING_BRIEFING_ENABLED`) inside the cron route as the authoritative kill-switch, so even if the external cron-job.org job keeps firing it returns `skipped` before any Claude/ElevenLabs call. No code deleted, trivial to re-enable.
+- The closest-slot logic landed as one small shared helper (`briefingAnchorWib`) swapped into the four existing date computations, leaving the lookback-window and content logic untouched. At/after the slot it equals plain WIB-now, so the real scheduled path is provably unchanged.
+- Anchored the read paths (briefing GET, delta) too, not just the generators, so a pre-07:30 on-demand run writes and reads the same date and the dashboard does not show "no briefing yet" for a briefing that exists.
+
+**Wrong:**
+- The scheduler lives in the cron-job.org UI, so the repo can only no-op the request, not stop the ping. The actual pause is a manual step outside the codebase, which is easy to forget.
+- There are two briefing generators (the lightweight cron `generateBriefing` and the rich `regenerate`) writing to the same cache row; the split is a latent source of confusion that this ship worked around rather than resolved.
+
+**Next:**
+- Pause the morning-briefing job in cron-job.org so it stops pinging entirely.
+- Consider consolidating the two briefing generators, or documenting clearly which one is canonical.
+
 ## 2026-06-20, v3.36.0, Quran synthesis: shorten to a tight three-to-four-minute read
 
 Another Ubayy prompt edit to `POST /api/quran/synthesis`, this one a direction reversal: synthesis length drops from ~1000-1100 words (set across v3.28-v3.30) back down to ~600-700, with Meaning capped at three thematic clusters and all per-section budgets lowered. Four-section shape unchanged.

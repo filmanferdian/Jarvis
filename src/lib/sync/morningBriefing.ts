@@ -4,6 +4,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio, cleanupOldDeltas } from '@/lib/tts';
 import { sanitizeInline, sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import { briefingAnchorWib, briefingDateSummary } from '@/lib/briefingSchedule';
 
 export interface BriefingResult {
   date: string;
@@ -18,10 +19,10 @@ export async function generateBriefing(): Promise<BriefingResult> {
     throw new Error('Daily API limit reached');
   }
 
-  // Use WIB timezone (UTC+7)
-  const now = new Date();
-  const wibOffset = 7 * 60 * 60 * 1000;
-  const wibDate = new Date(now.getTime() + wibOffset);
+  // Use WIB timezone (UTC+7), anchored to the most recent past 07:30 WIB slot so
+  // an on-demand run reproduces that scheduled run's coverage window instead of
+  // re-scoping to the current moment. At/after the slot this equals plain WIB-now.
+  const wibDate = briefingAnchorWib();
   const today = wibDate.toISOString().split('T')[0];
 
   // End of this week (Sunday)
@@ -91,13 +92,7 @@ export async function generateBriefing(): Promise<BriefingResult> {
     ? `Email summary: ${sanitizeMultiline(emailData.synthesis_text, 4000)}`
     : 'No email synthesis available.';
 
-  const dateSummary = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'Asia/Jakarta',
-  });
+  const dateSummary = briefingDateSummary(wibDate);
 
   const ctx = await buildJarvisContext({ pages: allPages() });
 

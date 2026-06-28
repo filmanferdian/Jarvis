@@ -7,6 +7,7 @@ import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
 import { sanitizeBriefing } from '@/lib/briefingText';
 import { CLAUDE_MODEL } from '@/lib/models';
+import { briefingAnchorWib, briefingDateSummary } from '@/lib/briefingSchedule';
 
 // POST: Regenerate today's morning briefing using real calendar + tasks + fitness data
 export const POST = withAuth(async (_req: NextRequest) => {
@@ -19,10 +20,12 @@ export const POST = withAuth(async (_req: NextRequest) => {
       );
     }
 
-    // Use WIB timezone (UTC+7)
+    // Use WIB timezone (UTC+7). The coverage date is anchored to the most recent
+    // past 07:30 WIB slot so this on-demand regenerate reproduces that scheduled
+    // run's window instead of re-scoping to now. `now` below stays the real
+    // current time for staleness checks and generated_at timestamps.
     const now = new Date();
-    const wibOffset = 7 * 60 * 60 * 1000;
-    const wibDate = new Date(now.getTime() + wibOffset);
+    const wibDate = briefingAnchorWib(now);
     const today = wibDate.toISOString().split('T')[0];
     const dayName = wibDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();
     const isSunday = dayName === 'sunday';
@@ -243,13 +246,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
       }
     }
 
-    const dateSummary = new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'Asia/Jakarta',
-    });
+    const dateSummary = briefingDateSummary(wibDate);
 
     // --- Transformation intelligence: additional context sections ---
 

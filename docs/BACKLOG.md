@@ -33,6 +33,14 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## Medium priority
 
+### 2026-06-28, Morning briefing: pause the external cron job + consider consolidating generators
+
+**Context:** v3.37.0 disabled the automated daily briefing via the `MORNING_BRIEFING_ENABLED` gate (default off) in `/api/cron/morning-briefing` and made it on-demand only, with on-demand runs anchored to the closest previous 07:30 WIB slot.
+
+**Follow-ups:**
+- **Manual, do soon:** pause the morning-briefing job in the cron-job.org dashboard so it stops pinging the endpoint daily. The in-code gate already prevents any API spend (returns `skipped`), but pausing the job removes the noise entirely. Re-enabling later = set `MORNING_BRIEFING_ENABLED=true` in Railway + un-pause the job.
+- **Scope-later:** two briefing generators write to the same `briefing_cache` row — the lightweight cron `generateBriefing` (`src/lib/sync/morningBriefing.ts`) and the rich `regenerate` route. Consider consolidating, or documenting which is canonical, to avoid drift.
+
 ### 2026-06-20, garmin_activity_details: optional history backfill + retry incomplete rows
 
 **Context:** v3.34.0 added the plaintext `garmin_activity_details` table for the Charge (FP) iOS app (per-km splits, HR samples, tiles, time-in-zone), populated forward-only via `syncGarmin` → `src/lib/sync/activityDetails.ts`. Two things were intentionally deferred.
