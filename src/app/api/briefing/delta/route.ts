@@ -6,11 +6,12 @@ import { buildJarvisContext, allPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
 import { CLAUDE_MODEL } from '@/lib/models';
 import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
+import { briefingAnchorWib } from '@/lib/briefingSchedule';
 
+// Anchor to the most recent past 07:30 WIB slot so the delta reads the same
+// baseline date the morning briefing was written under.
 function getWibToday(): string {
-  const now = new Date();
-  const wibOffset = 7 * 60 * 60 * 1000;
-  return new Date(now.getTime() + wibOffset).toISOString().split('T')[0];
+  return briefingAnchorWib().toISOString().split('T')[0];
 }
 
 // POST: Generate delta briefing (what changed since morning)

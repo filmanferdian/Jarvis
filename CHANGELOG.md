@@ -4,6 +4,14 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.37] – 2026-06-28 – Morning briefing: automated run disabled, on-demand only (v3.37.0)
+
+Turned off the scheduled daily briefing to preserve API usage, and made it on-demand only. The code and the cron-job.org wiring stay in place behind a clean toggle so it is easy to re-enable later.
+
+- **Disable toggle:** `src/app/api/cron/morning-briefing/route.ts` now gates on `MORNING_BRIEFING_ENABLED`. Unset/absent means disabled (the new default), and the route returns `{ skipped: true }` without calling Claude or ElevenLabs, so a stray cron-job.org ping spends nothing. Re-enable by setting `MORNING_BRIEFING_ENABLED=true` in Railway and un-pausing the cron-job.org job. The cron-job.org job is external (not in the repo); it should also be paused in that dashboard.
+- **On-demand triggers:** the dashboard "regenerate" button (`POST /api/briefing/regenerate`) is unchanged and always available. The scheduled-style generator can be run manually with `GET /api/cron/morning-briefing?force=1` (still requires the `x-cron-secret` header); `?force=1` bypasses the disable gate.
+- **Closest-previous-slot scope:** new `src/lib/briefingSchedule.ts` holds the slot time (07:30 WIB) plus `briefingAnchorWib()` / `briefingDateSummary()`. On-demand runs now anchor the coverage date to the most recent past 07:30 WIB slot instead of re-scoping to "now": before today's slot they reproduce the previous day's window, at/after it they equal plain WIB-now (so the real scheduled behavior is unchanged). Applied to the four briefing date computations: `src/lib/sync/morningBriefing.ts`, `src/app/api/briefing/regenerate/route.ts`, and the read paths `src/app/api/briefing/route.ts` + `src/app/api/briefing/delta/route.ts` (so the dashboard reads the same date a briefing was written under). Content and lookback-window logic are otherwise untouched.
+
 ## [3.36] – 2026-06-20 – Quran synthesis: shorten to a tight three-to-four-minute read (v3.36.0)
 
 Reversed direction on synthesis length. The note now targets about 600-700 words (a tight three to four minute read) instead of the ~1000-1100 set in v3.28-v3.30; Ubayy found the longer format too long. Originates from Ubayy (the Quran reader that piggybacks on Jarvis's Anthropic API); shipped from a Claude worktree.
