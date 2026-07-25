@@ -6,22 +6,6 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
-### 2026-07-25 — News blocklist: word-boundary matcher (v3.38.2 follow-up)
-
-**Context:** `isBlockedOutlet` in `src/lib/sources/googleNewsRss.ts` matches with `n === b || n.includes(b)`. Substring matching is why several junk outlets cannot be blocked at all: any short token risks killing a legitimate outlet that merely contains it.
-
-**Currently blocked on this, all noted in-file:**
-- `ign` (gaming) would match "Foreign Policy"
-- `patch` (hyper-local network) would match "The Dispatch"
-- `komo` (Seattle TV affiliate) is a 4-letter token, too collision-prone to add blind
-
-**Proposed fix:** add an optional word-boundary mode to the matcher, so an entry can opt into matching only on whole-word boundaries rather than raw substring. Either a sentinel prefix on the entry string or a second array per locale. Then move the three outlets above into it.
-
-**Why it matters:** the list grows every weekly review and the failure mode is silent. A bad entry does not error, it just quietly removes a good outlet from the feed, and nobody notices until a source stops appearing. The three deferred outlets are the visible cost; the invisible cost is that every future review has to reason about substring collisions by hand.
-
-**Verification note:** the v3.38.2 batch was checked by replaying the match rule over the week's real pulled source names, which caught two near-misses (regional ANTARA bureaus vs the national wire, `katadataoto` vs `databoks katadata`). Worth committing that script alongside the matcher change so each weekly batch gets the same check.
-
-
 ### 2026-07-25 — Learnings: wire the weekly automation (v3.38.0 follow-up)
 
 **Context:** v3.38.0 shipped the `/learnings` page, the `learning_entries` / `learning_runs` ledger, and `scripts/ai-insights-fetch.mjs`, seeded with one hand-run week (18-25 Jul 2026). The recurring job does not exist yet, so the page is a snapshot rather than a feed.
@@ -94,9 +78,12 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 **Context:** v3.32.0 expanded `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts` by ~48 entries from a 14-day source audit, and set up a weekly scheduled review (Sunday morning, over the previous 7 days, run from the Claude app, not in-app code) to keep proposing candidates for confirmation. Three things were intentionally deferred.
 
+**Status (2026-07-25, after v3.38.2 batch 3):** the word-boundary matcher is now the most pressing of the three and is effectively promoted to high priority. Three outlets are blocked on it, up from one, and the count grows every review.
+
 **Follow-ups:**
-- **Word-boundary matcher.** The matcher is `n === b || n.includes(b)`, which forces both hand-fixes (e.g. the `pontianakpost` no-space variant) and unsafe omissions: `ign` (gaming) was left out because a bare substring would wrongly block "Foreign Policy". Add an optional exact / word-boundary match mode so short distinctive tokens can be blocked safely, then add `ign`.
-- **Tier-3 borderline decisions.** Still unblocked pending a call: detik tech vertical (detikinet, high volume), Apple / gadget-rumor blogs (macrumors, 9to5mac, 9to5google, gizmodo, gsmarena, wccftech), and US regional papers (sfgate, the seattle times, dallas news, san francisco chronicle, the texas tribune, chicago sun-times). Finance content (stockbit snips, ajaib) and fact-checkers (turnbackhoax, jala hoaks) were decided as keep.
+- **Word-boundary matcher.** The matcher is `n === b || n.includes(b)`, which forces both hand-fixes (e.g. the `pontianakpost` no-space variant) and unsafe omissions. Three outlets are now deferred purely because of it, all noted in-file next to each other: `ign` (gaming) would match "Foreign Policy", `patch` (hyper-local network) would match "The Dispatch", and `komo` (Seattle TV affiliate) is a 4-letter token too collision-prone to add blind. Add an optional exact / word-boundary match mode, then move all three into it. The failure mode is silent: a bad entry does not error, it quietly removes a good outlet and nobody notices until a source stops appearing.
+- **Commit the verification script.** The v3.38.2 batch was checked by replaying the real match rule over the week's actual pulled source names, which caught two near-misses (regional ANTARA bureaus vs the national wire, `katadataoto` vs `databoks katadata`). That script was hand-rolled and thrown away. Commit it alongside the matcher change so every weekly batch gets the same check instead of a fresh one each time.
+- **Tier-3 borderline decisions.** Mostly resolved in v3.38.2: `gizmodo` and `sfgate` were blocked; `san francisco chronicle`, `chicago sun-times` and `the texas tribune` were decided as keep; the Apple / gadget-rumor blogs were blocked back in batch 2. Still unblocked pending a call: the detik tech vertical (`detikinet`, high volume). Finance content (stockbit snips, ajaib) and fact-checkers (turnbackhoax, jala hoaks) remain keep.
 - **Long-tail heuristic.** There is a long tail of ~30 one-off hyper-local Indonesian regionals and US call-sign TV stations that is not worth hand-listing. Consider a structural rule (drop an outlet seen once in a slot with no corroborating outlets) instead of growing the list forever.
 ### 2026-06-20, Model selection: monitor token cost and retune tiers
 
