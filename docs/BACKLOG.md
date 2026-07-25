@@ -391,3 +391,20 @@ Still open from that entry: the Nitter fallback-instance list, and the status to
 - **Surface segment labels to Claude weekly analysis.** The analysis-engine prompt only sees per-run summaries today; doesn't see per-lap segment classification. Could enable richer "you nailed the tempo finish on Saturday" / "the third VO2 interval was 5 bpm hot" feedback. Pass `splits` (with `segmentType`) into `extractRunSummaries` and add a "structured segments" block to the weekly synthesis prompt.
 
 ---
+
+### 2026-06-16 — Architecture ideas from OpenHuman eval (mine for ideas, do not adopt the product)
+
+**Context:** Evaluated three GitHub projects for relevance to Jarvis. The first two (colbymchenry/codegraph, Egonex-AI/Understand-Anything) were code-navigation dev tools, judged not worth adopting for a well-documented 29k-line solo repo. The third, tinyhumansai/openhuman, is a personal-assistant framework that overlaps with what Jarvis is. Not adopting it (GPL-3.0, early beta, and by default it proxies OAuth tool calls and LLM prompts through tinyhumans.ai servers, which conflicts with our security posture). But three of its design ideas are worth studying and selectively reimplementing in our own stack. Borrow ideas only, not GPL code.
+
+**Items:**
+- **Memory Tree + markdown vault with compressed chunks.** OpenHuman canonicalizes synced data into small (~3k-token) compressed markdown chunks stored locally (SQLite + Obsidian-style vault). Directly relevant to how `src/lib/context.ts` builds the Jarvis system prompt from `notion_context`. Investigate compressing synced source data into small canonical chunks rather than embedding fuller text, to shrink context cost. Compare against our current file-based memory plus context build.
+- **Token compression on synced data ("TokenJuice", claimed up to 80%).** Same theme as above but as an explicit pipeline step: summarize/compress integration data before it enters any prompt. Relevant to the briefing and context pipeline where we currently pass fairly raw synced text. Scope a compression/summarization pass for the heaviest context contributors and measure the token delta.
+- **Composio as an integration layer (buy vs build).** OpenHuman gets 118+ integrations via the Composio connector layer instead of hand-rolling each sync. We hand-build every sync module (`src/lib/sync/*`). For future integrations, evaluate Composio (or similar) as a faster path. Caveat: our specials (Garmin username/password, WIB-specific logic) will not fit a generic connector, so this is additive for new mainstream integrations, not a replacement for existing ones.
+
+**Why defer:** Pure research/evaluation, no committed scope. Each item is a "study then decide" spike, not a build task.
+
+**Effort estimate:** ~1 session per item if pursued (mostly investigation plus a small prototype).
+
+**Provenance:** recovered 2026-07-25 from the uncommitted `upbeat-shaw-284379` worktree during worktree cleanup. It had never been committed.
+
+---
