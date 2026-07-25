@@ -4,6 +4,26 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-07-25, v3.38.0, Learnings page and the weekly AI insights review
+
+New `/learnings` page with an AI tab, backed by a two-table ledger, seeded with the 18-25 Jul week. Compute runs in Claude Code, Jarvis only displays.
+
+**Well:**
+- Ran a throwaway POC before writing any Jarvis code, and it paid for itself immediately. Four real bugs surfaced only by running it: Node `fetch` gets HTTP 200 with an empty body from Cloudflare-fronted hosts (Nitter, Reddit) while curl gets the real payload; CDATA-wrapped titles were being deleted outright by the tag stripper, silently zeroing four feeds; Reddit throttles on a rolling IP window and needs serialized fetches; and absolute star counts are not "trending". Every one of these fails silently as zero items rather than as an error, so none would have been caught by a green exit code.
+- The compute/display split is the right shape. Putting the Claude call in the scheduled task rather than in a Jarvis cron route means the feature costs no `JARVIS_ANTHROPIC_KEY` credits, and Jarvis's side is small enough to be obviously correct: one migration, one read route, one page.
+- Verified the populated page end to end without ever handling the real `JARVIS_AUTH_TOKEN`, by running a second dev server on port 3100 with a self-generated throwaway token. Worth repeating as the default pattern for auth-gated UI verification.
+- The ledger design makes next week's ranking better for free: storing prior star counts turns week two into a velocity ranking with no new fetching.
+
+**Wrong:**
+- Planned an entire Jarvis feature before establishing that the feature belonged in Jarvis. Two pivots followed (Jarvis, then Claude-plus-email, then back to Jarvis-as-display). The question that actually mattered, "where does the compute live versus where does the output live", should have been asked first, because it determined the whole architecture.
+- Shipped week one knowing the GitHub ranking was weak. It is defensible since the ledger fixes it from week two, but it means the first digest is the least useful one, and the seeded content will always be the odd entry out.
+- Judged source health by item counts rather than by reading output. Only three of twenty-one feeds had their actual content inspected before the digest was written; the rest were trusted because the count was non-zero.
+
+**Next:**
+- The weekly automation does not exist yet. The page is currently a one-off snapshot, not a recurring feed, and the scheduling decision (Railway cron for the fetch versus a laptop-only scheduled task) is still open.
+- Switch GitHub ranking to week-over-week star velocity once week two lands.
+- Nitter will break eventually. When it does, X coverage should degrade into `sources_failed` rather than quietly returning nothing.
+
 ## 2026-06-28, v3.37.0, Morning briefing disabled and made on-demand only
 
 Turned the scheduled daily briefing off to save API spend, kept it runnable on demand, and made on-demand runs reproduce the closest previous 07:30 WIB slot instead of re-scoping to now.

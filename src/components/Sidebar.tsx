@@ -85,6 +85,16 @@ const NAV_ITEMS: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: '/learnings',
+    label: 'Learnings',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6.5a16 16 0 0 1 9 2 16 16 0 0 1 9-2v11a16 16 0 0 0-9 2 16 16 0 0 0-9-2z" />
+        <path d="M12 8.5v11" />
+      </svg>
+    ),
+  },
+  {
     href: '/utilities',
     label: 'Utilities',
     icon: (

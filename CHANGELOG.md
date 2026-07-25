@@ -4,6 +4,17 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.38] – 2026-07-25 – Learnings page: weekly AI insights review (v3.38.0)
+
+New `/learnings` page with an AI tab, holding a weekly scan of what changed outside, filtered for what is actually adoptable. Deliberate split: **Claude Code does the compute, Jarvis only displays.** Nothing in this feature calls Claude from Jarvis, so it spends no `JARVIS_ANTHROPIC_KEY` credits.
+
+- **`supabase/migration-036-learnings.sql`:** two tables. `learning_entries` is a permanent ledger keyed `(topic, dedupe_key)` — a repeat sighting bumps `weeks_running` instead of inserting a duplicate, which is what stops the same trending repo resurfacing as "new" every week. `learning_runs` holds the per-`(topic, week, lens)` narrative summary plus `sources_ok` / `sources_failed`. RLS enabled with no policy (service-role only), matching migration-027/029.
+- **`src/app/api/learnings/route.ts`:** read-only `withAuth` GET. Accepts `?topic=` and `?week=`, returns lenses in a fixed order (github, tooling, industry) with unknown lenses appended rather than dropped. Empty state is a 200 with `{ latest: null, message }`, never a 404.
+- **`src/app/learnings/page.tsx`** and a `Learnings` Sidebar entry. Topic tabs, week selector (appears once there is history), per-lens summary, ranked item rows with source/signal/why-it-matters, and a source-health strip. Verified on desktop and mobile (375px, no horizontal overflow).
+- **`scripts/ai-insights-fetch.mjs`:** dependency-free fetcher over 21 feeds (GitHub search, HN Algolia, Reddit, vendor RSS, AI newsletters, X via Nitter). Two non-obvious things it encodes, both of which fail *silently* rather than loudly: it shells out to `curl` because Cloudflare-fronted hosts return HTTP 200 with an **empty body** to Node `fetch`'s TLS fingerprint; and it unwraps CDATA before stripping tags, because `<![CDATA[Title]]>` matches `/<[^>]*>/` and would otherwise delete every Substack and OpenAI headline.
+- **Seeded** the 18–25 Jul 2026 week: 169 raw items deduped to 28 across three lenses, 21/21 sources healthy. Same copy mirrored to the Obsidian vault at `outputs/ai-insights-2026-07-25.md`.
+- **Known gap:** week one ranks GitHub repos on absolute stars, a weak proxy for trending. From week two the ledger holds prior star counts, so ranking switches to week-over-week velocity.
+
 ## [3.37] – 2026-06-28 – Morning briefing: automated run disabled, on-demand only (v3.37.0)
 
 Turned off the scheduled daily briefing to preserve API usage, and made it on-demand only. The code and the cron-job.org wiring stay in place behind a clean toggle so it is easy to re-enable later.
