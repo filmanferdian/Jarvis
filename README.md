@@ -33,6 +33,7 @@ There is no test framework configured. Verify changes with `npm run build`.
 - `src/lib/sync/` — one module per integration (Google Calendar, Outlook, Garmin, Notion, email, news, contacts)
 - `src/components/` — dashboard cards and shell
 - `supabase/` — `migration-NNN-*.sql`, applied manually to production
+- `scripts/` — one-off utilities. `check-news-blocklist.mjs --self-test` validates the news blocklist matcher; run it before applying a weekly blocklist batch.
 
 ## Scheduling
 

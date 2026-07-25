@@ -6,9 +6,11 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.39] – 2026-07-25 – Learnings: weekly capture on a schedule, and velocity ranking
 
-### Prompt-injection gap in the on-demand briefing, and Nitter mirror fallback (v3.39.1)
+### Prompt-injection gap in the on-demand briefing, and Nitter mirror fallback (v3.39.2)
 
 Two follow-ups from the weekly AI review triage.
+
+> Renumbered from v3.39.1 to v3.39.2 on 2026-07-25. This work merged (`34eba5d`) on top of the word-boundary matcher below without bumping `package.json`, so two unrelated ships both claimed v3.39.1 and production reported a version that did not identify what was running. The earlier ship keeps v3.39.1 because it is the commit that set that number and deployed under it.
 
 **Closed a real prompt-injection gap.** The two briefing generators had drifted apart. `src/lib/sync/morningBriefing.ts` (the scheduled path) sanitizes and wraps everything; `src/app/api/briefing/regenerate/route.ts` (the dashboard regenerate button) built the *same* prompt from the *same* three untrusted sources with **none** of the guards:
 
@@ -24,8 +26,6 @@ Calendar event titles are attacker-controlled in the ordinary case: anyone who s
 Audited all 14 Claude call sites. The other two lacking `UNTRUSTED_PREAMBLE` (`health-fitness/insights`, `quran/synthesis`) were checked and are fine: they embed numeric metrics and self-authored OKR text, not third-party content.
 
 **Nitter fallback that validates content, not status.** X now rotates across a mirror list instead of one hard-coded host. The important detail is *why* it checks for `<item>` rather than HTTP 200: probing on 2026-07-25 found `nitter.tiekoetter.com` answers **200 with a real page containing zero items**. A status-only fallback would treat that as success and silently ship an empty X section, the same class of silent failure as the v3.38.1 empty-body bug. Only `nitter.net` works today (poast and lightbrd 403, xcancel 400, privacyredirect 502); the list stays populated so a dead primary can fail over later, and a dead host costs one fast failure. Re-verified: 21/21 sources, 168 items.
-
-### Learnings: weekly capture on a schedule, and velocity ranking (v3.39.0)
 
 ### News blocklist: word-boundary matcher (v3.39.1)
 
@@ -45,6 +45,8 @@ node scripts/check-news-blocklist.mjs WORLD "Some Outlet"
 The parser strips comments before reading string literals. That is not incidental: during the v3.38.2 review an ad-hoc version of this check did not, an apostrophe inside a comment paired with a later quote, and it reported 41 false failures that were very nearly read as a problem with the source file.
 
 Verified with no regressions across the 185 real outlet names pulled in the week to 2026-07-25. Exactly two of them, `patch` and `komo`, are newly blocked.
+
+### Learnings: weekly capture on a schedule, and velocity ranking (v3.39.0)
 
 The Learnings feed now runs itself, **without adding anything to cron-job.org by hand**, and GitHub is ranked by growth rate instead of size.
 
