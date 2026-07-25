@@ -4,7 +4,24 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
-## [3.38] – 2026-07-25 – Learnings page: weekly AI insights review (v3.38.0)
+## [3.38] – 2026-07-25 – Learnings page: weekly AI insights review
+
+### Source reachability probe, and a correction (v3.38.1)
+
+Added `GET /api/utilities/source-probe` plus a Utilities section that runs it on demand across the 13 host families behind the Learnings page. Each target is tried on **both** transports, because "can Jarvis fetch this?" has two independent answers: TLS fingerprint, and egress IP. A 200 with an empty body is classified as its own failure rather than folded into success, since that is the signature symptom.
+
+Running it on both machines corrected two claims made in v3.38.0 below:
+
+- **"Cloudflare-fronted hosts (Nitter, Reddit) return an empty body to Node fetch" was too broad.** That is **Nitter only**. Reddit's failure mode is plain rate limiting (429), which hits curl and fetch equally; the earlier reading was a timing artifact of Reddit's rolling window. Measured: Reddit returns a full 74KB to Node fetch from both machines.
+- **curl is NOT installed in Railway's Railpack image.** The v3.38.0 fetcher shelled out to curl unconditionally, so it could never have run on Railway. This was the blocking constraint, and it was the question I had treated as secondary.
+
+Measured 2026-07-25 — Mac: 13/13 reachable, Nitter curl-only. Railway (egress on AWS, no curl): **12/13 reachable via Node fetch alone**, including Reddit; only Nitter fails, at the connection level before any HTTP status.
+
+The Garmin and Revolut Cloudflare precedent did **not** generalise to Reddit. Datacenter-IP blocking is real for this project but host-specific, so probe rather than assume.
+
+- **`scripts/ai-insights-fetch.mjs` transport reworked** from curl-only to fetch-first with curl as a fallback where present. Node fetch covers 12 of 13 host families on both machines, so the script now runs unmodified in both places; X coverage is Mac-only by construction. Re-verified on the Mac: 21/21 sources, 169 items.
+
+### Learnings page: weekly AI insights review (v3.38.0)
 
 New `/learnings` page with an AI tab, holding a weekly scan of what changed outside, filtered for what is actually adoptable. Deliberate split: **Claude Code does the compute, Jarvis only displays.** Nothing in this feature calls Claude from Jarvis, so it spends no `JARVIS_ANTHROPIC_KEY` credits.
 

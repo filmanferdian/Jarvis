@@ -13,7 +13,13 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 **Agreed approach (confirmed 2026-07-25) — hybrid split:**
 - **Railway cron does the fetch.** A new `GET /api/cron/ai-insights-fetch` route wrapped in `withCronAuth` runs the fetcher's source list weekly and stores raw candidates. Pure HTTP, no Claude call, so it spends no `JARVIS_ANTHROPIC_KEY` credits and runs whether or not the laptop is on. Add the cron-job.org job (Asia/Jakarta, Sunday 07:00 WIB) pointing at the Railway URL.
 - **Claude Code does the ranking.** A scheduled task reads the stored raw candidates, dedupes against the ledger, ranks, writes `why_it_matters`, and inserts rows. Runs on the Claude Code subscription. If the app is closed on Sunday the run happens on next launch, and nothing is lost because the week's raw data was already captured on schedule.
-- The fetcher currently shells out to `curl`; confirm curl is present in the Railway image, or port the transport before relying on the cron route.
+
+**Reachability measured 2026-07-25** via `/api/utilities/source-probe`, run on both machines. This settles what each side can cover:
+- **Railway: 12 of 13 host families reachable with Node fetch alone**, including Reddit (full 74KB). curl is **not installed** in the Railpack image, and the v3.38.0 fetcher shelled out to curl unconditionally, so it could never have run there. Transport reworked to fetch-first in v3.38.1.
+- **Nitter is the only casualty.** It fails from Railway at the connection level, before any HTTP status, and it is also the one host that refuses Node fetch locally (200 with an empty body). So **X coverage is Mac-only by construction** and cannot move to Railway.
+- The Garmin and Revolut Cloudflare precedent did **not** generalise to Reddit. Datacenter-IP blocking is real here but host-specific. Probe, do not assume: re-run the Utilities probe before changing transports or adding sources.
+
+**Split that follows from the measurement:** Railway takes GitHub, Hacker News, Reddit, all four vendor blogs and all five newsletters. The Mac adds the four X accounts when it next runs. A week with the laptop off yields 17 of 21 feeds with the gap visible in the source-health strip, rather than a silently thinner digest.
 
 **Also outstanding:**
 - **Star velocity ranking.** Week one ranks GitHub repos on absolute stars, which mixes permanent giants in with genuinely new projects. From week two, diff against the stored prior star count and rank on the delta.
