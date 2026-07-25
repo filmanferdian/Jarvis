@@ -6,6 +6,17 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.38] – 2026-07-25 – Learnings page: weekly AI insights review
 
+### News blocklist, weekly review batch 3 (v3.38.2)
+
+Applied the 2026-07-25 weekly source review. Added 44 WORLD and 46 ID outlets to `BLOCKED_OUTLETS` in `src/lib/sources/googleNewsRss.ts`: US local-TV affiliates, sports leagues and motorsport, celebrity/entertainment, gadget-review blogs, Indonesian regional dailies, regional ANTARA bureaus, and government/party press feeds.
+
+Two carve-outs, both deliberate:
+
+- **`harapan rakyat` kept** at the user's request, despite fitting the hyper-local pattern.
+- **`patch` and `komo` not added.** The matcher is `n === b || n.includes(b)`, so both are unsafe as bare substrings: `patch` matches "The Dispatch", and `komo` is a 4-letter token that collides too easily. Blocking either needs a word-boundary matcher first. Noted in-file next to the existing `ign` note.
+
+Verified by replaying the match rule over the week's actual pulled sources: every intended outlet blocks, and no kept outlet (Reuters, FT, Barron's, Bloomberg, Katadata, investor.id, the national ANTARA wire…) is caught as collateral. Finance and markets coverage was preserved throughout.
+
 ### Source reachability probe, and a correction (v3.38.1)
 
 Added `GET /api/utilities/source-probe` plus a Utilities section that runs it on demand across the 13 host families behind the Learnings page. Each target is tried on **both** transports, because "can Jarvis fetch this?" has two independent answers: TLS fingerprint, and egress IP. A 200 with an empty body is classified as its own failure rather than folded into success, since that is the signature symptom.

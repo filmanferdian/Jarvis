@@ -93,8 +93,59 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'hollywoodreporter.com', // domain variant that slips past the spaced 'hollywood reporter'
     // --- added 2026-06-20 (weekly review batch 2): government / institutional PR ---
     'texas department of public safety',
+    // --- added 2026-07-25 (weekly review batch 3): sports ---
+    'pga tour',
+    'nascar.com',
+    'autosport',
+    'boston sports journal',
+    'formula 1',
+    'mlb.com',
+    'motorsport.com',
+    'mma mania',
+    // --- added 2026-07-25 (weekly review batch 3): entertainment / celebrity / music ---
+    'just jared',
+    'the shade room',
+    'pitchfork',
+    'rolling stone',
+    // --- added 2026-07-25 (weekly review batch 3): gaming ---
+    'gamesradar',
+    'game file', // Stephen Totilo gaming newsletter
+    // --- added 2026-07-25 (weekly review batch 3): gadget-review ---
+    'android central',
+    'android authority',
+    'windows central',
+    'techspot',
+    'gizmodo',
+    // --- added 2026-07-25 (weekly review batch 3): hyper-local US TV affiliates ---
+    'ktla',
+    'wbal-tv',
+    'wlwt',
+    'kcra',
+    'abc7 chicago',
+    'abc7 bay area',
+    '6abc philadelphia',
+    'wxyz channel 7',
+    'king5.com',
+    'wral',
+    'wmur',
+    'wdrb',
+    'ketv',
+    'ktvu',
+    'wcvb',
+    'wisn',
+    'ksl news',
+    // --- added 2026-07-25 (weekly review batch 3): hyper-local print / lifestyle ---
+    'block club chicago',
+    'gothamist',
+    'sfgate',
+    'yahoo health', // full phrase so it never matches plain "Yahoo"
+    'fox weather', // full phrase so it never matches "Fox News"
     // NOTE: 'ign' (gaming) deliberately NOT added — bare substring would match
     // "Foreign Policy" etc. Needs a word-boundary match before it can be blocked.
+    // NOTE: 'patch' (hyper-local network) deliberately NOT added — bare substring
+    // would match "The Dispatch". Needs a word-boundary match.
+    // NOTE: 'komo' (Seattle TV affiliate) deliberately NOT added — 4-letter bare
+    // substring, too collision-prone. Needs a word-boundary match.
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -205,6 +256,66 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'merahputih.com', // lifestyle/general portal
     'realestat.id', // property vertical
     'ajaib', // investing-app content marketing
+    // --- added 2026-07-25 (weekly review batch 3) ---
+    // NOTE: 'harapan rakyat' deliberately NOT added — kept at user's request.
+    // religious / community org
+    'ahlulbait indonesia',
+    // health / institutional PR
+    'puskesmas tangan-tangan', // Aceh health-center feed
+    'klikdokter', // health vertical
+    // gadget-review
+    'gadgetren',
+    'yangcanggih.com',
+    // regional / hyper-local dailies
+    'harian jogja',
+    'sibawor', // Banyumas
+    'radar cirebon',
+    'rakyat cirebon',
+    'suarantb.com', // NTB
+    'riauaktual.com',
+    'sumatera news',
+    'hargo.co.id', // Gorontalo
+    'nomor satu kaltim',
+    'dialeksis.com', // Aceh
+    'cakaplah.com',
+    'pontianak info',
+    'seputarpapua.com',
+    'bernas.id',
+    'malang-post.com',
+    'adadimalang.com',
+    'media selayar',
+    'jatengdaily',
+    'times indonesia',
+    'sekilas media',
+    'nasionalnews', // full token; does not match "Sindonews Nasional"
+    'poskotaonline',
+    'indosatunews.com',
+    // regional ANTARA bureaus (full phrases; never match the national ANTARA wire)
+    'antara news gorontalo',
+    'antara news jatim',
+    'antara news megapolitan',
+    'antara foto', // photo-only wire, no text value
+    // government / institutional PR
+    'beritajakarta.id',
+    'pemkab bojonegoro',
+    'dinas komunikasi dan informatika provinsi jawa timur',
+    'ppid kabupaten jember',
+    'pro.kutaitimurkab.go.id',
+    // partisan / party PR
+    'fraksi pks',
+    'politikindonesia.id',
+    // industry / hobby trade
+    'infosawit', // palm-oil trade
+    'trubus.id', // gardening
+    'katadataoto', // Katadata automotive vertical; does not match "Databoks Katadata"
+    // misc low-value portals / personal blogs
+    'journalarta',
+    'afu.id',
+    'spatial highlights',
+    'indonesiainside',
+    'ketik.com',
+    'mashable indonesia',
+    'achmadnurhidayat.id',
   ],
 };
 
