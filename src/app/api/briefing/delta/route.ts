@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage, trackServiceUsage } from '@/lib/rateLimit';
-import { buildJarvisContext, allPages } from '@/lib/context';
+import { buildJarvisContext, briefingPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
 import { CLAUDE_MODEL } from '@/lib/models';
 import { sanitizeInline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
@@ -137,7 +137,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
     }
 
     // Generate delta with Claude
-    const ctx = await buildJarvisContext({ pages: allPages() });
+    const ctx = await buildJarvisContext({ pages: briefingPages() });
     const apiKey = (process.env.JARVIS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY)!;
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

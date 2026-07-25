@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { detectRedFlags, RedFlag } from '@/lib/fitness/redflags';
-import { buildJarvisContext, allPages } from '@/lib/context';
+import { buildJarvisContext, briefingPages } from '@/lib/context';
 import { generateAndStoreAudio } from '@/lib/tts';
 import { sanitizeBriefing } from '@/lib/briefingText';
 import { CLAUDE_MODEL } from '@/lib/models';
@@ -342,7 +342,7 @@ export const POST = withAuth(async (_req: NextRequest) => {
       .join('\n');
 
     // --- Dual-script prompt: generates both WRITTEN and VOICEOVER ---
-    const ctx = await buildJarvisContext({ pages: allPages() });
+    const ctx = await buildJarvisContext({ pages: briefingPages() });
 
     const prompt = `${ctx.systemPrompt}
 

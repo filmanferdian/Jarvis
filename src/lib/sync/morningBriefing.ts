@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { CLAUDE_MODEL } from '@/lib/models';
 import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
-import { buildJarvisContext, allPages } from '@/lib/context';
+import { buildJarvisContext, briefingPages } from '@/lib/context';
 import { generateAndStoreAudio, cleanupOldDeltas } from '@/lib/tts';
 import { sanitizeInline, sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 import { briefingAnchorWib, briefingDateSummary } from '@/lib/briefingSchedule';
@@ -94,7 +94,7 @@ export async function generateBriefing(): Promise<BriefingResult> {
 
   const dateSummary = briefingDateSummary(wibDate);
 
-  const ctx = await buildJarvisContext({ pages: allPages() });
+  const ctx = await buildJarvisContext({ pages: briefingPages() });
 
   const prompt = `${ctx.systemPrompt}
 

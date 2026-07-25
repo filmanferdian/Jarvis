@@ -69,7 +69,34 @@ export async function buildJarvisContext(options?: BuildOptions): Promise<Jarvis
   return { systemPrompt, userContext };
 }
 
-// Convenience: get all pages (for briefing, voice, delta)
+// Page selection is a cost and quality lever, not a formality. The context
+// pages total roughly 39k characters (about 9.8k tokens), which is 13-26x
+// larger than the hand-written instructions they precede. Loading all of them
+// into every call buries the actual task, which is exactly what the Claude Code
+// team's prompting guidance warns against. Give each caller the pages its task
+// needs and nothing more.
+//
+// Measured 2026-07-25: about_me 9.7k chars, projects 8.3k, communication 7.2k,
+// ghostwriting 5.7k, work 4.9k, growth 3.4k.
+
+// Everything. Prefer a narrower selector; this stays for callers that genuinely
+// need the full picture.
 export function allPages(): ContextPageKey[] {
   return ALL_PAGES;
+}
+
+// Briefings cover schedule, tasks, priorities and progress. They never write in
+// Filman's email voice, so the ghostwriting guide (5.7k chars, the most
+// list-heavy page) is dead weight here.
+export function briefingPages(): ContextPageKey[] {
+  return ['about_me', 'communication', 'work', 'growth', 'projects'];
+}
+
+// Voice intent parsing turns one short spoken sentence into a JSON intent. It
+// needs to recognise people and projects, nothing else. This is the hottest and
+// most latency-sensitive path in the app, and it was previously loading all six
+// pages, so trimming it to about_me alone drops roughly 29k characters (~75%)
+// off every voice command.
+export function voicePages(): ContextPageKey[] {
+  return ['about_me'];
 }

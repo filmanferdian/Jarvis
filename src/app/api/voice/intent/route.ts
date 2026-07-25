@@ -5,7 +5,7 @@ import { checkRateLimit, incrementUsage } from '@/lib/rateLimit';
 import { VoiceIntentSchema } from '@/lib/validation';
 import { CLAUDE_MODEL_FAST } from '@/lib/models';
 import { safeError } from '@/lib/errors';
-import { buildJarvisContext, allPages } from '@/lib/context';
+import { buildJarvisContext, voicePages } from '@/lib/context';
 import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 
 async function getFitnessContext(): Promise<string> {
@@ -83,7 +83,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       fitnessContext = await getFitnessContext();
     }
 
-    const ctx = await buildJarvisContext({ pages: allPages() });
+    const ctx = await buildJarvisContext({ pages: voicePages() });
 
     const safeTranscript = sanitizeMultiline(transcript, 5000);
 
