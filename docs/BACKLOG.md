@@ -6,6 +6,22 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### 2026-07-25 — News blocklist: word-boundary matcher (v3.38.2 follow-up)
+
+**Context:** `isBlockedOutlet` in `src/lib/sources/googleNewsRss.ts` matches with `n === b || n.includes(b)`. Substring matching is why several junk outlets cannot be blocked at all: any short token risks killing a legitimate outlet that merely contains it.
+
+**Currently blocked on this, all noted in-file:**
+- `ign` (gaming) would match "Foreign Policy"
+- `patch` (hyper-local network) would match "The Dispatch"
+- `komo` (Seattle TV affiliate) is a 4-letter token, too collision-prone to add blind
+
+**Proposed fix:** add an optional word-boundary mode to the matcher, so an entry can opt into matching only on whole-word boundaries rather than raw substring. Either a sentinel prefix on the entry string or a second array per locale. Then move the three outlets above into it.
+
+**Why it matters:** the list grows every weekly review and the failure mode is silent. A bad entry does not error, it just quietly removes a good outlet from the feed, and nobody notices until a source stops appearing. The three deferred outlets are the visible cost; the invisible cost is that every future review has to reason about substring collisions by hand.
+
+**Verification note:** the v3.38.2 batch was checked by replaying the match rule over the week's real pulled source names, which caught two near-misses (regional ANTARA bureaus vs the national wire, `katadataoto` vs `databoks katadata`). Worth committing that script alongside the matcher change so each weekly batch gets the same check.
+
+
 ### 2026-07-25 — Learnings: wire the weekly automation (v3.38.0 follow-up)
 
 **Context:** v3.38.0 shipped the `/learnings` page, the `learning_entries` / `learning_runs` ledger, and `scripts/ai-insights-fetch.mjs`, seeded with one hand-run week (18-25 Jul 2026). The recurring job does not exist yet, so the page is a snapshot rather than a feed.

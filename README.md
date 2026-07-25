@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jarvis
 
-## Getting Started
+A single-user personal assistant. Next.js 16 + TypeScript + Supabase + the Claude API, deployed on Railway.
 
-First, run the development server:
+Jarvis pulls a handful of personal data sources into one dashboard: calendar, tasks, email, news, fitness, and KPIs, plus a morning briefing and voice input. All times are WIB (UTC+7).
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Requires a `.env.local` with Supabase, Claude, Google/Microsoft OAuth, Garmin, and `CRYPTO_KEY` values. Note that `CRYPTO_KEY` encrypts stored OAuth tokens and Garmin payloads at rest; rotating it invalidates all of them.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server on localhost:3000 |
+| `npm run build` | Production build; also validates TypeScript |
+| `npm run start` | Production server (binds 0.0.0.0, uses `$PORT`) |
 
-To learn more about Next.js, take a look at the following resources:
+There is no test framework configured. Verify changes with `npm run build`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `src/app/page.tsx` — dashboard, renders the cards
+- `src/app/api/` — API routes by domain (auth, briefing, calendar, emails, fitness, tasks, voice, cron, …)
+- `src/lib/` — shared server-side utilities
+- `src/lib/sync/` — one module per integration (Google Calendar, Outlook, Garmin, Notion, email, news, contacts)
+- `src/components/` — dashboard cards and shell
+- `supabase/` — `migration-NNN-*.sql`, applied manually to production
 
-## Deploy on Vercel
+## Scheduling
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Cron runs on cron-job.org (Asia/Jakarta), which calls `GET /api/cron/*` with an `x-cron-secret` header. The `n8n-workflows/` directory is legacy and unused.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+Railway deploys from `main`. Pushing to `main` triggers a deploy; the app listens on `$PORT`.
+
+See `CLAUDE.md` for architecture notes, security posture, and versioning rules, and `CHANGELOG.md` for release history.
