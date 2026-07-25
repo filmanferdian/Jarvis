@@ -6,6 +6,31 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### 2026-07-25 — affaan-m/ECC evaluation (read-only; NOT installed)
+
+Top item by velocity in the 18-25 Jul AI review (233k stars in 6 months). Evaluated from repo metadata and README only. **Nothing was installed.**
+
+**What it is:** an agent-harness system for Claude Code, Codex, Cursor and others. Ships skills, agents, commands, rules, MCP configs and hooks. MIT licensed, JavaScript, ~44MB, pushed the same day, 99 open issues.
+
+**The real decision is hooks.** ECC installs Claude Code hooks that run scripts automatically on session lifecycle events (SessionStart, Stop). That is code executing inside the agent loop on every session, which is a high-trust position. The project is upfront and offers an explicit no-hooks path:
+- `npx ecc-install --profile minimal --target claude` excludes `hooks-runtime`.
+- `./install.sh --profile core --without baseline:hooks --target claude` keeps core without hooks.
+- `ECC_HOOK_PROFILE` and `ECC_DISABLED_HOOKS` gate hooks at runtime.
+- It warns explicitly against stacking install methods (plugin install, then full installer), which duplicates skills and hooks.
+
+**If it gets tried:** minimal profile, no hooks, throwaway setup first, nothing written to the global `~/.claude` until the diff has been reviewed. Do not stack install methods.
+
+**Reservations:**
+- Bus factor. Roughly 1,502 of about 1,700 commits are from one author; the next contributor has 47.
+- 233k stars in 6 months is an extraordinary curve for a developer tool. The 35.5k forks and merged external PRs suggest real usage, but the number alone is not endorsement.
+- It is a large system, and the highest-value finding from the same week was the Claude Code team's guidance to *stop* overloading prompts with long rule and example lists. ECC ships a 96KB README plus an extensive rules and skills surface. Those two findings are in direct tension.
+
+**Recommendation:** worth reading for ideas, especially its memory and skills patterns. Not worth adopting wholesale into a setup whose main identified problem is prompt bloat.
+
+### DONE in v3.39.1 — Nitter mirror fallback
+
+Shipped 2026-07-25. X now rotates across a mirror host list and validates that the response actually contains feed items, because `nitter.tiekoetter.com` returns HTTP 200 with zero items and a status-only check would have shipped an empty X section silently. Only `nitter.net` works today; the rest of the list is there for when the primary dies. Resolves the "Nitter fragility" line below.
+
 ### DONE in v3.39.0 — Learnings: weekly automation wired, velocity ranking live
 
 Shipped 2026-07-25. Resolves the entry below.
