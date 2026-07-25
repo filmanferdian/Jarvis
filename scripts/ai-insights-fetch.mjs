@@ -14,10 +14,20 @@
 // failures are isolated into health[] and never abort the run.
 //
 // Two non-obvious things this file exists to encode:
-//   1. It shells out to curl instead of using Node fetch. See get() below.
+//   1. Transport is fetch-first with a curl fallback. See get() below.
 //   2. CDATA is unwrapped before tags are stripped. See stripTags() below.
 // Both failure modes are silent (zero items, HTTP 200), not loud, so verify
 // with the health[] output rather than assuming a green exit code means data.
+//
+// Measured 2026-07-25 via /api/utilities/source-probe, run on both machines:
+//   - Node fetch handles 12 of the 13 host families on macOS AND on Railway.
+//   - nitter.net is the sole exception: it hands undici a 200 with an EMPTY
+//     body while serving curl normally.
+//   - curl is NOT installed in Railway's Railpack image, and nitter.net is
+//     unreachable from Railway's egress anyway (connection-level failure).
+// So X coverage is Mac-only by construction, and everything else runs in both
+// places. Do not "simplify" this back to curl-only; that breaks Railway
+// entirely. Re-run the probe from Utilities before changing any of it.
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -48,27 +58,59 @@ const AI_RE = /\b(ai|llm|gpt|claude|anthropic|openai|gemini|deepseek|qwen|mistra
 const results = [];
 const health = [];
 
-// Shell out to curl, not Node fetch. Cloudflare-fronted hosts (nitter, reddit)
-// return HTTP 200 with an EMPTY body to undici's TLS fingerprint but serve curl
-// normally. Using fetch here silently yields zero items instead of an error.
+// Is curl available? Probed once. Absent on Railway, present on macOS.
+const HAS_CURL = await execFileP('curl', ['--version'], { timeout: 5000 }).then(
+  () => true,
+  () => false,
+);
+
+function accept(json) {
+  return json ? 'application/json' : 'application/rss+xml, application/xml, text/xml, */*';
+}
+
+async function rawFetch(url, json, timeout) {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: accept(json) },
+    signal: AbortSignal.timeout(timeout * 1000),
+    redirect: 'follow',
+  });
+  return { code: res.status, body: await res.text() };
+}
+
+async function rawCurl(url, json, timeout) {
+  const { stdout } = await execFileP(
+    'curl',
+    ['-sL', '--compressed', '-m', String(timeout), '-A', UA, '-H', `Accept: ${accept(json)}`, '-w', '\n%{http_code}', url],
+    { maxBuffer: 32 * 1024 * 1024 },
+  );
+  const cut = stdout.lastIndexOf('\n');
+  return { code: Number(stdout.slice(cut + 1).trim()), body: stdout.slice(0, cut) };
+}
+
+// Fetch-first, curl only as a fallback. A 200 with an empty body is the
+// signature of undici being refused (nitter.net), so it is treated as a
+// failure worth retrying on the other transport rather than as success.
 async function get(url, { json = false, timeout = 25, retries = 1 } = {}) {
-  for (let attempt = 0; ; attempt++) {
-    const { stdout } = await execFileP('curl', [
-      '-sL', '--compressed', '-m', String(timeout), '-A', UA,
-      '-H', json ? 'Accept: application/json' : 'Accept: application/rss+xml, application/xml, text/xml, */*',
-      '-w', '\n%{http_code}', url,
-    ], { maxBuffer: 32 * 1024 * 1024 });
+  let last = 'no attempt';
 
-    const cut = stdout.lastIndexOf('\n');
-    const code = Number(stdout.slice(cut + 1).trim());
-    const body = stdout.slice(0, cut);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    for (const transport of HAS_CURL ? ['fetch', 'curl'] : ['fetch']) {
+      try {
+        const { code, body } = await (transport === 'fetch'
+          ? rawFetch(url, json, timeout)
+          : rawCurl(url, json, timeout));
 
-    if (code === 200 && body.length > 0) return json ? JSON.parse(body) : body;
-    if (attempt >= retries) {
-      throw new Error(code === 200 ? 'HTTP 200 but empty body (blocked)' : `HTTP ${code}`);
+        if (code === 200 && body.length > 0) return json ? JSON.parse(body) : body;
+        last = code === 200 ? `HTTP 200 but empty body (${transport} blocked)` : `HTTP ${code} (${transport})`;
+      } catch (err) {
+        last = `${transport} failed: ${err instanceof Error ? err.message.slice(0, 80) : String(err)}`;
+      }
     }
-    await sleep((attempt + 1) * 10000); // progressive backoff; Reddit throttles on a rolling IP window
+    // Reddit throttles on a rolling IP window and returns 429 to both
+    // transports, so backoff is the only thing that helps there.
+    if (attempt < retries) await sleep((attempt + 1) * 10000);
   }
+  throw new Error(last);
 }
 
 function decodeEntities(s) {
