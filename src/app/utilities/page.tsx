@@ -632,16 +632,7 @@ export default function UtilitiesPage() {
                           <td className="py-1.5 pr-3"><AttemptCell a={r.curl} /></td>
                           <td className="py-1.5 pr-3"><AttemptCell a={r.fetch} /></td>
                           <td className="py-1.5 whitespace-nowrap">
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10.5px] font-medium"
-                              style={
-                                r.reachable
-                                  ? { background: 'rgba(52, 199, 130, 0.14)', color: 'var(--color-jarvis-success)' }
-                                  : { background: 'rgba(230, 90, 90, 0.14)', color: 'var(--color-jarvis-danger)' }
-                              }
-                            >
-                              {r.reachable ? (r.curl.ok && !r.fetch.ok ? 'curl only' : 'ok') : 'blocked'}
-                            </span>
+                            <Verdict curlOnly={r.curl.ok && !r.fetch.ok} reachable={r.reachable} />
                           </td>
                         </tr>
                       ))}
@@ -654,6 +645,26 @@ export default function UtilitiesPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+// "curl only" is deliberately a warning, not a pass. curl is absent from
+// Railway's image, so a curl-only source works on the Mac and cannot run in
+// production at all. Colouring it green would hide exactly that.
+function Verdict({ curlOnly, reachable }: { curlOnly: boolean; reachable: boolean }) {
+  const style = !reachable
+    ? { background: 'rgba(230, 90, 90, 0.14)', color: 'var(--color-jarvis-danger)' }
+    : curlOnly
+      ? { background: 'rgba(230, 170, 60, 0.14)', color: 'var(--color-jarvis-warn)' }
+      : { background: 'rgba(52, 199, 130, 0.14)', color: 'var(--color-jarvis-success)' };
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-[10.5px] font-medium"
+      style={style}
+      title={curlOnly && reachable ? 'Works via curl only. curl is not installed on Railway, so this source cannot run in production.' : undefined}
+    >
+      {!reachable ? 'blocked' : curlOnly ? 'curl only, Mac' : 'ok'}
+    </span>
   );
 }
 
