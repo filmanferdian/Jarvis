@@ -6,6 +6,25 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.39] – 2026-07-25 – Learnings: weekly capture on a schedule, and velocity ranking (v3.39.0)
 
+### News blocklist: word-boundary matcher (v3.39.1)
+
+The blocklist matcher was exact-or-substring, which meant short outlet names could not be blocked at all: `ign` would have matched "Foreign Policy", `patch` matches "The Dispatch", and `komo` is a four-letter token that collides too easily. Three outlets had accumulated in in-file NOTE comments waiting on this, one of them since June.
+
+Added `WORD_BLOCKED_OUTLETS` alongside the existing list. Entries there match only on whole-word boundaries, where a boundary is any non-alphanumeric character including start and end of string. So "IGN.com", "Chicago Patch" and "KOMO News" match, while "Foreign Policy", "The Dispatch" and "Komodo" do not. The three deferred outlets moved into it and their NOTE comments are gone.
+
+Deliberately not `\b`: that counts underscore as a word character, so "ign_gaming" would slip through. Explicit alphanumeric lookarounds instead, which also makes ".", "-" and "+" boundaries.
+
+Also added `scripts/check-news-blocklist.mjs`, which was the other half of the backlog item. It parses the lists straight out of the TypeScript source rather than keeping a second copy, mirrors the match rule, and ships a 26-case self-test covering every collision the word-boundary list exists to prevent. Run it before applying a weekly batch:
+
+```bash
+node scripts/check-news-blocklist.mjs --self-test
+node scripts/check-news-blocklist.mjs WORLD "Some Outlet"
+```
+
+The parser strips comments before reading string literals. That is not incidental: during the v3.38.2 review an ad-hoc version of this check did not, an apostrophe inside a comment paired with a later quote, and it reported 41 false failures that were very nearly read as a problem with the source file.
+
+Verified with no regressions across the 185 real outlet names pulled in the week to 2026-07-25. Exactly two of them, `patch` and `komo`, are newly blocked.
+
 The Learnings feed now runs itself, **without adding anything to cron-job.org by hand**, and GitHub is ranked by growth rate instead of size.
 
 ### Scheduling without touching the external scheduler

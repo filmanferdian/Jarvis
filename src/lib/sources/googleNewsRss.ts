@@ -140,12 +140,8 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'sfgate',
     'yahoo health', // full phrase so it never matches plain "Yahoo"
     'fox weather', // full phrase so it never matches "Fox News"
-    // NOTE: 'ign' (gaming) deliberately NOT added — bare substring would match
-    // "Foreign Policy" etc. Needs a word-boundary match before it can be blocked.
-    // NOTE: 'patch' (hyper-local network) deliberately NOT added — bare substring
-    // would match "The Dispatch". Needs a word-boundary match.
-    // NOTE: 'komo' (Seattle TV affiliate) deliberately NOT added — 4-letter bare
-    // substring, too collision-prone. Needs a word-boundary match.
+    // NOTE: short tokens that would collide as bare substrings ('ign', 'patch',
+    // 'komo') live in WORD_BLOCKED_OUTLETS below, not here.
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -319,6 +315,40 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
   ],
 };
 
+// Outlets matched on whole-word boundaries instead of as a raw substring.
+// Reserved for short tokens that would otherwise wrongly block a legitimate
+// outlet containing the same letters. A boundary is anything that is not a
+// letter or digit, including the start and end of the string, so "IGN.com",
+// "Chicago Patch" and "KOMO News" still match while "Foreign Policy",
+// "The Dispatch" and "Komodo" do not.
+// Prefer BLOCKED_OUTLETS above for ordinary multi-word outlet names; only reach
+// for this list when a bare substring would be unsafe.
+const WORD_BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
+  WORLD: [
+    'ign', // gaming; substring would match "Foreign Policy"
+    'patch', // hyper-local network; substring would match "The Dispatch"
+    'komo', // Seattle TV affiliate; 4-letter token, collision-prone
+  ],
+  ID: [],
+};
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Built once at module load rather than per call; the lists are static.
+const WORD_BLOCKED_PATTERNS: Record<NewsLocale, RegExp[]> = {
+  WORLD: WORD_BLOCKED_OUTLETS.WORLD.map(buildWordBoundaryPattern),
+  ID: WORD_BLOCKED_OUTLETS.ID.map(buildWordBoundaryPattern),
+};
+
+// Explicit alphanumeric lookarounds rather than \b, because \b counts "_" as a
+// word character: "ign_gaming" would escape a \b match but should be caught.
+// Everything non-alphanumeric (".", "-", "_", "+", space) is a boundary here.
+function buildWordBoundaryPattern(b: string): RegExp {
+  return new RegExp(`(?<![a-z0-9])${escapeRegex(b)}(?![a-z0-9])`);
+}
+
 function normalizeOutlet(s: string): string {
   return (s || '').toLowerCase().trim();
 }
@@ -326,7 +356,8 @@ function normalizeOutlet(s: string): string {
 function isBlockedOutlet(outlet: string, locale: NewsLocale): boolean {
   const n = normalizeOutlet(outlet);
   if (!n) return false;
-  return BLOCKED_OUTLETS[locale].some((b) => n === b || n.includes(b));
+  if (BLOCKED_OUTLETS[locale].some((b) => n === b || n.includes(b))) return true;
+  return WORD_BLOCKED_PATTERNS[locale].some((re) => re.test(n));
 }
 
 function decodeEntities(s: string): string {
