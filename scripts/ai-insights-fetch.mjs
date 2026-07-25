@@ -152,9 +152,11 @@ function parseFeed(xml) {
   });
 }
 
-async function feed({ name, url, lens, aiFilter = false, limit = 12, retries = 1 }) {
+// `fetcher` overrides how the raw body is obtained (used by X, which rotates
+// across mirror hosts instead of hitting one fixed url).
+async function feed({ name, url, lens, aiFilter = false, limit = 12, retries = 1, fetcher = null }) {
   try {
-    const items = parseFeed(await get(url, { retries }))
+    const items = parseFeed(fetcher ? await fetcher() : await get(url, { retries }))
       .filter((i) => i.title && i.url)
       .filter((i) => !i.published || i.published >= SINCE)
       .filter((i) => !aiFilter || AI_RE.test(i.title + ' ' + i.body))
@@ -209,6 +211,47 @@ async function hn() {
 const SUBS = ['LocalLLaMA', 'MachineLearning', 'ClaudeAI'];
 const NITTER = ['AnthropicAI', 'OpenAI', 'simonw', 'swyx'];
 
+// Nitter mirrors are unofficial and die often, so X is fetched through a host
+// list rather than a single hard-coded domain.
+//
+// Probed 2026-07-25 — only the first actually works today:
+//   nitter.net                 200, 16 items
+//   nitter.tiekoetter.com      200, ZERO items   <- the dangerous one
+//   nitter.poast.org           403
+//   lightbrd.com               403
+//   xcancel.com                400 (needs a whitelisted reader)
+//   nitter.privacyredirect.com 502
+//
+// tiekoetter is exactly why fetchNitter validates CONTENT and not status: it
+// answers 200 with a real page containing no <item> at all, so a status-only
+// fallback would treat it as success and silently ship an empty X section.
+// The list is kept populated anyway; when nitter.net dies, one of the others
+// may be healthy again, and a dead host now just costs one fast failure.
+const NITTER_HOSTS = [
+  'nitter.net',
+  'nitter.tiekoetter.com',
+  'nitter.poast.org',
+  'lightbrd.com',
+  'nitter.privacyredirect.com',
+];
+
+// Returns the first host's body that actually contains feed items. Throws with
+// the per-host outcomes when every mirror fails, so the health output says what
+// happened rather than just "0 items".
+async function fetchNitter(account) {
+  const tried = [];
+  for (const host of NITTER_HOSTS) {
+    try {
+      const body = await get(`https://${host}/${account}/rss`, { timeout: 15 });
+      if (/<item[\s>]/i.test(body)) return body;
+      tried.push(`${host}: 200 but no items`);
+    } catch (err) {
+      tried.push(`${host}: ${err instanceof Error ? err.message.slice(0, 40) : 'failed'}`);
+    }
+  }
+  throw new Error(`all Nitter mirrors failed (${tried.join('; ')})`);
+}
+
 const NEWSLETTERS = [
   ['Import AI (Jack Clark)', 'https://jack-clark.net/feed/'],
   ['Latent Space', 'https://www.latent.space/feed'],
@@ -236,7 +279,7 @@ const redditLane = (async () => {
 
 const nitterLane = (async () => {
   for (const a of NITTER) {
-    await feed({ name: `@${a}`, url: `https://nitter.net/${a}/rss`, lens: 'auto', aiFilter: true, limit: 10 });
+    await feed({ name: `@${a}`, url: '', lens: 'auto', aiFilter: true, limit: 10, fetcher: () => fetchNitter(a) });
     await sleep(1500);
   }
 })();
