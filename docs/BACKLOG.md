@@ -6,6 +6,17 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### DONE in v3.39.0 — Learnings: weekly automation wired, velocity ranking live
+
+Shipped 2026-07-25. Resolves the entry below.
+
+- **No cron-job.org entry was needed.** The capture rides the `google-calendar` cron (42/42 successes over 7 days, fires 07:00 WIB daily) gated to Sunday, landing it at Sunday 07:00 WIB. Gate lives in `src/lib/learningsSchedule.ts`; a standalone `/api/cron/ai-insights-capture` route exists for on-demand runs and as the target if a dedicated schedule is ever added.
+- **Migration 037** adds `learning_candidates` + `learning_capture_runs`. Capture verified: 142 items, 17 sources ok, 0 failed, idempotent on re-run.
+- **Scheduled task `ai-insights-weekly-ranking`** (Sunday 07:03 WIB) adds X, ranks, writes `learning_entries`, mirrors to the vault.
+- **Velocity ranking applied to the 18-25 Jul week.** Surfaced `ponytail` at ~2,071 stars/day, which absolute-star ranking had missed entirely.
+
+Still open from that entry: the Nitter fallback-instance list, and the status toggle UI. Both carried forward below.
+
 ### 2026-07-25 — Learnings: wire the weekly automation (v3.38.0 follow-up)
 
 **Context:** v3.38.0 shipped the `/learnings` page, the `learning_entries` / `learning_runs` ledger, and `scripts/ai-insights-fetch.mjs`, seeded with one hand-run week (18-25 Jul 2026). The recurring job does not exist yet, so the page is a snapshot rather than a feed.

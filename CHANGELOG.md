@@ -4,6 +4,35 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.39] – 2026-07-25 – Learnings: weekly capture on a schedule, and velocity ranking (v3.39.0)
+
+The Learnings feed now runs itself, **without adding anything to cron-job.org by hand**, and GitHub is ranked by growth rate instead of size.
+
+### Scheduling without touching the external scheduler
+
+cron-job.org is configured manually in a web UI and this project has no API for it, so every new job has historically been manual work. Instead the weekly capture rides an already-registered job and gates itself.
+
+- **Host: the `google-calendar` cron.** Chosen from `cron_run_log`, not from the interval comments: it is the most frequent and most reliable registered job (42 runs, 42 successes over the last 7 days) and it fires at 07:00 WIB on 7 of 7 days. Gating the capture to Sunday at or after 07:00 therefore lands it at **Sunday 07:00 WIB**, the originally intended schedule, with no scheduler change.
+- **`src/lib/learningsSchedule.ts`** holds the gate (`RUN_DAY`, `RUN_HOUR`, a 6-day minimum interval) and `maybeCaptureAiInsights()`, invoked from the host route inside `after()` so it cannot add latency to that job or change its result. It never throws.
+- **The 6-day interval is deliberate, not 7.** The gate must reopen before the next Sunday tick; at exactly 7 days a run landing a few minutes late pushes the following week out by a whole cycle and the schedule drifts.
+- **The error path deliberately does not call `markSynced`.** `markSynced` stamps `last_synced_at` regardless of the result it records, and `shouldSync` reads only that timestamp, so marking a failure would shut the gate for six days and silently skip the week. Logging only leaves the gate open, so the next tick (10:00 WIB, then 13:00) retries the same Sunday.
+- **`src/app/api/cron/ai-insights-capture/route.ts`** is a standalone `withCronAuth` route for on-demand runs, and the target if a dedicated schedule is ever added. Returns 202 and works in `after()`, since Reddit's serialized backoff alone can exceed the scheduler's 30s timeout.
+
+### Split capture
+
+- **`supabase/migration-037-learning-candidates.sql`** adds `learning_candidates` (raw weekly capture, unique on `(topic, week_start, dedupe_key)`) and `learning_capture_runs` (per-run source health). Splitting capture from ranking is what makes a missed laptop week harmless: the raw material is banked on schedule, so ranking can run whenever the app is next opened.
+- **`src/lib/sync/aiInsightsCapture.ts`** is fetch-only and contains no Claude call, so the Railway half spends no `JARVIS_ANTHROPIC_KEY` credits. Verified end to end: **142 items, 17 sources ok, 0 failed**, and a second run left the count at 142, confirming the upsert is idempotent.
+- X is absent from this half by construction. The Nitter mirror refuses Node fetch on every machine and curl is not installed on Railway, so the local scheduled task adds those items on top.
+- **New scheduled task `ai-insights-weekly-ranking`** (Sunday 07:03 WIB) adds the X items, ranks, dedupes against the ledger, writes `learning_entries`, and mirrors the digest into the Obsidian vault.
+
+### Velocity ranking, applied to this week
+
+GitHub is now ordered by **star velocity** rather than absolute stars, with repos older than a year excluded because a lifetime average stops approximating current velocity once a project is old.
+
+The change earned its keep immediately: **`DietrichGebert/ponytail` is the fastest-growing repo in the set at ~2,071 stars/day** and did not appear anywhere in the v3.38.0 list, because 89k absolute stars buried it beneath year-old giants. `inkeep/open-knowledge` fell from second to ninth. `Kaelio/ktx`, `anysearch-mcp-server`, `openless` and `TradingAgents-astock` dropped out entirely; all were carried on raw counts.
+
+Week one uses stars-per-day-since-creation as the velocity proxy. `learning_candidates.star_count` is persisted, so from week two this becomes a true week-over-week delta.
+
 ## [3.38] – 2026-07-25 – Learnings page: weekly AI insights review
 
 ### News blocklist, weekly review batch 3 (v3.38.2)
