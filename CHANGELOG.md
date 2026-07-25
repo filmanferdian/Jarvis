@@ -6,6 +6,23 @@ Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.
 
 ## [3.39] – 2026-07-25 – Learnings: weekly capture on a schedule, and velocity ranking
 
+### Context-page trimming: give each prompt only what its task needs (v3.39.3)
+
+Acting on the week's top finding, the Claude Code team's guidance to stop overloading prompts with long rule and example lists.
+
+**The hand-written prompts were not the problem.** Measured rather than assumed: the largest is `running-analysis` at 5.6k chars with 4 bullets, and most are 1.3-2k chars with 6-10 bullets. That is ordinary structure, not an example bank. Rewriting them would have been busywork.
+
+**The Notion context block was the problem.** The six context pages total **39,120 characters (~9.8k tokens)**, 13-26x larger than the instructions they precede. Four call sites loaded all six via `allPages()`, burying the actual task under everything Jarvis knows about Filman.
+
+`src/lib/context.ts` gains two purpose-named selectors alongside `allPages()`:
+
+- **`voicePages()`** — `about_me` only. Voice intent parsing turns one short spoken sentence into a JSON intent; it needs to recognise people and projects, nothing else. It was loading the ghostwriting style guide, projects, growth and work priorities to classify "what's my schedule today". This is the hottest and most latency-sensitive path in the app. **Saves 29,408 chars, about 75%, on every voice command.**
+- **`briefingPages()`** — drops `ghostwriting` (5,732 chars, the most list-heavy page). Briefings never write in Filman's email voice. Applied to `morningBriefing`, `briefing/regenerate` and `briefing/delta`.
+
+`emailTriage` (`communication` + `ghostwriting`) and `health-fitness/insights` (`about_me`) were already scoped correctly and are untouched.
+
+**Verified, not assumed.** Ran six representative transcripts through intent parsing with the full six-page context and with `about_me` alone: **6/6 correct both ways**, on a 39,614 vs 10,045 character system prompt. Quality is unchanged; the context was dead weight.
+
 ### Prompt-injection gap in the on-demand briefing, and Nitter mirror fallback (v3.39.2)
 
 Two follow-ups from the weekly AI review triage.
