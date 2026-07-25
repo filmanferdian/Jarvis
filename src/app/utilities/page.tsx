@@ -74,6 +74,29 @@ interface CronStatusResponse {
   jobs: Record<string, CronJobStatus>;
 }
 
+interface ProbeAttempt {
+  ok: boolean;
+  status: number;
+  bytes: number;
+  note?: string;
+}
+
+interface ProbeResult {
+  name: string;
+  group: string;
+  host: string;
+  curl: ProbeAttempt;
+  fetch: ProbeAttempt;
+  reachable: boolean;
+}
+
+interface ProbeResponse {
+  checkedAt: string;
+  runtime: { node: string; curlVersion: string | null; egressIp: string | null };
+  summary: { total: number; reachable: number; curlOnly: number; unreachable: number };
+  results: ProbeResult[];
+}
+
 const SERVICE_LABELS: Record<string, string> = {
   claude: 'Claude (Anthropic)',
   elevenlabs: 'ElevenLabs',
@@ -218,6 +241,9 @@ export default function UtilitiesPage() {
   const [styleAnalysis, setStyleAnalysis] = useState<string | null>(null);
   const [styleLoading, setStyleLoading] = useState(false);
   const [styleError, setStyleError] = useState<string | null>(null);
+  const [probe, setProbe] = useState<ProbeResponse | null>(null);
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeError, setProbeError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -536,8 +562,108 @@ export default function UtilitiesPage() {
             {styleError && <p className="mt-2 text-[11.5px] text-jarvis-danger">{styleError}</p>}
           </div>
         </div>
+
+        {/* Learnings source reachability */}
+        <div>
+          <h2 className="text-[13px] uppercase text-jarvis-text-faint mb-3" style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.12em' }}>
+            Learnings source reachability
+          </h2>
+          <div className="rounded-[14px] border border-jarvis-border bg-jarvis-bg-card p-5">
+            <p className="text-[12px] text-jarvis-text-dim mb-4 max-w-[80ch]">
+              Probes every feed behind the Learnings page from wherever this is running, using both
+              curl and the Node fetch built-in. Two things break these independently: Cloudflare
+              hands Node fetch a 200 with an empty body while serving curl normally, and this
+              deployment sits on a datacenter IP that Cloudflare already blocks elsewhere in this
+              project. Running it here shows Railway&apos;s answer; running it on localhost shows your
+              Mac&apos;s.
+            </p>
+            <button
+              onClick={async () => {
+                setProbeLoading(true);
+                setProbeError(null);
+                try {
+                  setProbe(await fetchAuth<ProbeResponse>('/api/utilities/source-probe'));
+                } catch (err) {
+                  setProbeError(err instanceof Error ? err.message : 'Probe failed');
+                } finally {
+                  setProbeLoading(false);
+                }
+              }}
+              disabled={probeLoading}
+              className="px-4 py-2 text-[12px] rounded-[8px] text-white transition-colors disabled:opacity-50"
+              style={{ background: 'var(--color-jarvis-cta)' }}
+            >
+              {probeLoading ? 'Probing 13 sources…' : probe ? 'Re-run probe' : 'Check source reachability'}
+            </button>
+
+            {probeError && <p className="mt-2 text-[11.5px] text-jarvis-danger">{probeError}</p>}
+
+            {probe && (
+              <div className="mt-4 space-y-3">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono text-jarvis-text-faint">
+                  <span>
+                    {probe.summary.reachable}/{probe.summary.total} reachable
+                  </span>
+                  {probe.summary.curlOnly > 0 && <span>{probe.summary.curlOnly} curl-only</span>}
+                  {probe.summary.unreachable > 0 && (
+                    <span className="text-jarvis-danger">{probe.summary.unreachable} unreachable</span>
+                  )}
+                  <span>curl: {probe.runtime.curlVersion ? probe.runtime.curlVersion.split(' ')[1] || 'present' : 'NOT INSTALLED'}</span>
+                  {probe.runtime.egressIp && <span>egress {probe.runtime.egressIp}</span>}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] border-collapse">
+                    <thead>
+                      <tr className="text-left text-[10px] uppercase text-jarvis-text-faint" style={{ letterSpacing: '0.08em' }}>
+                        <th className="py-1.5 pr-3 font-normal">Source</th>
+                        <th className="py-1.5 pr-3 font-normal">curl</th>
+                        <th className="py-1.5 pr-3 font-normal">node fetch</th>
+                        <th className="py-1.5 font-normal">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {probe.results.map((r) => (
+                        <tr key={r.name} className="border-t border-jarvis-border">
+                          <td className="py-1.5 pr-3 text-jarvis-text-secondary whitespace-nowrap">
+                            {r.name}
+                            <span className="ml-1.5 text-[10px] font-mono text-jarvis-text-faint">{r.group}</span>
+                          </td>
+                          <td className="py-1.5 pr-3"><AttemptCell a={r.curl} /></td>
+                          <td className="py-1.5 pr-3"><AttemptCell a={r.fetch} /></td>
+                          <td className="py-1.5 whitespace-nowrap">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10.5px] font-medium"
+                              style={
+                                r.reachable
+                                  ? { background: 'rgba(52, 199, 130, 0.14)', color: 'var(--color-jarvis-success)' }
+                                  : { background: 'rgba(230, 90, 90, 0.14)', color: 'var(--color-jarvis-danger)' }
+                              }
+                            >
+                              {r.reachable ? (r.curl.ok && !r.fetch.ok ? 'curl only' : 'ok') : 'blocked'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+function AttemptCell({ a }: { a: ProbeAttempt }) {
+  const color = a.ok ? 'var(--color-jarvis-success)' : 'var(--color-jarvis-danger)';
+  return (
+    <span className="font-mono text-[11px] whitespace-nowrap" style={{ color }}>
+      {a.status || 'err'}
+      {a.ok ? ` · ${a.bytes > 1024 ? `${Math.round(a.bytes / 1024)}kb` : `${a.bytes}b`}` : a.note ? ` · ${a.note}` : ''}
+    </span>
   );
 }
 
