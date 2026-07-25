@@ -6,6 +6,23 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### 2026-07-25 — Learnings: wire the weekly automation (v3.38.0 follow-up)
+
+**Context:** v3.38.0 shipped the `/learnings` page, the `learning_entries` / `learning_runs` ledger, and `scripts/ai-insights-fetch.mjs`, seeded with one hand-run week (18-25 Jul 2026). The recurring job does not exist yet, so the page is a snapshot rather than a feed.
+
+**Agreed approach (confirmed 2026-07-25) — hybrid split:**
+- **Railway cron does the fetch.** A new `GET /api/cron/ai-insights-fetch` route wrapped in `withCronAuth` runs the fetcher's source list weekly and stores raw candidates. Pure HTTP, no Claude call, so it spends no `JARVIS_ANTHROPIC_KEY` credits and runs whether or not the laptop is on. Add the cron-job.org job (Asia/Jakarta, Sunday 07:00 WIB) pointing at the Railway URL.
+- **Claude Code does the ranking.** A scheduled task reads the stored raw candidates, dedupes against the ledger, ranks, writes `why_it_matters`, and inserts rows. Runs on the Claude Code subscription. If the app is closed on Sunday the run happens on next launch, and nothing is lost because the week's raw data was already captured on schedule.
+- The fetcher currently shells out to `curl`; confirm curl is present in the Railway image, or port the transport before relying on the cron route.
+
+**Also outstanding:**
+- **Star velocity ranking.** Week one ranks GitHub repos on absolute stars, which mixes permanent giants in with genuinely new projects. From week two, diff against the stored prior star count and rank on the delta.
+- **Nitter fragility.** `nitter.net` is unofficial and will break. Add a fallback instance list and make total X failure surface in `sources_failed` rather than returning silently empty.
+- **Reddit throttling.** Reddit 429s on a rolling IP window; the fetcher serializes with progressive backoff, but a bad week can still drop a subreddit. Consider the authenticated Reddit API if it drops often.
+- **Status toggle UI.** `learning_entries.status` (new / adopted / dismissed) exists in the schema but nothing writes it. Add the toggle if the auto-dedupe alone turns out to be insufficient.
+- **Mirror the digest to the Obsidian vault automatically.** The 2026-07-25 copy at `outputs/ai-insights-2026-07-25.md` was written by hand; the weekly task should do it.
+
+
 ### 2026-05-31 — Security hardening wave: OAuth, Garmin secrets, dependencies
 
 **Context:** Security review on 2026-05-31 covered auth, OAuth, secrets, Supabase/RLS, prompt-injection surfaces, input validation, storage/media URLs, dependency audit, n8n workflow artifacts, and the existing backlog. The app already has several strong defenses: timing-safe auth comparisons, signed OAuth state cookies, server-only service-role Supabase access, tightened RLS policies, centralized session cookie attributes, and escaped markdown rendering before `dangerouslySetInnerHTML`.
