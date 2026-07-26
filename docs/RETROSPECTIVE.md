@@ -4,6 +4,29 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-07-26, v3.41.0, AI insights capture gets its own schedule
+
+The weekly Railway capture silently did not run. Investigation found two bugs, and the piggyback architecture that hid them was removed.
+
+**Well:**
+- Did not accept the first plausible explanation. "Railway's capture did not run" looked like a Railway or network failure; `cron_run_log` showed google-calendar succeeding on schedule all morning, which ruled that out immediately and pointed at the gate instead.
+- Found the second, worse bug while fixing the first. `wibWeekStart()` returned today minus seven days with no weekday anchor, so capture and ranking computed different week keys on any normal Sunday. The two halves had only ever agreed by accident, because the one real capture was forced on a Saturday. Fixing the gate alone would have produced a capture that ran correctly and still wrote to a week the ranking task never reads.
+- Verified the new week key against real dates across the Saturday/Sunday boundary before building, rather than reasoning about the modulo arithmetic. Confirmed Sunday 26 July resolves to `2026-07-25`, the key this week's entries were already written under.
+- Reported honestly that the "week-over-week" star delta was really a 21.5-hour delta, and labelled it that way in the digest and the summary, instead of presenting a one-day number as a weekly one.
+
+**Wrong:**
+- The piggyback was my own design from v3.39.0, justified in a code comment as avoiding manual scheduler work. It traded five minutes of one-time setup for permanent hidden coupling between two unrelated jobs and a failure mode with no error, no log line, and no `cron_run_log` row. Filman rejected it on sight this ship. The instinct to avoid a manual step should not have outweighed observability for a job that runs once a week, where a silent miss costs a full cycle.
+- The v3.39.0 gate comment explicitly reasoned about `markSynced` shutting the window for six days, and still missed that the on-demand route stamps the same row through `runCronJob`. The hazard was half-identified and then filed as handled.
+- A time-based gate was the wrong primitive from the start. The question was always "has this week been captured", and asking it directly is both simpler and self-healing.
+
+**Next:**
+- Create the cron-job.org job for `/api/cron/ai-insights-capture` at Sunday 07:00 WIB. Until it exists the capture has no trigger at all, which is the one regression risk in this ship.
+- The scheduled-task skill file computes `week_start` as "the Saturday 7 days before today", which is ambiguous on a Sunday run and disagrees with `wibWeekStart()`. Align the wording or the two halves drift apart again.
+- No other job should gate itself on a `sync_status` row that an on-demand route also writes. Worth a sweep if the pattern was copied anywhere else.
+- `src/app/api/cron/google-calendar/route.ts` still returns `details: msg` in its 500 handler, leaking `err.message` to the client against the documented security posture. Pre-existing and untouched here; flagged for a separate fix.
+
+---
+
 ## 2026-07-26, v3.40.0, News blocklist batch 4
 
 Applied 73 of the 75 candidates from the weekly source review, holding back `cnet` and `detikinet` on Filman's call.

@@ -6,6 +6,19 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### 2026-07-26 — BLOCKING: create the cron-job.org job for ai-insights-capture
+
+**Context:** v3.41.0 removed the google-calendar piggyback. `/api/cron/ai-insights-capture` is now the only entry point and has no scheduler pointing at it. **Until the job exists the weekly capture has no trigger at all.**
+
+**Setup:** new cron-job.org job, Asia/Jakarta, **Sunday 07:00**, `GET https://jarvis-production-9aea.up.railway.app/api/cron/ai-insights-capture` with the `x-cron-secret` header. The route returns 202 immediately and finishes in the background, so the free-plan 30s HTTP timeout is not a problem. Re-running inside the same week is a no-op; append `?force=1` to re-bank a week deliberately.
+
+**Verify:** after the first fire, check for a `cron_run_log` row with job_name `ai-insights-capture` and a `learning_capture_runs` row for that week.
+
+**Related follow-ups from the same ship:**
+- The scheduled-task skill file computes `week_start` as "the Saturday 7 days before today", which is ambiguous on a Sunday run and disagrees with `wibWeekStart()`. Align the wording.
+- Sweep for other jobs gating themselves on a `sync_status` row that an on-demand route also writes. That shared-row pattern is what caused the silent miss.
+- `src/app/api/cron/google-calendar/route.ts` returns `details: msg` in its 500 handler, leaking `err.message` to the client against the documented security posture. Pre-existing, untouched in v3.41.0.
+
 ### 2026-07-25 — affaan-m/ECC evaluation (read-only; NOT installed)
 
 Top item by velocity in the 18-25 Jul AI review (233k stars in 6 months). Evaluated from repo metadata and README only. **Nothing was installed.**
