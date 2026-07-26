@@ -35,7 +35,7 @@ Shipped 2026-07-25. X now rotates across a mirror host list and validates that t
 
 Shipped 2026-07-25. Resolves the entry below.
 
-- **No cron-job.org entry was needed.** The capture rides the `google-calendar` cron (42/42 successes over 7 days, fires 07:00 WIB daily) gated to Sunday, landing it at Sunday 07:00 WIB. Gate lives in `src/lib/learningsSchedule.ts`; a standalone `/api/cron/ai-insights-capture` route exists for on-demand runs and as the target if a dedicated schedule is ever added.
+- ~~**No cron-job.org entry was needed.** The capture rides the `google-calendar` cron gated to Sunday.~~ **Reversed in v3.41.0.** The piggyback failed silently on 2026-07-26 and has been removed: `src/lib/learningsSchedule.ts` is deleted and `/api/cron/ai-insights-capture` now has its own cron-job.org job at Sunday 07:00 WIB. See the v3.41.0 changelog entry.
 - **Migration 037** adds `learning_candidates` + `learning_capture_runs`. Capture verified: 142 items, 17 sources ok, 0 failed, idempotent on re-run.
 - **Scheduled task `ai-insights-weekly-ranking`** (Sunday 07:03 WIB) adds X, ranks, writes `learning_entries`, mirrors to the vault.
 - **Velocity ranking applied to the 18-25 Jul week.** Surfaced `ponytail` at ~2,071 stars/day, which absolute-star ranking had missed entirely.

@@ -146,10 +146,42 @@ const NEWSLETTERS: [string, string][] = [
 const SUBS = ['LocalLLaMA', 'MachineLearning', 'ClaudeAI'];
 const NITTER = ['AnthropicAI', 'OpenAI', 'simonw', 'swyx'];
 
+// The partition key every row in this feature is filed under. Must be anchored
+// to a weekday, not to "today minus 7 days": the capture and the Claude Code
+// ranking task run on different ticks, and an unanchored key silently gives them
+// different weeks whenever they land on different days. That is exactly what
+// happened on 2026-07-26, when a Saturday capture keyed 2026-07-18 and the
+// Sunday ranking looked for 2026-07-25.
+//
+// Anchor is the most recent Saturday on or before the WIB date, so a Saturday
+// and the Sunday after it resolve to the same week.
 export function wibWeekStart(now = new Date()): string {
   const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  const monday = new Date(wib.getTime() - 7 * 864e5);
-  return monday.toISOString().slice(0, 10);
+  const daysSinceSaturday = (wib.getUTCDay() + 1) % 7; // Sat=0, Sun=1, ... Fri=6
+  const saturday = new Date(wib.getTime() - daysSinceSaturday * 864e5);
+  return saturday.toISOString().slice(0, 10);
+}
+
+/**
+ * Has this week's capture already been banked?
+ *
+ * The scheduler can double-fire: on 2026-07-25 the capture ran twice, three
+ * minutes apart. Gating on the week actually captured makes a re-fire a no-op
+ * without needing a time window. On a query error it returns false so the
+ * capture still runs: a duplicate upsert is harmless, a skipped week is not.
+ */
+export async function alreadyCapturedThisWeek(weekStart: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('learning_capture_runs')
+    .select('id')
+    .eq('topic', 'ai')
+    .eq('week_start', weekStart)
+    .limit(1);
+  if (error) {
+    console.error('[ai-insights-capture] capture-run lookup failed:', error.message);
+    return false;
+  }
+  return (data || []).length > 0;
 }
 
 export async function captureAiInsights(

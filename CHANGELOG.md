@@ -4,6 +4,22 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.41] – 2026-07-26 – AI insights capture: its own schedule, and the gate that ate a week
+
+The weekly Railway capture did not run on Sunday 2026-07-26. Railway was healthy the whole time. Two bugs conspired, and the failure was completely silent.
+
+**The gate that ate the week.** The capture had no scheduler entry of its own. It rode the google-calendar job and gated itself on `shouldSync('ai-insights-capture', 6 days)`, which reads a single shared `sync_status` row. The on-demand route goes through `runCronJob`, which stamps that same row. Two on-demand runs on Saturday 25 July (13:00 and 13:03 WIB) closed a six-day window, so every Sunday tick inside it returned early. No error, no log line, no `cron_run_log` entry. Nothing to notice.
+
+**The piggyback is gone.** Sharing a host job to avoid adding a scheduler entry by hand traded five minutes of setup for hidden coupling and an invisible failure mode. `src/lib/learningsSchedule.ts` is deleted, google-calendar no longer hosts anything, and `/api/cron/ai-insights-capture` is now the only entry point with its own cron-job.org job at Sunday 07:00 WIB. When a dedicated job stops running, the scheduler shows a failed job instead of nothing at all.
+
+Duplicate protection moved into the route, since the double-fire is real and observed. A second call in the same week is a no-op returning `skipped`, and `?force=1` overrides it to re-bank a week on purpose.
+
+**The week key.** `wibWeekStart()` returned today minus seven days with no weekday anchor, despite naming its local variable `monday`. Every run day produced a different partition key: the Saturday capture filed under `2026-07-18` while the Sunday ranking task looked for `2026-07-25`. The two halves of the pipeline would have disagreed on any normal Sunday, and only agreed the week before by accident, because that capture happened to be forced on a Saturday. The key is now anchored to the most recent Saturday on or before the WIB date, so a Saturday and the Sunday after it resolve to the same week.
+
+Existing rows are untouched. The `2026-07-18` week keeps its meaning and the series continues 2026-07-25, 2026-08-01, 2026-08-08.
+
+**Manual step required:** the cron-job.org job must be created by hand. There is no scheduler API in this project, so until that job exists the capture has no trigger at all.
+
 ## [3.40] – 2026-07-26 – News blocklist batch 4: 73 outlets, and two deliberate keeps
 
 The fourth weekly source review. 188 outlet names were pulled across the seven days to 2026-07-26; 75 were not already blocked. 73 are now blocked, 2 were kept on purpose.
