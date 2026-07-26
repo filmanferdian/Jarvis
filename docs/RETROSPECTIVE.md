@@ -4,6 +4,29 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-07-26, v3.42.0, The running pipeline leaves Notion
+
+Cut the health & fitness slice of the Notion exit: run details backfill plus the full running-analysis cutover to Supabase.
+
+**Well:**
+- Verified the handover brief instead of executing it. Four of its claims were wrong or unsafe, and each would have caused real damage: `session_profile` was not the only missing column (stride and vertical oscillation were already added out of band); "derive `splits` from the `t='m'` laps" would have written sub-km laps into a per-km contract the Charge iOS app reads; `lap_detail` already had a live shape, so writing Notion's compact `{i,t,d,...}` raw would have broken every reader on backfilled rows; and the "only genuine capability loss" turned out to be one subtitle line plus four paragraphs already stored and already rendered elsewhere.
+- Checked the contradicting claim myself. A subagent said the Garmin sync already writes detail rows; another said it does not. Reading `garmin.ts` settled it: `syncRecentActivities()` (what the pipeline calls) writes activities only, and the enrichment lives in `syncGarmin()` (what it never calls). Had I taken the first answer, deleting the Notion ingest would have left every fresh run with no laps and no session profile going into a prompt built entirely around them.
+- Tested the backfill on one row before any bulk run, and picked the row that proved the most: a scalar-only row with `stride_cm = 75.6`. It came back 75.6, confirming Garmin agreed with the SQL backfill and that a partial upsert does not clobber absent columns.
+- Exercised all three backfill paths (Garmin, Notion fallback, `--force` upgrade) on single activities and checked the resulting JSON shape in SQL each time, rather than trusting the summary line the script printed.
+- Caught a regression I introduced. The `raw_json` fallbacks returned unrounded floats (`trainingLoad: 14.257156372070312`) that the UI renders directly. The old Notion ingest rounded on write; since the reader is now the boundary, it rounds on read.
+
+**Wrong:**
+- Wrote the backfill script planning to duplicate the throttle logic, then found `setGarminBlocked`, `trackGarminCalls` and `isRateLimitError` are all module-private. Pulling `syncActivityDetailsFor` forward from the cutover phase was the right shape and should have been obvious from the start: Garmin budget policy belongs in one file.
+- Built a hardcoded 30-call daily ceiling into the script, then immediately hit it at 36 calls and was tempted to work around my own guard. Adding `--ceiling` was correct, but the guard should have been operator-overridable from the first draft.
+- Two latent bugs (the `"8:50 /km"` pace truncation and the dead verdict card) had been shipping wrong output for months. Both were found only because the cutover forced me to re-derive those fields. Nobody was checking whether the numbers on the page were right.
+
+**Next:**
+- Finish the backfill: ~40 runs at 3 Garmin calls each against a 50/day budget, so 4 to 5 daily runs of `scripts/backfill-run-details.ts --apply`.
+- Run one full weekly cycle with Notion still intact before proposing deletion of the two frozen databases.
+- The remaining Notion slices (projects, tasks, contacts, valuations, context) are untouched. Contacts is cheaper than the brief assumed: all 310 have no photo, so the Supabase Storage re-hosting step is moot.
+
+---
+
 ## 2026-07-26, v3.41.0, AI insights capture gets its own schedule
 
 The weekly Railway capture silently did not run. Investigation found two bugs, and the piggyback architecture that hid them was removed.

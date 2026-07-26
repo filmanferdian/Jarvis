@@ -24,7 +24,6 @@ interface TriggerResult {
   activitiesSkipped: number;
   analysisGenerated: boolean;
   weeklyInsightUpdated: boolean;
-  dashboardUpdated: boolean;
   errors: string[];
   timestamp: string;
 }
@@ -595,11 +594,10 @@ export default function CardioAnalysisPage() {
                       : '—',
                 },
                 { label: 'Activities found (this week)', value: String(result.activitiesFound) },
-                { label: 'Ingested to Notion', value: String(result.activitiesIngested) },
-                { label: 'Skipped (dup)', value: String(result.activitiesSkipped) },
+                { label: 'Lap detail written', value: String(result.activitiesIngested) },
+                { label: 'Skipped (had laps)', value: String(result.activitiesSkipped) },
                 { label: 'Analysis', value: result.analysisGenerated ? 'Generated' : 'Skipped' },
                 { label: 'Weekly Insights', value: result.weeklyInsightUpdated ? 'Updated' : 'Failed' },
-                { label: 'Dashboard', value: result.dashboardUpdated ? 'Updated' : 'Skipped' },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-[11px] text-jarvis-text-faint mb-0.5">{label}</p>

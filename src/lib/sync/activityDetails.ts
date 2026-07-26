@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 import {
   parseLapDTOs,
   classifyLaps,
+  summarizeSegments,
   calcDecoupling,
   extractPerfCondition,
   findDescriptorIndex,
@@ -47,6 +48,12 @@ function num(v: unknown): number | null {
 function roundOrNull(v: unknown): number | null {
   const n = num(v);
   return n == null ? null : Math.round(n);
+}
+
+/** One decimal place. Matches the rounding the Notion run ingest used for stride / vert osc. */
+function round1(v: unknown): number | null {
+  const n = num(v);
+  return n == null ? null : Math.round(n * 10) / 10;
 }
 
 function paceFrom(distanceM: number, durationS: number): number | null {
@@ -246,11 +253,15 @@ export async function buildAndUpsertActivityDetails(
   const splits = laps.length > 0 ? buildSplits(laps, isTreadmill, totalDistanceM) : null;
 
   // Rich classified laps for the coach prompt (separate from the Charge `splits` contract).
+  // `session_profile` is the one-line intent label derived from the same segment composition
+  // ("Z2 base 45min + 10min tempo finish"); it used to live only in the Notion Runs DB.
   let lapDetail: Record<string, unknown>[] | null = null;
+  let sessionProfile: string | null = null;
   if (laps.length > 0) {
     const parsed = parseLapDTOs(laps);
     classifyLaps(parsed);
     lapDetail = buildLapDetail(parsed);
+    sessionProfile = summarizeSegments(parsed) || null;
   }
 
   const det = (detailsResult ?? {}) as {
@@ -267,7 +278,7 @@ export async function buildAndUpsertActivityDetails(
 
   const weather = buildWeather(weatherResult);
 
-  const record = {
+  const record: Record<string, unknown> = {
     activity_id: activityId,
     total_distance_m: totalDistanceM,
     avg_cadence: roundOrNull(act.averageRunningCadenceInStepsPerMinute),
@@ -290,8 +301,34 @@ export async function buildAndUpsertActivityDetails(
     training_effect: buildTrainingEffect(act),
     training_load: num(act.activityTrainingLoad),
     avg_power_w: roundOrNull(act.avgPower),
+    // v3.42 — last Notion-only run fields
+    session_profile: sessionProfile,
+    stride_cm: round1(act.avgStrideLength),
+    vertical_oscillation_cm: round1(act.avgVerticalOscillation),
     updated_at: new Date().toISOString(),
   };
+
+  // Don't let a failed fetch leg NULL out data a previous run already wrote. syncGarmin only
+  // ever enriches rows that don't exist yet, so this could never bite there; the backfill and
+  // any forced re-enrich do re-visit existing rows, where a /splits 429 would otherwise
+  // overwrite good laps with null. Omitting the key leaves the stored value untouched, because
+  // PostgREST only generates ON CONFLICT DO UPDATE SET for columns present in the payload.
+  if (splitsResult == null) {
+    delete record.splits;
+    delete record.lap_detail;
+    delete record.session_profile;
+  }
+  if (detailsResult == null) {
+    delete record.hr_samples;
+    delete record.decoupling_pct;
+    delete record.perf_condition;
+  }
+  if (!isTreadmill && weatherResult == null) {
+    delete record.temp_c;
+    delete record.feels_like_c;
+    delete record.humidity_pct;
+    delete record.weather_desc;
+  }
 
   const { error } = await supabase
     .from('garmin_activity_details')

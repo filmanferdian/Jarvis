@@ -12,8 +12,8 @@
 import { sanitizeMultiline, wrapUntrusted, UNTRUSTED_PREAMBLE } from '@/lib/promptEscape';
 import { CLAUDE_MODEL } from '@/lib/models';
 import type { PlannedDay } from './plan-loader';
-import type { WeeklyInsightEntry } from './weekly-insights-db';
-import { parseLapsFromProperty, type LapData } from './garmin-enrich';
+import type { WeeklyInsightEntry } from './weekly-insights-store';
+import type { LapData } from './garmin-enrich';
 
 export interface PlanContext {
   lastWeek: PlannedDay[];
@@ -24,10 +24,16 @@ export interface PlanContext {
 }
 
 export interface WeeklyRunSummary {
+  /** Garmin activity id — joins to garmin_activities / garmin_activity_details. */
+  activityId: string;
   date: string;
   name: string;
   distanceKm: number;
+  /** Display string: "M:SS" or "H:MM:SS". */
   durationFormatted: string;
+  /** Duration in whole minutes. Authoritative for sums; durationFormatted is display-only. */
+  durationMins: number;
+  /** Bare "M:SS" per km. No unit suffix — callers append one. */
   avgPacePerKm: string;
   avgHr: number | null;
   maxHr: number | null;
@@ -44,8 +50,21 @@ export interface WeeklyRunSummary {
   elevGainM: number | null;
   /** Authoritative session-type label from segment composition. */
   sessionProfile: string | null;
-  /** Per-lap structured data parsed from the Notion Lap Profile property. */
+  /** Per-lap structured data from garmin_activity_details.lap_detail. */
   laps: LapData[];
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "20 Jul – 26 Jul 2026". Derived rather than stored, so running_weekly_insights needs no
+ * week_label column. UTC accessors throughout: the inputs are date-only ISO strings, which
+ * Date parses as UTC midnight, so local getters would render the previous day west of GMT.
+ */
+export function formatWeekLabel(weekStart: string, weekEnd: string): string {
+  const s = new Date(weekStart);
+  const e = new Date(weekEnd);
+  return `${s.getUTCDate()} ${MONTHS[s.getUTCMonth()]} – ${e.getUTCDate()} ${MONTHS[e.getUTCMonth()]} ${e.getUTCFullYear()}`;
 }
 
 export interface HistoricalContext {
@@ -84,65 +103,6 @@ export function weightedAvgCadence(runs: WeeklyRunSummary[]): number | null {
   return Math.round(weighted / totalDist);
 }
 
-function extractPropText(page: Record<string, unknown>, prop: string): string | null {
-  const p = (page.properties as Record<string, unknown>)?.[prop];
-  const richText = (p as { rich_text?: { plain_text: string }[] })?.rich_text;
-  return richText?.[0]?.plain_text ?? null;
-}
-
-function extractPropNumber(page: Record<string, unknown>, prop: string): number | null {
-  const p = (page.properties as Record<string, unknown>)?.[prop];
-  return (p as { number?: number })?.number ?? null;
-}
-
-function extractPropDate(page: Record<string, unknown>): string | null {
-  const p = (page.properties as Record<string, unknown>)?.['Date'];
-  return (p as { date?: { start: string } })?.date?.start ?? null;
-}
-
-function extractPropTitle(page: Record<string, unknown>): string {
-  const p = (page.properties as Record<string, unknown>)?.['Run'];
-  const title = (p as { title?: { plain_text: string }[] })?.title;
-  return title?.[0]?.plain_text ?? 'Unnamed Run';
-}
-
-function durationStringToSeconds(dur: string | null): number {
-  if (!dur) return 0;
-  const parts = dur.split(':').map(Number);
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return 0;
-}
-
-function secondsToMins(s: number): number {
-  return Math.round(s / 60);
-}
-
-export function extractRunSummaries(pages: Record<string, unknown>[]): WeeklyRunSummary[] {
-  return pages.map((page) => ({
-    date: extractPropDate(page) ?? '',
-    name: extractPropTitle(page),
-    distanceKm: extractPropNumber(page, 'Distance (km)') ?? 0,
-    durationFormatted: extractPropText(page, 'Duration') ?? '',
-    avgPacePerKm: extractPropText(page, 'Avg Pace') ?? '',
-    avgHr: extractPropNumber(page, 'Avg HR'),
-    maxHr: extractPropNumber(page, 'Max HR'),
-    trainingLoad: extractPropNumber(page, 'Training Load'),
-    trainingEffect: extractPropText(page, 'Training Effect'),
-    vo2Max: extractPropNumber(page, 'VO2 Max'),
-    perfCondition: extractPropNumber(page, 'Perf Condition'),
-    decouplingPct: extractPropNumber(page, 'Decoupling (%)'),
-    tempC: extractPropNumber(page, 'Temp (C)'),
-    humidityPct: extractPropNumber(page, 'Humidity (%)'),
-    weather: extractPropText(page, 'Weather'),
-    cadenceSpm: extractPropNumber(page, 'Cadence (spm)'),
-    avgPowerW: extractPropNumber(page, 'Avg Power (W)'),
-    elevGainM: extractPropNumber(page, 'Elev Gain (m)'),
-    sessionProfile: extractPropText(page, 'Session Profile'),
-    laps: parseLapsFromProperty(extractPropText(page, 'Lap Profile')),
-  }));
-}
-
 function avgPace(runs: WeeklyRunSummary[]): string {
   const paces = runs.map((r) => {
     const [m, s] = r.avgPacePerKm.split(':').map(Number);
@@ -174,18 +134,13 @@ export async function generateWeeklyAnalysis(
   if (!apiKey) throw new Error('JARVIS_ANTHROPIC_KEY not configured');
 
   const totalDistanceKm = Math.round(thisWeekRuns.reduce((s, r) => s + r.distanceKm, 0) * 100) / 100;
-  const totalDurationSec = thisWeekRuns.reduce((s, r) => s + durationStringToSeconds(r.durationFormatted), 0);
-  const totalDurationMins = secondsToMins(totalDurationSec);
+  const totalDurationMins = thisWeekRuns.reduce((s, r) => s + r.durationMins, 0);
   const weekAvgPace = avgPace(thisWeekRuns);
   const weekAvgHr = avgNumber(thisWeekRuns.map((r) => r.avgHr));
   const weekAvgCadence = weightedAvgCadence(thisWeekRuns);
   const totalLoad = Math.round(thisWeekRuns.reduce((s, r) => s + (r.trainingLoad ?? 0), 0) * 10) / 10;
 
-  // Format date range for label
-  const startD = new Date(weekStart);
-  const endD = new Date(weekEnd);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const weekLabel = `${startD.getDate()} ${months[startD.getMonth()]} – ${endD.getDate()} ${months[endD.getMonth()]} ${endD.getFullYear()}`;
+  const weekLabel = formatWeekLabel(weekStart, weekEnd);
 
   if (thisWeekRuns.length === 0) {
     return {

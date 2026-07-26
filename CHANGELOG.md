@@ -4,6 +4,28 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.42] – 2026-07-26 – The running pipeline leaves Notion
+
+The weekly running analysis no longer touches Notion. It reads runs out of `garmin_activities` + `garmin_activity_details`, writes insights to `running_weekly_insights`, and takes the cardio protocol from a new `fitness_protocols` table. The whole slice now runs with `NOTION_API_KEY` unset, which is the acceptance test.
+
+**What is gone.** `notion-runs-db.ts`, `weekly-insights-db.ts` and `dashboard-update.ts` are deleted, along with `enrichActivity`, `serializeLapsForProperty` and `reprocessDecoupling`. The Notion dashboard update turned out to write one subtitle line and four prose paragraphs that already live in Supabase and already render on `/cardio-analysis`, so it was dropped rather than replaced.
+
+**The Notion Runs DB and Weekly Insights DB are frozen as of 2026-07-26.** They still exist and still hold their 62 and 23 rows, but nothing writes to them any more. They are a snapshot, not a mirror. Deleting them is gated on explicit sign-off.
+
+**New Step 2.** The old pipeline wrote each new run into Notion. The obvious replacement was nothing, because the Garmin sync surely wrote detail rows already; it does not. `syncRecentActivities()` writes `garmin_activities` only, and the per-lap enrichment lives in `syncGarmin()`, which the running pipeline never calls. Left alone, a Saturday-morning run would have reached the Saturday-noon analysis with no laps and no session profile, which is precisely the data the prompt is built on. Step 2 is now `syncActivityDetailsFor()`, which enriches runs still missing `lap_detail` over a 14-day lookback (so a run that missed its own week because Garmin was rate-limited gets another two chances) and degrades rather than fails when the circuit breaker is open.
+
+**Two visible behaviour changes, both bug fixes.**
+
+`garmin_activities.avg_pace` is stored as `"8:50 /km"`. Every consumer split it on `:` and parsed the seconds as `NaN`, so the weekly average pace silently truncated to the whole minute: `8:50` became `8:00`. Pace is now computed from distance and duration and emitted bare, so weekly averages will move and the `/cardio-analysis` table stops rendering `8:50 /km/km`.
+
+The verdict card on `/cardio-analysis` was permanently stuck on "No HR data on recent runs". It falls back to a duration parser that cannot read `"1:05:23"`, so its zone total was always 0. Runs now carry `durationMins` and the card computes a real verdict.
+
+Rounding also moved into the read path. Stored values like `training_load = 36.94035339355469` were rounded by the old Notion ingest on the way in; the reader now does it on the way out, so the UI shows `36.9` again.
+
+**Schema (migration 038).** Adds `garmin_activity_details.session_profile`, the last run field that existed only in Notion. Adds `fitness_protocols (protocol_key, content)` for the cardio protocol prose, deliberately its own table rather than a column on `fitness_context`, which `syncFitness()` delete-then-inserts daily. Retro-codifies `running_weekly_insights` and the stride/vertical-oscillation columns, which had been applied out of band with no file.
+
+**Backfill.** `scripts/backfill-run-details.ts` fills per-lap detail for runs that lack it, preferring a Garmin re-fetch (full fidelity: laps, splits, HR stream) and falling back to the Notion `Lap Profile` where Garmin fails. The fallback is deliberately lossy and honest about it: Notion lap distances are not per-km, so `splits` is left NULL rather than fabricated, which would have corrupted the contract the Charge iOS app reads. At 3 Garmin calls per run against a 50/day budget this is a multi-day operation; 2 of ~40 runs are done. `--force` re-enriches a fallback row to full fidelity later.
+
 ## [3.41] – 2026-07-26 – AI insights capture: its own schedule, and the gate that ate a week
 
 The weekly Railway capture did not run on Sunday 2026-07-26. Railway was healthy the whole time. Two bugs conspired, and the failure was completely silent.
