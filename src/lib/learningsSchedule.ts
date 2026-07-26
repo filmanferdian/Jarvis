@@ -1,6 +1,7 @@
-import { shouldSync, markSynced } from '@/lib/syncTracker';
-import { captureAiInsights } from '@/lib/sync/aiInsightsCapture';
+import { markSynced } from '@/lib/syncTracker';
+import { captureAiInsights, wibWeekStart } from '@/lib/sync/aiInsightsCapture';
 import { logCronRun } from '@/lib/cronLog';
+import { supabase } from '@/lib/supabase';
 
 // Weekly capture WITHOUT its own cron-job.org entry.
 //
@@ -23,18 +24,41 @@ const SYNC_TYPE = 'ai-insights-capture';
 const RUN_DAY = 0; // 0 = Sunday, WIB
 const RUN_HOUR = 7; // WIB, inclusive
 
-// 6 days, not 7: the gate must reopen before the next Sunday tick, otherwise a
-// run that lands a few minutes late pushes the following week's run out by one
-// whole cycle and the schedule drifts.
-const MIN_INTERVAL_MS = 6 * 24 * 60 * 60 * 1000;
-
 export function isCaptureWindow(now = new Date()): boolean {
   const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   return wib.getUTCDay() === RUN_DAY && wib.getUTCHours() >= RUN_HOUR;
 }
 
 /**
- * Runs the weekly capture if the window is open and it has not run recently.
+ * Has this week's capture already been banked?
+ *
+ * Gates on the week actually captured, not on elapsed time. A time-based gate
+ * reads one shared `sync_status` timestamp that the on-demand route stamps too,
+ * so any manual trigger inside the interval silently ate that week's scheduled
+ * run. That is what happened on 2026-07-26: two on-demand runs on Saturday
+ * closed a six-day window, and the real Sunday tick skipped without a trace.
+ *
+ * Asking "is there a capture row for this week_start" is idempotent, immune to
+ * runs belonging to other weeks, and self-healing after a missed week. On a
+ * query error it returns false so the capture still runs: a duplicate upsert is
+ * harmless, a silently skipped week is not.
+ */
+async function alreadyCapturedThisWeek(weekStart: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('learning_capture_runs')
+    .select('id')
+    .eq('topic', 'ai')
+    .eq('week_start', weekStart)
+    .limit(1);
+  if (error) {
+    console.error('[ai-insights-capture] capture-run lookup failed:', error.message);
+    return false;
+  }
+  return (data || []).length > 0;
+}
+
+/**
+ * Runs the weekly capture if the window is open and this week is not yet banked.
  * Never throws: it is called from `after()` inside another job's route, and must
  * not be able to affect that job's result.
  */
@@ -42,7 +66,7 @@ export async function maybeCaptureAiInsights(force = false): Promise<void> {
   try {
     if (!force) {
       if (!isCaptureWindow()) return;
-      if (!(await shouldSync(SYNC_TYPE, MIN_INTERVAL_MS))) return;
+      if (await alreadyCapturedThisWeek(wibWeekStart())) return;
     }
 
     const start = Date.now();
@@ -57,10 +81,10 @@ export async function maybeCaptureAiInsights(force = false): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[ai-insights-capture] failed:', msg);
-    // Deliberately does NOT call markSynced. markSynced stamps last_synced_at
-    // regardless of the result it records, and shouldSync only reads that
-    // timestamp, so marking a failure here would shut the gate for six days and
-    // silently skip the week. Logging only leaves the gate open, so the next
+    // Deliberately does NOT call markSynced: sync_status is observability only
+    // now, and stamping a failure here would misreport the last good capture.
+    // The gate reads learning_capture_runs, whose row is only written after a
+    // successful capture, so a failure leaves the gate open and the next
     // google-calendar tick (10:00 WIB, then 13:00, and so on) retries the same
     // Sunday.
     await logCronRun(SYNC_TYPE, 'error', msg.slice(0, 500)).catch(() => {});
