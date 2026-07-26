@@ -140,8 +140,48 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'sfgate',
     'yahoo health', // full phrase so it never matches plain "Yahoo"
     'fox weather', // full phrase so it never matches "Fox News"
+    // --- added 2026-07-26 (weekly review batch 4): sports ---
+    'hoops rumors',
+    "today's golfer",
+    'today’s golfer', // curly-apostrophe variant, in case the feed renders it that way
+    'skratch golf',
+    'cageside seats', // pro wrestling
+    'action network', // sports betting odds/picks
+    // --- added 2026-07-26 (weekly review batch 4): gaming ---
+    'kotaku',
+    'push square',
+    // --- added 2026-07-26 (weekly review batch 4): gadget-review / product review ---
+    'engadget',
+    'consumer reports',
+    'mashable',
+    // --- added 2026-07-26 (weekly review batch 4): entertainment / lifestyle / hobby ---
+    'tv insider',
+    'boing boing',
+    'bbc wildlife magazine', // full phrase so it never matches plain "BBC"
+    'motor1.com', // automotive reviews
+    // --- added 2026-07-26 (weekly review batch 4): press-release aggregators ---
+    'space daily',
+    'medical xpress', // Science X network, same operator as blocked phys.org
+    // --- added 2026-07-26 (weekly review batch 4): finance UGC ---
+    'seeking alpha', // contributor blog farm, not a newsroom
+    // --- added 2026-07-26 (weekly review batch 4): hyper-local US TV affiliates ---
+    'wtop',
+    'ksl.com', // domain form; complements the blocked 'ksl news'
+    'kptv',
+    'wyff',
+    'wkow',
+    'pix11',
+    'kiro 7 news seattle',
+    'fox 8 news',
+    // --- added 2026-07-26 (weekly review batch 4): hyper-local print ---
+    'denverite',
+    'pennlive.com',
+    'masslive',
+    'triblive.com',
+    'wisconsin examiner', // single-state politics
     // NOTE: short tokens that would collide as bare substrings ('ign', 'patch',
-    // 'komo') live in WORD_BLOCKED_OUTLETS below, not here.
+    // 'komo', 'kold', 'koco', 'katu', 'andscape') live in WORD_BLOCKED_OUTLETS
+    // below, not here.
   ],
   ID: [
     'lentera.co', // user wrote "Lenterea.co"; actual outlet name is "Lentera.co"
@@ -312,6 +352,57 @@ const BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'ketik.com',
     'mashable indonesia',
     'achmadnurhidayat.id',
+    // --- added 2026-07-26 (weekly review batch 4) ---
+    // NOTE: 'harapan rakyat' still deliberately NOT added, per earlier request.
+    // NOTE: 'detikinet' deliberately NOT added at user's request, despite the
+    // other detik verticals being blocked.
+    // government / institutional PR
+    'kota administrasi jakarta barat',
+    'okuselatankab.go.id',
+    'pemkab gayo lues',
+    'pemerintah kota depok',
+    'jabarprov',
+    'dinas kesehatan provinsi aceh',
+    'pemerintah kabupaten sidenreng rappang',
+    'kecamatan busungbiu',
+    'media center sembada', // Sleman govt media center
+    'universitas gadjah mada',
+    'uin alauddin makassar',
+    // regional ANTARA bureaus (full phrases; never match the national ANTARA wire)
+    'antara news yogyakarta',
+    'antara news sumbar',
+    'antara news jateng',
+    // trade / marketing PR
+    'mix marcomm',
+    'marketeers',
+    'gramedia', // retailer/publisher content marketing
+    // gadget-review / gaming / sports verticals
+    'technologue.id',
+    'jagat play',
+    'mainbasket',
+    // lifestyle / tourism
+    'genpi.co',
+    // regional / hyper-local
+    'sindonews daerah', // full phrase; does not match "Sindonews Nasional"
+    'palpres.com',
+    'gosulsel.com',
+    'lampung jaya news',
+    'medinaslampungnews',
+    'mimbarriau.com',
+    'riau pos',
+    'vivaborneo.com', // full domain so it never matches "Viva.co.id"
+    'viva jogja', // full phrase, same reason
+    'zonasultra.id',
+    'koranindopos.com',
+    'radar malang',
+    'sultengterkini',
+    'kendari terkini',
+    'detak.co',
+    'informasi-realita.net',
+    // low-value / unclear portals
+    'mediata.id',
+    'kita garuda id',
+    'mojok.co', // satire and essays, not current events
   ],
 };
 
@@ -328,6 +419,11 @@ const WORD_BLOCKED_OUTLETS: Record<NewsLocale, string[]> = {
     'ign', // gaming; substring would match "Foreign Policy"
     'patch', // hyper-local network; substring would match "The Dispatch"
     'komo', // Seattle TV affiliate; 4-letter token, collision-prone
+    // --- added 2026-07-26 (weekly review batch 4) ---
+    'andscape', // ESPN sports/culture site; substring would match "Landscape"
+    'kold', // Tucson TV affiliate; 4-letter token, collision-prone
+    'koco', // Oklahoma City TV affiliate; same
+    'katu', // Portland TV affiliate; same
   ],
   ID: [],
 };
