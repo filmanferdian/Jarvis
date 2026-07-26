@@ -4,6 +4,36 @@ All notable changes to Jarvis are documented here.
 
 Format: `{major}.{minor}` — from v3.0 onward we version by minor only (3.0, 3.1, 3.2…), not by patch.
 
+## [3.40] – 2026-07-26 – News blocklist batch 4: 73 outlets, and two deliberate keeps
+
+The fourth weekly source review. 188 outlet names were pulled across the seven days to 2026-07-26; 75 were not already blocked. 73 are now blocked, 2 were kept on purpose.
+
+**What went in.** `BLOCKED_OUTLETS` gains 29 WORLD and 40 ID entries; `WORD_BLOCKED_OUTLETS` gains 4.
+
+| Locale | Category | Examples |
+|---|---|---|
+| WORLD | sports | hoops rumors, today's golfer, skratch golf, cageside seats, action network |
+| WORLD | gaming | kotaku, push square |
+| WORLD | gadget / product review | engadget, consumer reports, mashable |
+| WORLD | entertainment / hobby | tv insider, boing boing, bbc wildlife magazine, motor1.com |
+| WORLD | press-release aggregators | space daily, medical xpress (Science X, same operator as the already-blocked phys.org) |
+| WORLD | hyper-local | wtop, ksl.com, kptv, wyff, wkow, pix11, kiro 7 news seattle, fox 8 news, denverite, pennlive.com, masslive, triblive.com, wisconsin examiner |
+| ID | government / campus PR | kota administrasi jakarta barat, okuselatankab.go.id, jabarprov, universitas gadjah mada, uin alauddin makassar, and 6 more |
+| ID | regional ANTARA bureaus | antara news yogyakarta, antara news sumbar, antara news jateng |
+| ID | trade / marketing PR | mix marcomm, marketeers, gramedia |
+| ID | verticals | technologue.id, jagat play, mainbasket, genpi.co, sindonews daerah |
+| ID | hyper-local | palpres.com, gosulsel.com, riau pos, radar malang, viva jogja, and 10 more |
+
+**Two outlets kept against their own category.** `detikinet` (13 appearances) and `cnet` (9) both sit in categories that are otherwise fully blocked: every other detik vertical is gone, and so are 9to5mac, bgr, techspot and gizmodo. Both were kept anyway. They carry genuine technology news alongside the buying guides, and between them they hold about 22 slots a week, so blocking them would have thinned the feed more than it cleaned it. `harapan rakyat` remains kept from batch 3.
+
+**Three matcher decisions, not just list entries.**
+
+- `andscape` went into `WORD_BLOCKED_OUTLETS`, not the substring list. As a raw substring it matches "Landscape", so any outlet with that word in its name would have been silently dropped.
+- `kold`, `koco` and `katu` are 4-letter TV call signs, collision-prone for the same reason `komo` already lives there.
+- `yahoo` could not be blocked at all. It appears as its own bare outlet label, but both matchers also hit "Yahoo Finance", which is a keep. Left in the feed and logged in the backlog as needing an exact-match tier.
+
+**Verified against the real week, not synthetic cases.** `scripts/check-news-blocklist.mjs --self-test` passes its 26 collision cases against the expanded lists. Replaying the live match rule over all 188 pulled names blocks 48 of 102 WORLD and 54 of 86 ID, with every keep surviving: yahoo finance, viva.co.id, sindonews nasional, the national antara wire, bbc, space.com, harapan rakyat, cnet and detikinet. No duplicate entries and no entry shadowing another.
+
 ## [3.39] – 2026-07-25 – Learnings: weekly capture on a schedule, and velocity ranking
 
 ### Context-page trimming: give each prompt only what its task needs (v3.39.3)
