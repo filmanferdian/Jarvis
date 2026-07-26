@@ -14,6 +14,12 @@ const GARMIN_LOGIN_RETRIES = 1;           // was 3
 // calls (/splits + /weather + /details). Ongoing this is ~1/day; the cap bounds a post-deploy
 // burst and keeps the sync under cron-job.org's 30s HTTP timeout.
 const GARMIN_MAX_ACTIVITY_DETAILS_PER_SYNC = 3;
+// Same idea for syncActivityDetailsFor, which the weekly analysis and the backfill script drive.
+// A week holds at most ~7 runs, so 8 covers a full catch-up (24 calls) inside the daily budget.
+const GARMIN_MAX_ACTIVITY_DETAILS_PER_ANALYSIS = 8;
+// Gap between activities in a details run. Wider than the general inter-call delay because each
+// iteration is already 3 calls deep and these run in bulk.
+const GARMIN_DETAILS_GAP_MS = 2500;
 
 export interface GarminSyncResult {
   date: string;
@@ -847,6 +853,111 @@ export async function syncRecentActivities(): Promise<{ fetched: number; synced:
   console.log(`[garmin] syncRecentActivities: synced ${synced}/${fetched} activities to Supabase`);
   await saveCachedTokens(client);
   return { fetched, synced };
+}
+
+export interface ActivityDetailsSyncResult {
+  attempted: number;
+  written: number;
+  skipped: number;
+  blocked: boolean;
+  errors: string[];
+}
+
+/**
+ * Enrich `garmin_activity_details` for specific activity ids.
+ *
+ * Lives here rather than in the caller because the circuit breaker, the daily call budget and
+ * the 429 classifier are all module-private, and Garmin budget policy belongs in one file.
+ *
+ * The activity SUMMARY is read back out of `garmin_activities.raw_json` (which stores the exact
+ * object `buildAndUpsertActivityDetails` expects), so this costs zero extra calls beyond the
+ * three per activity that the enrichment itself needs.
+ *
+ * Skip predicate is `lap_detail IS NULL`, not row-absence. syncGarmin's inline block keys off row
+ * existence, which means a row written with null laps (a partial fetch, or the out-of-band scalar
+ * backfill) can never be repaired by the live sync. This one repairs them.
+ *
+ * Throws only if a Garmin session cannot be established; per-activity failures are collected.
+ */
+export async function syncActivityDetailsFor(
+  activityIds: string[],
+  opts: { max?: number; force?: boolean } = {},
+): Promise<ActivityDetailsSyncResult> {
+  const { max = GARMIN_MAX_ACTIVITY_DETAILS_PER_ANALYSIS, force = false } = opts;
+  const result: ActivityDetailsSyncResult = {
+    attempted: 0, written: 0, skipped: 0, blocked: false, errors: [],
+  };
+  if (activityIds.length === 0) return result;
+
+  const preBlock = await isGarminBlocked();
+  if (preBlock.blocked) {
+    result.blocked = true;
+    result.errors.push(`circuit-breaker: ${preBlock.reason}`);
+    return result;
+  }
+
+  // Which of these still need laps?
+  const { data: existing } = await supabase
+    .from('garmin_activity_details')
+    .select('activity_id, lap_detail')
+    .in('activity_id', activityIds);
+  const haveLaps = new Set(
+    (existing ?? []).filter((r) => r.lap_detail != null).map((r) => r.activity_id),
+  );
+
+  const wanted = force ? activityIds : activityIds.filter((id) => !haveLaps.has(id));
+  result.skipped = activityIds.length - wanted.length;
+  if (wanted.length === 0) return result;
+
+  const targets = wanted.slice(0, max);
+  if (targets.length < wanted.length) {
+    console.log(`[garmin] activity-details: capping ${wanted.length} candidates at ${max} this run`);
+  }
+
+  const { data: rows } = await supabase
+    .from('garmin_activities')
+    .select('activity_id, raw_json')
+    .in('activity_id', targets);
+
+  const client = await createGarminClient();
+
+  for (const row of rows ?? []) {
+    const block = await isGarminBlocked();
+    if (block.blocked) {
+      result.blocked = true;
+      console.log('[garmin] activity-details enrichment halted: circuit breaker tripped');
+      break;
+    }
+
+    const act = unwrapJsonb<Record<string, unknown>>(row.raw_json);
+    if (!act?.activityId) {
+      result.errors.push(`${row.activity_id}: raw_json missing or undecryptable`);
+      continue;
+    }
+
+    result.attempted++;
+    try {
+      await buildAndUpsertActivityDetails(client, act);
+      result.written++;
+      console.log(`[garmin] activity-details persisted for ${row.activity_id}`);
+    } catch (err) {
+      const { isRateLimit, retryAfterMs } = isRateLimitError(err);
+      if (isRateLimit) {
+        await setGarminBlocked('429-activity-details', retryAfterMs ?? GARMIN_COOLDOWN_DEFAULT_MS);
+        await trackGarminCalls(3);
+        result.blocked = true;
+        result.errors.push(`${row.activity_id}: rate-limited, halted`);
+        console.log('[garmin] activity-details enrichment halted: rate-limited');
+        break;
+      }
+      result.errors.push(`${row.activity_id}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await trackGarminCalls(3); // /splits + /weather + /details
+    await new Promise((r) => setTimeout(r, GARMIN_DETAILS_GAP_MS));
+  }
+
+  await saveCachedTokens(client);
+  return result;
 }
 
 const RETENTION_DAYS = 56;

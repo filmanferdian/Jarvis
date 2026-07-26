@@ -6,6 +6,47 @@ Future features, pickup notes, and scope-later items. Mirrors the Notion Product
 
 ## High priority
 
+### 2026-07-26 — Finish the run-details backfill (~40 runs remaining)
+
+**Context:** v3.42.0 cut the running pipeline off Notion. The per-lap backfill that lets the Notion Runs DB be deleted is only 2 runs in, because Garmin allows ~50 API calls/day and each run costs 3.
+
+**Items:**
+- Run `npx tsx scripts/backfill-run-details.ts --apply` once a day until the gate query returns 0. Expect 4 to 5 days. Check the circuit breaker and today's `api_usage_v2` count first; the script does this itself and skips the Garmin pass above 30 calls.
+- Gate: `select count(*) from garmin_activities a left join garmin_activity_details d using (activity_id) where a.activity_type ilike '%run%' and a.started_at >= '2026-04-01T00:00:00+07:00' and d.lap_detail is null;`
+- Any run filled by the Notion fallback (laps present, `splits` NULL) can be upgraded later with `--force --id=<id>`.
+- The ~52 pre-Notion runs (Nov 2025 to Mar 2026) are out of gate scope and stay laps-less. Harmless: historical context uses only pace, HR and distance. Backfill with `--from=2025-11-01` if ever wanted.
+
+**Effort estimate:** ~5 minutes/day for a week.
+
+---
+
+### 2026-07-26 — GATED: delete the Notion Runs and Weekly Insights databases
+
+**Context:** Both are frozen as of 2026-07-26. Nothing reads or writes them; they are kept only as a fallback snapshot. Deletion is irreversible and needs Filman's explicit sign-off.
+
+**Preconditions:**
+- The backfill above returns 0.
+- One full weekly cycle has run with the Supabase pipeline and been reviewed.
+
+**Items:**
+- Runs DB `061105bb-bd86-464b-b344-c86d89c771ca`, Weekly Insights DB `331c674a-ecec-81c1-91f9-f8dfd6a85c43`.
+- Once gone, delete `scripts/backfill-run-details.ts` and `scripts/seed-cardio-protocol.ts` (both read Notion), and drop `parseLapsFromProperty` + `SEGMENT_CODE`/`SEGMENT_FROM_CODE` from `garmin-enrich.ts`, whose last consumer is that backfill.
+- `scripts/archive-walk-runs.mjs` already points at the frozen Runs DB and is dead. Flagged, not deleted, since it is unrelated to this change.
+
+---
+
+### 2026-07-26 — Remaining Notion exit slices (projects, tasks, contacts, valuations, context)
+
+**Context:** v3.42.0 covered health & fitness only. The Supabase tables for the rest exist with RLS on and 0 rows.
+
+**Items:**
+- **Contacts is cheaper than the handover brief assumed.** It calls for downloading each `Photo` and re-hosting in Supabase Storage because the Notion URLs expire. Verified: **all 310 contacts have no photo.** Skip that step entirely; no storage bucket needed. Only 2 of 310 have a DOB, so `contacts_upcoming_birthdays` will be nearly empty.
+- **`project_completion` will read 0% unless the status mismatch is fixed.** The view counts `status ilike 'complete%'`, but Notion's task statuses are `Not Started / Postponed / BAU / In Progress / Waiting / For review / Blocked / Done / Archived`. Nothing matches. Notion's own `Completion` rollup is `percent_per_group` over the **Complete group**, which is `Done` + `Archived`. Keep the literal status strings (all existing code speaks `Done`) and redefine the view to `status in ('Done','Archived')`.
+- **`notionContext` is blocked** on the Obsidian vault pages, which are not written yet. Needs coordination, not code.
+- The `notion_tasks` cache table (75 rows) can be dropped once `tasks` is populated and read paths are cut over. Separate migration.
+
+---
+
 ### 2026-07-26 — BLOCKING: create the cron-job.org job for ai-insights-capture
 
 **Context:** v3.41.0 removed the google-calendar piggyback. `/api/cron/ai-insights-capture` is now the only entry point and has no scheduler pointing at it. **Until the job exists the weekly capture has no trigger at all.**

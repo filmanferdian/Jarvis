@@ -3,12 +3,12 @@
  *
  * Pulls three supplementary inputs into the synthesis prompt:
  * - This week + next week per-day schedule from Supabase `program_schedule`
- * - High-level cardio protocol markdown from Notion (for zone HR semantics)
- * - Previous week's WeeklyInsight (for continuity with last week's `Focus Next Week`)
+ * - High-level cardio protocol markdown from Supabase `fitness_protocols` (zone HR semantics)
+ *
+ * Previous-week continuity lives in weekly-insights-store.getPreviousWeekInsight().
  */
 
 import { supabase } from '@/lib/supabase';
-import { getWeeklyInsights, WeeklyInsightEntry } from './weekly-insights-db';
 
 export interface PlannedDay {
   date: string;
@@ -84,120 +84,29 @@ export async function loadWeekSchedule(weekStart: string, weekEnd: string): Prom
   return { lastWeek, thisWeek, nextWeek };
 }
 
-// --- Notion cardio protocol loader ---
-
-const TRANSFORMATION_PROGRAM_PAGE_ID = '2f2c674aecec819dac40c78f9fb5a517';
-const CARDIO_SECTION_HEADING = '5. Cardio protocol';
-
-function notionHeaders(apiKey: string) {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Notion-Version': '2022-06-28',
-  };
-}
-
-function extractBlockText(block: Record<string, unknown>): string {
-  const type = block.type as string;
-  const content = block[type] as Record<string, unknown> | undefined;
-  if (!content) return '';
-
-  const richText = content.rich_text as Array<{ plain_text: string }> | undefined;
-  if (richText) {
-    const text = richText.map((t) => t.plain_text).join('');
-    if (type === 'heading_1') return `# ${text}`;
-    if (type === 'heading_2') return `## ${text}`;
-    if (type === 'heading_3') return `### ${text}`;
-    if (type === 'bulleted_list_item') return `- ${text}`;
-    if (type === 'numbered_list_item') return `- ${text}`;
-    if (type === 'to_do') {
-      const checked = (content.checked as boolean) ? '[x]' : '[ ]';
-      return `- ${checked} ${text}`;
-    }
-    if (type === 'toggle') return `> ${text}`;
-    if (type === 'quote') return `> ${text}`;
-    if (type === 'callout') return `> ${text}`;
-    if (type === 'divider') return '---';
-    return text;
-  }
-
-  if (type === 'divider') return '---';
-  return '';
-}
-
-async function fetchPageBlocks(apiKey: string, pageId: string): Promise<string[]> {
-  const blocks: string[] = [];
-  let hasMore = true;
-  let startCursor: string | undefined;
-
-  while (hasMore) {
-    const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
-    url.searchParams.set('page_size', '100');
-    if (startCursor) url.searchParams.set('start_cursor', startCursor);
-
-    const res = await fetch(url.toString(), { headers: notionHeaders(apiKey) });
-    if (!res.ok) throw new Error(`Notion blocks ${pageId}: ${res.status}`);
-    const data = await res.json();
-
-    for (const block of data.results) {
-      const text = extractBlockText(block as Record<string, unknown>);
-      if (text) blocks.push(text);
-    }
-
-    hasMore = data.has_more;
-    startCursor = data.next_cursor || undefined;
-  }
-
-  return blocks;
-}
-
-// Memoize the protocol slice — it changes rarely. Keyed by YYYY-MM-DD.
-let protocolCache: { day: string; text: string } | null = null;
+// --- Cardio protocol loader ---
 
 /**
- * Fetch the `# 5. Cardio protocol` section from the Transformation program Notion page.
- * Returns only that section (H1 to next H1) to keep prompt tokens down.
+ * The cardio protocol section (zone HR semantics, phase structure) used to be sliced live out of
+ * a Notion page on every analysis. It now lives in Supabase `fitness_protocols` under the
+ * 'cardio' key, seeded once by scripts/seed-cardio-protocol.ts and hand-edited thereafter.
+ *
+ * Returns '' when absent. The caller treats an empty protocol as non-fatal.
  */
-export async function loadCardioProtocol(apiKey: string): Promise<string> {
-  const today = new Date().toISOString().split('T')[0];
-  if (protocolCache && protocolCache.day === today) return protocolCache.text;
+export async function loadCardioProtocol(): Promise<string> {
+  const { data, error } = await supabase
+    .from('fitness_protocols')
+    .select('content')
+    .eq('protocol_key', 'cardio')
+    .maybeSingle();
 
-  const blocks = await fetchPageBlocks(apiKey, TRANSFORMATION_PROGRAM_PAGE_ID);
-
-  // Slice from the cardio-protocol H1 up to the next H1.
-  const startIdx = blocks.findIndex(
-    (b) => b.startsWith('# ') && b.toLowerCase().includes(CARDIO_SECTION_HEADING.toLowerCase()),
-  );
-  if (startIdx === -1) {
-    console.warn('[plan-loader] Cardio protocol section not found in Transformation program');
+  if (error) {
+    console.warn('[plan-loader] fitness_protocols query failed:', error.message);
     return '';
   }
-
-  let endIdx = blocks.length;
-  for (let i = startIdx + 1; i < blocks.length; i++) {
-    if (blocks[i].startsWith('# ')) {
-      endIdx = i;
-      break;
-    }
+  if (!data?.content) {
+    console.warn('[plan-loader] no cardio protocol stored — run scripts/seed-cardio-protocol.ts');
+    return '';
   }
-
-  const text = blocks.slice(startIdx, endIdx).join('\n');
-  protocolCache = { day: today, text };
-  return text;
-}
-
-// --- Previous week insight loader ---
-
-/**
- * Find the most recent Weekly Insight with weekStart < the given date.
- * Returns null on first run or if no prior entry exists.
- */
-export async function loadPreviousWeekInsight(
-  apiKey: string,
-  weekStart: string,
-): Promise<WeeklyInsightEntry | null> {
-  const all = await getWeeklyInsights(apiKey);
-  const prior = all
-    .filter((entry) => entry.weekStart && entry.weekStart < weekStart)
-    .sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
-  return prior[0] ?? null;
+  return data.content;
 }

@@ -1,16 +1,10 @@
 /**
- * Garmin API enrichment for running activities.
- * Fetches splits, weather, and performance details for a given activity ID.
+ * Lap parsing, segment classification and decoupling maths for running activities.
+ *
+ * Pure transforms over Garmin API payloads — the fetching itself lives in
+ * src/lib/sync/activityDetails.ts. `parseLapsFromProperty` survives for the Notion-exit
+ * backfill script, which is the last reader of the old compact lap encoding.
  */
-
-import { createGarminClient } from '@/lib/sync/garmin';
-
-const API_BASE = 'https://connectapi.garmin.com';
-const CALL_DELAY_MS = 1500;
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 export type SegmentType =
   | 'warm-up'
@@ -19,6 +13,15 @@ export type SegmentType =
   | 'interval-work'
   | 'interval-rest'
   | 'cool-down';
+
+const SEGMENT_TYPES: readonly string[] = [
+  'warm-up', 'main', 'tempo', 'interval-work', 'interval-rest', 'cool-down',
+];
+
+/** Narrows a stored `lap_detail[].segment` string back to SegmentType. */
+export function isSegmentType(v: unknown): v is SegmentType {
+  return typeof v === 'string' && SEGMENT_TYPES.includes(v);
+}
 
 export interface SplitData {
   lapIndex: number;
@@ -37,20 +40,6 @@ export interface SplitData {
   elevLoss: number | null;
   /** Inferred from HR + pace heuristics; defaults to 'main' for uniform runs. */
   segmentType: SegmentType;
-}
-
-export interface WeatherData {
-  tempC: number | null;
-  feelsLikeC: number | null;
-  humidity: number | null;
-  description: string | null;
-}
-
-export interface EnrichedActivityData {
-  splits: SplitData[];
-  weather: WeatherData;
-  perfCondition: number | null;
-  decouplingPct: number | null;
 }
 
 export function fToC(f: number | null): number | null {
@@ -343,13 +332,12 @@ export function classifyLaps(splits: SplitData[]): SplitData[] {
 }
 
 // ---------------------------------------------------------------------------
-// Session profile + lap serialization
+// Session profile
 //
-// Once classifyLaps() has labelled the splits, we derive two strings that get
-// persisted as Notion Runs DB properties so the weekly-analysis prompt can
-// read them without re-fetching Garmin:
-//   - Session Profile: a one-line authoritative session-type label.
-//   - Lap Profile JSON: a compact per-lap JSON for the prompt's runsDetail.
+// Once classifyLaps() has labelled the splits, summarizeSegments() derives a
+// one-line authoritative session-type label, persisted as
+// garmin_activity_details.session_profile so the weekly-analysis prompt can
+// read it without re-fetching Garmin.
 // ---------------------------------------------------------------------------
 
 const SEGMENT_CODE: Record<SegmentType, string> = {
@@ -400,24 +388,6 @@ export function summarizeSegments(splits: SplitData[]): string {
 
   const mainMin = Math.round(main.reduce((s, m) => s + m.durationSeconds, 0) / 60);
   return mainMin > 0 ? `Z2 base ~${mainMin}min` : '';
-}
-
-/** Compact JSON serialization of laps for storage in a Notion rich_text property.
- *  Shape per lap: {i, t, d, du, hr, p, c}. Codes for `t`: w|m|t|iw|ir|c.
- *  `c` is per-lap cadence (steps per minute, both legs). Older rows without `c`
- *  parse cleanly with cadence=null. */
-export function serializeLapsForProperty(splits: SplitData[]): string {
-  if (splits.length === 0) return '';
-  const compact = splits.map((s) => ({
-    i: s.lapIndex,
-    t: SEGMENT_CODE[s.segmentType],
-    d: Math.round(s.distanceMeters),
-    du: Math.round(s.durationSeconds),
-    hr: s.avgHr ?? null,
-    p: paceStringToSec(s.pacePerKm) === Infinity ? null : Math.round(paceStringToSec(s.pacePerKm)),
-    c: s.cadence ?? null,
-  }));
-  return JSON.stringify(compact);
 }
 
 export interface LapData {
@@ -487,81 +457,4 @@ export function parseLapDTOs(laps: Record<string, unknown>[]): SplitData[] {
     });
   }
   return splits;
-}
-
-export async function enrichActivity(activityId: string): Promise<EnrichedActivityData> {
-  const client = await createGarminClient();
-
-  // Make calls sequentially with delays to avoid rate limiting
-  let splitsResult: unknown = null;
-  let weatherResult: unknown = null;
-  let detailsResult: unknown = null;
-
-  try {
-    splitsResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/splits`);
-    console.log(`[garmin-enrich] Splits fetched for ${activityId}`);
-  } catch (err) {
-    console.error(`[garmin-enrich] Splits fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
-  }
-
-  await delay(CALL_DELAY_MS);
-
-  try {
-    weatherResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/weather`);
-    console.log(`[garmin-enrich] Weather fetched for ${activityId}`);
-  } catch (err) {
-    console.error(`[garmin-enrich] Weather fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
-  }
-
-  await delay(CALL_DELAY_MS);
-
-  try {
-    detailsResult = await client.get(`${API_BASE}/activity-service/activity/${activityId}/details?maxChartSize=2000&maxPolylineSize=100`);
-    console.log(`[garmin-enrich] Details fetched for ${activityId}`);
-  } catch (err) {
-    console.error(`[garmin-enrich] Details fetch failed for ${activityId}:`, err instanceof Error ? err.message : err);
-  }
-
-  // Parse splits
-  const splits = parseLapDTOs((splitsResult as { lapDTOs?: Record<string, unknown>[] })?.lapDTOs ?? []);
-  if (splits.length > 0) {
-    classifyLaps(splits);
-  }
-
-  // Parse weather — Garmin uses field names `temp` and `apparentTemp`
-  const weather: WeatherData = { tempC: null, feelsLikeC: null, humidity: null, description: null };
-  if (weatherResult) {
-    const w = weatherResult as Record<string, unknown>;
-    const rawTemp = (w.temp as number) ?? (w.temperature as number) ?? null;
-    const rawApparentTemp = (w.apparentTemp as number) ?? (w.apparentTemperature as number) ?? null;
-    weather.tempC = fToC(rawTemp);
-    weather.feelsLikeC = fToC(rawApparentTemp);
-    weather.humidity = (w.relativeHumidity as number) ?? null;
-    const weatherType = w.weatherTypeDTO as { desc?: string } | undefined;
-    weather.description = weatherType?.desc ?? null;
-  }
-
-  // Parse details — performance condition and decoupling
-  let perfCondition: number | null = null;
-  let decouplingPct: number | null = null;
-  if (detailsResult) {
-    const details = detailsResult as {
-      metricDescriptors?: Record<string, unknown>[];
-      activityDetailMetrics?: { metrics: number[] }[];
-    };
-    const descriptors = details?.metricDescriptors ?? [];
-    const metrics = details?.activityDetailMetrics ?? [];
-    if (descriptors.length > 0 && metrics.length > 0) {
-      // Log available keys for diagnostics
-      const availableKeys = descriptors.map((d) => (d.key as string) || (d.metricsKey as string) || 'unknown');
-      console.log(`[garmin-enrich] Available metric keys for ${activityId}: ${availableKeys.join(', ')}`);
-      perfCondition = extractPerfCondition(descriptors, metrics);
-      decouplingPct = calcDecoupling(descriptors, metrics);
-      console.log(`[garmin-enrich] PerfCondition=${perfCondition}, Decoupling=${decouplingPct} for ${activityId}`);
-    } else {
-      console.warn(`[garmin-enrich] Details response missing descriptors (${descriptors.length}) or metrics (${metrics.length}) for ${activityId}`);
-    }
-  }
-
-  return { splits, weather, perfCondition, decouplingPct };
 }
