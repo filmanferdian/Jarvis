@@ -162,6 +162,28 @@ export function wibWeekStart(now = new Date()): string {
   return saturday.toISOString().slice(0, 10);
 }
 
+/**
+ * Has this week's capture already been banked?
+ *
+ * The scheduler can double-fire: on 2026-07-25 the capture ran twice, three
+ * minutes apart. Gating on the week actually captured makes a re-fire a no-op
+ * without needing a time window. On a query error it returns false so the
+ * capture still runs: a duplicate upsert is harmless, a skipped week is not.
+ */
+export async function alreadyCapturedThisWeek(weekStart: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('learning_capture_runs')
+    .select('id')
+    .eq('topic', 'ai')
+    .eq('week_start', weekStart)
+    .limit(1);
+  if (error) {
+    console.error('[ai-insights-capture] capture-run lookup failed:', error.message);
+    return false;
+  }
+  return (data || []).length > 0;
+}
+
 export async function captureAiInsights(
   opts: { includeSocial?: boolean; ranFrom?: string } = {},
 ): Promise<CaptureResult> {
