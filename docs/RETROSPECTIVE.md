@@ -4,6 +4,28 @@ Short "well / wrong / next" reflection per ship. Mirrors the Notion Retrospectiv
 
 ---
 
+## 2026-07-26, v3.40.0, News blocklist batch 4
+
+Applied 73 of the 75 candidates from the weekly source review, holding back `cnet` and `detikinet` on Filman's call.
+
+**Well:**
+- Caught the `andscape` collision at implementation, not in production. The proposal had listed it as an ordinary substring entry; as a substring it matches "Landscape", so any outlet with that word in its name would have vanished from the feed with no signal. It went into `WORD_BLOCKED_OUTLETS` instead, which is exactly what that list was built for last week.
+- Recognised that `yahoo` is unblockable rather than forcing it. Substring and word-boundary both also match "Yahoo Finance". Naming the gap and logging it as needing an exact-match tier is better than shipping a matcher that quietly costs a finance source.
+- Wrote the two deliberate keeps into the source as NOTE comments next to the lists. Batch 3 did this for `harapan rakyat` and it worked: nothing re-proposed it. `cnet` and `detikinet` now have the same protection, so next Sunday's review will not re-litigate a decision that is already made.
+- Verified against the 188 real outlet names from the week and asserted the keeps explicitly, rather than only checking that the intended blocks landed. Confirming what survives is the half that catches collisions.
+
+**Wrong:**
+- Built a throwaway verification script before noticing that `scripts/check-news-blocklist.mjs` already existed, committed in v3.39.1 for precisely this purpose. Found it only while grepping the backlog during the docs step, near the end. The previous retrospective's "next" item had worked, and I did not read it before starting. The weekly review skill describes the match rule in prose but never points at the script, so following the skill leads straight past the tool.
+- The collision surfaced during implementation because the proposal was written by reasoning about the match rule rather than running it. The checker accepts candidate names as arguments; the proposal step should have piped all 75 through it first.
+- The list grew by another 22 single-appearance outlets. The long-tail item has been open since 2026-06-20 and has now survived four batches, each one making it more expensive to keep deferring.
+
+**Next:**
+- Add a line to the weekly review skill telling it to run `scripts/check-news-blocklist.mjs` over the candidate list before writing the proposal, and to report any collision in the proposal itself. That moves `andscape`-class findings from implementation into the report where Filman sees them.
+- Long-tail heuristic, still the highest-value fix: a structural rule that drops single-appearance outlets with no corroboration, instead of hand-listing regionals forever.
+- Exact-match tier for bare aggregator labels, so `yahoo` becomes expressible.
+
+---
+
 ## 2026-07-25, v3.39.1, News blocklist word-boundary matcher, and a worktree cleanup
 
 Closed the two-thirds of the 2026-06-20 blocklist backlog item that was blocking three outlets, and cleared nine stale worktrees. Also surfaced two repo-hygiene problems that had nothing to do with either task.
