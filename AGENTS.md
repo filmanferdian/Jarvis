@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## Commands
 - `npm run dev` — start dev server (localhost:3000)
@@ -9,7 +9,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - No test framework configured; verify changes with `npm run build`
 
 ## Architecture
-- Next.js 16 + TypeScript + Supabase + Codex API
+- Next.js 16 + TypeScript + Supabase + Claude API
 - Single-user personal assistant ("Jarvis"), deployed on Railway
 - All times use WIB timezone (UTC+7), hardcoded offset `7 * 60 * 60 * 1000`
 - Auth: httpOnly cookie (browser) + `x-cron-secret` header (external callers)
@@ -50,8 +50,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 9. **Garmin uses username/password, not OAuth** — Garmin Connect has no public OAuth. `GARMIN_EMAIL` / `GARMIN_PASSWORD` are top-tier secrets: never log them, never echo from Railway build logs, never print error details that might include the request payload.
 
 ## Security posture
-- **Prompt injection defense**: all externally-sourced text (emails, calendar events, tasks, transcripts, newsletters) must go through `sanitizeInline`/`sanitizeMultiline` from `src/lib/promptEscape.ts` and be wrapped with `wrapUntrusted(tag, content)` before embedding in Codex prompts. Include the `UNTRUSTED_PREAMBLE` near the top of the system prompt.
-- **XSS defense**: Codex-generated markdown is HTML-escaped before any regex substitutions in `src/lib/renderMarkdown.ts`. Do NOT add regex substitutions that produce HTML tags from user-controlled capture groups without re-escaping.
+- **Prompt injection defense**: all externally-sourced text (emails, calendar events, tasks, transcripts, newsletters) must go through `sanitizeInline`/`sanitizeMultiline` from `src/lib/promptEscape.ts` and be wrapped with `wrapUntrusted(tag, content)` before embedding in Claude prompts. Include the `UNTRUSTED_PREAMBLE` near the top of the system prompt.
+- **XSS defense**: Claude-generated markdown is HTML-escaped before any regex substitutions in `src/lib/renderMarkdown.ts`. Do NOT add regex substitutions that produce HTML tags from user-controlled capture groups without re-escaping.
 - **OAuth state**: `/api/auth/google` and `/api/auth/microsoft` generate signed state tokens via `src/lib/oauthState.ts`; callbacks reject mismatched state. Always use `buildAuthUrl(state)` (never the no-arg form) when adding new OAuth integrations.
 - **API error responses**: route every non-trivial catch through `safeError()` from `src/lib/errors.ts`. Never return `err.message` / `String(err)` / Supabase `error.message` to the client — log server-side, return a generic message.
 - **Session cookie**: any write to the `jarvis_session` cookie (login, logout, future refresh) MUST spread `SESSION_COOKIE_OPTS` from `src/lib/auth.ts` so `httpOnly`, `sameSite`, `secure`, and `path` cannot drift apart (mismatched attributes prevent the browser from clearing the cookie).
@@ -100,71 +100,13 @@ Key patterns:
 - **Closings**: "Best regards, Filman Ferdian / Co-founder & CEO of Infinid / +62 811 1011 580"
 - **Actionability**: Direct commands internally, polite requests externally. Clear next steps always.
 
-## Behavioral Guidelines
+## Working Norms
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-### 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-### 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-### 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-### 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+- **Scope:** every changed line should trace to the request. Don't refactor, reformat, or "improve" adjacent code on the way past.
+- **Unrelated problems:** flag them, don't fix them. Dead code, a stale doc, a security leak in a file you happened to open: say so and leave it. Ship it separately if it matters.
+- **Orphans:** remove imports, variables, and functions that YOUR change made unused. Leave pre-existing dead code alone.
+- **Verification:** there is no test framework here, so `npm run build` is the check. It validates TypeScript too. Run it before claiming a change works.
+- **Ambiguity:** decide and state the assumption. Ask only when two readings would produce materially different work.
 
 ## Project Identifiers
 - Notion workspace: Pijar
